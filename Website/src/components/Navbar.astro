@@ -1,0 +1,58 @@
+---
+const navItems = [
+	{ label: "Home", href: "/" },
+	{ label: "Services", href: "/services" },
+	{ label: "Pricing", href: "/pricing" },
+	{ label: "Contact", href: "/contact" },
+];
+---
+
+<header class="navbar">
+	<a href="/" class="navbar__brand">
+		<img src="/favicon.svg" alt="Sky House Cleaning" class="navbar__logo" />
+		<span>Sky House Cleaning</span>
+	</a>
+	<nav class="navbar__nav" aria-label="Main navigation">
+		<ul>
+			{navItems.map((item) => (
+				<li><a href={item.href}>{item.label}</a></li>
+			))}
+		</ul>
+	</nav>
+</header>
+
+<style>
+	.navbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1rem 2rem;
+	}
+	.navbar__brand {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		text-decoration: none;
+		color: #1c2b45;
+		font-weight: 600;
+		font-size: 1.1rem;
+	}
+	.navbar__logo {
+		height: 32px;
+		width: auto;
+	}
+	.navbar__nav ul {
+		display: flex;
+		gap: 1.5rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.navbar__nav a {
+		text-decoration: none;
+		color: #1c2b45;
+	}
+	.navbar__nav a:hover {
+		text-decoration: underline;
+	}
+</style>

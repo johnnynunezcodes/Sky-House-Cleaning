@@ -1,0 +1,237 @@
+{
+  "main": {
+    "id": "3ac8b84c645e1171",
+    "type": "split",
+    "children": [
+      {
+        "id": "629d6069f20f5e2a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ac397c36cb2f1b26",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "CLAUDE.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CLAUDE"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "b9b30c7412c3b68b",
+    "type": "split",
+    "children": [
+      {
+        "id": "85bf127fd435fdcb",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "841a8f9f869b120f",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "d06be37196fa674b",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "50ef68bfb772b6c4",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "790f7059cc5b0a30",
+    "type": "split",
+    "children": [
+      {
+        "id": "dd04cd368c97ed5a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "911b61230bf14993",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "dce1816811ffcb3c",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "be22ab3bc0823dc3",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "c30e19ee12e25ed0",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "e9b26c8147608f5b",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Welcome.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "ac397c36cb2f1b26",
+  "lastOpenFiles": [
+    "Website/public/favicon.svg",
+    "Website/src/components/Navbar.astro",
+    "Website/src/components/Footer.astro",
+    "Website/src/components",
+    "Website/src/layouts/Layout.astro",
+    "Website/src/layouts",
+    "Website/README.md",
+    "Website/AGENTS.md",
+    "CLAUDE.md",
+    "Services/Overview.md",
+    "Images/Overview.md",
+    "Website/tsconfig.json",
+    "Website/src/pages/index.astro",
+    "Website/src/pages",
+    "Website/src",
+    "Website/public/favicon.ico",
+    "Website/node_modules/csso/node_modules/mdn-data/css/readme.md",
+    "Website/node_modules/get-tsconfig/skills/get-tsconfig/SKILL.md",
+    "Website/node_modules/dom-serializer/node_modules/entities/readme.md",
+    "Website/node_modules/csso/node_modules/mdn-data/README.md",
+    "Website/node_modules/csso/node_modules/mdn-data/CHANGELOG.md",
+    "Website/node_modules/csso/node_modules/css-tree/README.md",
+    "Website/node_modules/anymatch/node_modules/picomatch/README.md",
+    "Website/node_modules/@ungap/structured-clone/README.md",
+    "Website/node_modules/@types/unist/README.md",
+    "Website/node_modules/@types/nlcst/README.md",
+    "Website/node_modules/@types/mdast/README.md",
+    "Website/node_modules/@types/hast/README.md",
+    "Website/node_modules/@types/estree-jsx/README.md",
+    "Website/node_modules/@types/estree/README.md",
+    "Website/node_modules/@shikijs/vscode-textmate/README.md",
+    "Website/node_modules/@shikijs/vscode-textmate/LICENSE.md",
+    "Website/node_modules/@shikijs/types/README.md",
+    "Website/node_modules/@shikijs/themes/README.md",
+    "Website/node_modules/@shikijs/langs/README.md",
+    "Website/node_modules/@shikijs/engine-oniguruma/README.md",
+    "Website/\"./Sky House Cleaning/public/favicon.svg",
+    "Website/\"./Sky House Cleaning\"/public/favicon.svg",
+    "Images/Logos/Logo Icon.svg",
+    "Images/Logos/Logo Icon.png",
+    "Images/Logos/Logo w:white background.png",
+    "Images/Logos/Logo icon white background.png",
+    "Images/Logos/Full logo transparent.png",
+    "Branding/Logo/sky-house-wordmark.svg",
+    "Branding/Logo/sky-house-logo-stacked.svg"
+  ]
+}
