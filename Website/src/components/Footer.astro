@@ -1,18 +1,162 @@
 ---
 const year = new Date().getFullYear();
+
+const quickLinks = [
+	{ label: "About", href: "/about" },
+	{ label: "Services", href: "/services" },
+	{ label: "Pricing", href: "/pricing" },
+	{ label: "Reviews", href: "/reviews" },
+	{ label: "Contact", href: "/contact" },
+];
+
+const serviceLinks = [
+	{ label: "One-Time Cleaning", href: "/services/one-time-cleaning" },
+	{ label: "Recurring Cleaning", href: "/services/recurring-cleaning" },
+	{ label: "Deep Cleaning", href: "/services/deep-cleaning" },
+	{ label: "Move-In / Move-Out", href: "/services/move-in-move-out-cleaning" },
+	{ label: "Car Detailing", href: "/services/car-detailing" },
+	{ label: "Garage Organization", href: "/services/garage-organization" },
+];
 ---
 
 <footer class="footer">
-	<div class="footer__inner">
-		<p>&copy; {year} Sky House Cleaning. Serving the San Francisco Bay Area.</p>
+	<div class="container footer__inner">
+		<div class="footer__brand">
+			<a href="/" class="footer__logo-link">
+				<img src="/images/logo-icon.svg" alt="Sky House Cleaning" class="footer__logo" />
+				<span>Sky House Cleaning</span>
+			</a>
+			<p>
+				Dependable, detail-oriented cleaning for homes across the San Francisco Bay Area. We
+				treat your home like it's our own.
+			</p>
+		</div>
+
+		<div class="footer__col">
+			<h3>Quick Links</h3>
+			<ul>
+				{quickLinks.map((link) => (
+					<li><a href={link.href}>{link.label}</a></li>
+				))}
+			</ul>
+		</div>
+
+		<div class="footer__col">
+			<h3>Services</h3>
+			<ul>
+				{serviceLinks.map((link) => (
+					<li><a href={link.href}>{link.label}</a></li>
+				))}
+			</ul>
+		</div>
+
+		<div class="footer__col">
+			<h3>Reach Us</h3>
+			<ul class="footer__contact">
+				<li><a href="tel:+18017592044">(801) 759-2044</a></li>
+				<li><a href="mailto:info@skyhousecleaning.com">info@skyhousecleaning.com</a></li>
+				<li>Serving Oakland &amp; the greater Bay Area</li>
+			</ul>
+			<!-- TODO: once online booking is set up, add a "Book Now" link here pointing to the booking tool -->
+		</div>
+	</div>
+
+	<div class="footer__bottom container">
+		<p>&copy; {year} Sky House Cleaning. All rights reserved.</p>
 	</div>
 </footer>
 
 <style>
 	.footer {
-		padding: 2rem;
+		background: var(--color-ink);
+		color: #cfd7e4;
+		margin-top: 4rem;
+	}
+
+	.footer__inner {
+		display: grid;
+		grid-template-columns: 1.4fr 1fr 1fr 1fr;
+		gap: 2.5rem;
+		padding: 3.5rem 1.5rem 2.5rem;
+	}
+
+	.footer__brand p {
+		color: #aab4c6;
+		font-size: 0.9rem;
+		margin-top: 0.75rem;
+	}
+
+	.footer__logo-link {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		text-decoration: none;
+		color: #fff;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 1.05rem;
+	}
+
+	.footer__logo {
+		height: 30px;
+		width: auto;
+		filter: brightness(0) invert(1);
+	}
+
+	.footer h3 {
+		color: #fff;
+		font-size: 0.85rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		margin-bottom: 1rem;
+	}
+
+	.footer__col ul {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+
+	.footer__col a {
+		color: #cfd7e4;
+		text-decoration: none;
+		font-size: 0.9rem;
+	}
+
+	.footer__col a:hover {
+		color: #fff;
+		text-decoration: underline;
+	}
+
+	.footer__contact li {
+		color: #cfd7e4;
+		font-size: 0.9rem;
+	}
+
+	.footer__bottom {
+		border-top: 1px solid rgba(255, 255, 255, 0.12);
+		padding: 1.25rem 1.5rem;
 		text-align: center;
-		color: #6b7280;
-		font-size: 0.875rem;
+	}
+
+	.footer__bottom p {
+		margin: 0;
+		color: #8b96a9;
+		font-size: 0.8rem;
+	}
+
+	@media (max-width: 860px) {
+		.footer__inner {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	@media (max-width: 560px) {
+		.footer__inner {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

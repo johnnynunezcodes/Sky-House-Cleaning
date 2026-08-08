@@ -1,0 +1,215 @@
+/* Sky House Cleaning — global styles */
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap");
+
+:root {
+	/* Colors */
+	--color-ink: #1c2b45; /* deep navy-charcoal, from logo */
+	--color-slate: #58595b; /* logo gray */
+	--color-slate-light: #7c8695;
+	--color-sky: #3e7cb1; /* primary accent blue */
+	--color-sky-dark: #2f5f8a;
+	--color-sky-light: #eaf3fa; /* tinted section backgrounds */
+	--color-cream: #faf9f6; /* page background */
+	--color-white: #ffffff;
+	--color-border: #e4e1da;
+
+	/* Type */
+	--font-heading: "Poppins", "Segoe UI", system-ui, sans-serif;
+	--font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+
+	/* Layout */
+	--max-width: 1120px;
+	--radius: 14px;
+	--shadow-soft: 0 4px 20px rgba(28, 43, 69, 0.08);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-body);
+	color: var(--color-ink);
+	background: var(--color-cream);
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	font-family: var(--font-heading);
+	color: var(--color-ink);
+	line-height: 1.2;
+	margin: 0 0 0.6em;
+}
+
+h1 {
+	font-size: clamp(2rem, 4vw, 3rem);
+}
+
+h2 {
+	font-size: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+h3 {
+	font-size: 1.25rem;
+}
+
+p {
+	margin: 0 0 1em;
+	color: var(--color-slate);
+}
+
+a {
+	color: var(--color-sky-dark);
+}
+
+img {
+	max-width: 100%;
+	display: block;
+}
+
+ul {
+	padding-left: 1.2em;
+	color: var(--color-slate);
+}
+
+.container {
+	max-width: var(--max-width);
+	margin: 0 auto;
+	padding: 0 1.5rem;
+}
+
+.section {
+	padding: 4rem 0;
+}
+
+.section--tint {
+	background: var(--color-sky-light);
+}
+
+.eyebrow {
+	display: inline-block;
+	font-family: var(--font-heading);
+	font-weight: 600;
+	font-size: 0.8rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--color-sky-dark);
+	margin-bottom: 0.75rem;
+}
+
+.section-heading {
+	text-align: center;
+	max-width: 640px;
+	margin: 0 auto 3rem;
+}
+
+.section-heading p {
+	margin-bottom: 0;
+}
+
+/* Buttons */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	font-family: var(--font-heading);
+	font-weight: 600;
+	font-size: 0.95rem;
+	text-decoration: none;
+	padding: 0.85rem 1.6rem;
+	border-radius: 999px;
+	border: 2px solid transparent;
+	cursor: pointer;
+	transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.btn:hover {
+	transform: translateY(-1px);
+}
+
+.btn--primary {
+	background: var(--color-sky);
+	color: var(--color-white);
+}
+
+.btn--primary:hover {
+	background: var(--color-sky-dark);
+	color: var(--color-white);
+}
+
+.btn--outline {
+	background: transparent;
+	border-color: var(--color-sky);
+	color: var(--color-sky-dark);
+}
+
+.btn--outline:hover {
+	background: var(--color-sky-light);
+}
+
+.btn--ghost {
+	background: var(--color-white);
+	color: var(--color-ink);
+	border-color: var(--color-border);
+}
+
+.btn--ghost:hover {
+	border-color: var(--color-sky);
+	color: var(--color-sky-dark);
+}
+
+/* Cards */
+.card {
+	background: var(--color-white);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-soft);
+	padding: 2rem;
+}
+
+/* Grid helpers */
+.grid {
+	display: grid;
+	gap: 1.75rem;
+}
+
+.grid--2 {
+	grid-template-columns: repeat(2, 1fr);
+}
+
+.grid--3 {
+	grid-template-columns: repeat(3, 1fr);
+}
+
+.grid--4 {
+	grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 900px) {
+	.grid--3,
+	.grid--4 {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (max-width: 640px) {
+	.grid--2,
+	.grid--3,
+	.grid--4 {
+		grid-template-columns: 1fr;
+	}
+
+	.section {
+		padding: 2.75rem 0;
+	}
+}

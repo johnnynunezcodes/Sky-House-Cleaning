@@ -1,8 +1,120 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import ServiceCard from "../components/ServiceCard.astro";
+import TestimonialCard from "../components/TestimonialCard.astro";
+import CtaBand from "../components/CtaBand.astro";
+import { cleaningServices, otherServices, testimonials } from "../data/content.js";
 ---
 
-<Layout title="Sky House Cleaning">
-	<h1>Sky House Cleaning</h1>
-	<p>Premium home cleaning for the San Francisco Bay Area.</p>
+<Layout
+	title="Sky House Cleaning | Bay Area Home Cleaning"
+	description="Trusted, detail-oriented home cleaning for the San Francisco Bay Area. One-time, weekly, bi-weekly, and monthly cleaning memberships, plus car detailing and garage organization."
+>
+	<section class="hero">
+		<div class="container hero__inner">
+			<p class="eyebrow">Serving Oakland &amp; the Bay Area</p>
+			<h1>A cleaner home, cared for like it's our own</h1>
+			<p class="hero__lede">
+				One-time visits, recurring memberships, move-in/move-out cleans, car detailing, and garage
+				organization — reliable, detail-oriented service so you can spend less time on chores and
+				more time on what matters.
+			</p>
+			<div class="hero__actions">
+				<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+				<a href="/services" class="btn btn--outline">See Our Services</a>
+			</div>
+		</div>
+	</section>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">Cleaning Tailored to Your Needs</p>
+				<h2>Whatever your home needs, we'll build a plan around it</h2>
+				<p>
+					Whether you want a recurring membership, a one-time deep clean, or help getting your
+					garage back in order, we'll put together a plan that fits your schedule and your space.
+					Our goal is simple: consistent, thorough cleaning you can count on, every visit.
+				</p>
+			</div>
+
+			<div class="grid grid--4">
+				{cleaningServices.map((service) => (
+					<ServiceCard
+						title={service.title}
+						blurb={service.blurb}
+						href={`/services/${service.slug}`}
+						startingAt={service.startingAt}
+					/>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section section--tint">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">More Ways We Help</p>
+				<h2>Beyond the home</h2>
+			</div>
+			<div class="grid grid--2">
+				{otherServices.map((service) => (
+					<ServiceCard
+						title={service.title}
+						blurb={service.blurb}
+						href={`/services/${service.slug}`}
+						startingAt={service.startingAt}
+					/>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">Client Experiences</p>
+				<h2>Your satisfaction is our top priority</h2>
+			</div>
+			<div class="grid grid--3">
+				{testimonials.map((t) => (
+					<TestimonialCard quote={t.quote} name={t.name} />
+				))}
+			</div>
+		</div>
+	</section>
+
+	<CtaBand />
 </Layout>
+
+<style>
+	.hero {
+		padding: 5rem 0 4rem;
+		background: linear-gradient(180deg, var(--color-sky-light) 0%, var(--color-cream) 100%);
+	}
+
+	.hero__inner {
+		max-width: 760px;
+		text-align: center;
+		margin: 0 auto;
+	}
+
+	.hero__lede {
+		font-size: 1.1rem;
+		max-width: 620px;
+		margin: 0 auto 2rem;
+	}
+
+	.hero__actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+
+	@media (max-width: 640px) {
+		.hero {
+			padding: 3.5rem 0 2.5rem;
+		}
+	}
+</style>

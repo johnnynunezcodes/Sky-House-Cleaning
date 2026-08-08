@@ -1,0 +1,52 @@
+---
+interface Props {
+	heading?: string;
+	subtext?: string;
+}
+
+const {
+	heading = "Ready for a cleaner, calmer home?",
+	subtext = "Give us a call or send us an email and we'll help you find the right plan for your home.",
+} = Astro.props;
+---
+
+<section class="section cta-band">
+	<div class="container cta-band__inner">
+		<h2>{heading}</h2>
+		<p>{subtext}</p>
+		<div class="cta-band__actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="mailto:info@skyhousecleaning.com" class="btn btn--ghost">Email Us</a>
+		</div>
+	</div>
+</section>
+
+<style>
+	.cta-band {
+		background: var(--color-ink);
+		border-radius: var(--radius);
+		margin: 0 1.5rem 4rem;
+	}
+
+	.cta-band__inner {
+		text-align: center;
+		max-width: 560px;
+		margin: 0 auto;
+	}
+
+	.cta-band h2 {
+		color: #fff;
+	}
+
+	.cta-band p {
+		color: #cfd7e4;
+		margin-bottom: 2rem;
+	}
+
+	.cta-band__actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+	}
+</style>

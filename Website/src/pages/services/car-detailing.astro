@@ -1,0 +1,98 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "Interior Detailing",
+		items: [
+			"Full vacuum of seats, carpets, and trunk",
+			"Wiping down the dash, console, and door panels",
+			"Cleaning interior glass and mirrors",
+			"Conditioning and cleaning seats and upholstery",
+			"Cleaning cup holders, vents, and other tight spots",
+		],
+	},
+];
+---
+
+<Layout
+	title="Interior Car Detailing | Sky House Cleaning"
+	description="One-time and monthly membership interior car detailing from Sky House Cleaning. One-time interior detail starting at $275."
+>
+	<PageHero
+		eyebrow="Vehicle Care · One-Time from $275"
+		title="Interior Car Detailing"
+		lede="Professional detailing, exceptional results. We bring your vehicle's interior back to life — whether it's a one-time refresh or a monthly membership to keep it that way."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/contact" class="btn btn--outline">Get a Quote</a>
+		</div>
+	</PageHero>
+
+	<section class="section">
+		<div class="container">
+			<div class="grid grid--2 plan-grid">
+				<div class="plan-card">
+					<h3>One-Time Interior Detail</h3>
+					<p class="plan-card__price">From $275</p>
+					<p>A single, thorough detailing to bring your vehicle's interior back to life.</p>
+				</div>
+				<div class="plan-card">
+					<h3>Monthly Detailing Membership</h3>
+					<p class="plan-card__price">Custom quote</p>
+					<p>
+						Routine detailing on a monthly schedule, so your vehicle's interior stays consistently
+						clean.
+					</p>
+				</div>
+			</div>
+
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+		</div>
+	</section>
+
+	<CtaBand />
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.plan-grid {
+		margin-bottom: 1.75rem;
+	}
+
+	.plan-card {
+		background: var(--color-sky-light);
+		border-radius: var(--radius);
+		padding: 1.75rem;
+	}
+
+	.plan-card h3 {
+		margin-bottom: 0.4rem;
+	}
+
+	.plan-card__price {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		color: var(--color-sky-dark);
+		margin-bottom: 0.6rem;
+	}
+
+	.plan-card p:last-child {
+		margin-bottom: 0;
+	}
+</style>

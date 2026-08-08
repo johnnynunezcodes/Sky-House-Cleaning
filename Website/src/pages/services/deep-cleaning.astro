@@ -1,0 +1,98 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "Kitchen",
+		items: [
+			"Wiping down and spot-cleaning cabinet faces",
+			"Cleaning the stovetop, burners, and drip pans",
+			"Freshening the inside of the microwave",
+			"Cleaning the exterior of appliances",
+			"Polishing the sink and wiping counters and backsplash",
+			"Cleaning the interior of cabinets and drawers",
+			"Cleaning the interior of appliances (oven, refrigerator)",
+		],
+	},
+	{
+		title: "Bathrooms",
+		items: [
+			"Thorough scrubbing of sinks, toilets, tubs, and showers",
+			"Polished faucets and sparkling mirrors",
+			"Wiped counters and cabinet fronts",
+			"Cleaning the interior of cabinets and drawers",
+		],
+	},
+	{
+		title: "Living Areas & Bedrooms",
+		items: [
+			"Tidying pillows, blankets, and common areas",
+			"Making beds (if fresh linens are left out)",
+			"Dusting shelves and blinds",
+			"Wiping window sills",
+		],
+	},
+	{
+		title: "Throughout the Home",
+		items: [
+			"Vacuuming carpets and sweeping/mopping hard surfaces",
+			"Dusting interior shelves and closets",
+			"Wiping down handrails",
+			"Wiping down walls and baseboards",
+			"Cleaning interior windows",
+		],
+	},
+];
+---
+
+<Layout
+	title="Deep Cleaning | Sky House Cleaning"
+	description="A deeper clean for homes that need extra attention — first-time cleanings, neglected areas, or a seasonal reset. Starting at $225."
+>
+	<PageHero
+		eyebrow="Residential Cleaning · From $225"
+		title="Deep Cleaning"
+		lede="Deep Cleaning goes further than our Standard Cleaning, for homes that need a little extra attention — first-time cleanings, neglected areas, or a seasonal reset. You'll get everything in our Standard Cleaning, plus deeper detailing throughout the home."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/pricing" class="btn btn--outline">See Pricing</a>
+		</div>
+	</PageHero>
+
+	<section class="section">
+		<div class="container">
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+			<p class="note">
+				We recommend this one before starting a
+				<a href="/services/recurring-cleaning">Recurring Cleaning</a> membership, or any time your
+				home needs more than a standard refresh.
+			</p>
+		</div>
+	</section>
+
+	<CtaBand />
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+</style>

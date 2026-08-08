@@ -1,0 +1,79 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "Organization",
+		items: [
+			"Sorting and decluttering items with your input (keep, donate, discard)",
+			"Grouping items into zones that make sense for you (tools, sports gear, seasonal items, and more)",
+			"Setting up or improving shelving, bins, and storage systems",
+			"Labeling bins and storage areas so it's easy to keep up",
+		],
+	},
+	{
+		title: "Cleaning",
+		items: [
+			"Sweeping and mopping the garage floor",
+			"Wiping down shelves, workbenches, and storage units",
+			"Clearing cobwebs and dusting corners, rafters, and light fixtures",
+			"Wiping down the interior of cabinets and storage bins",
+		],
+	},
+];
+---
+
+<Layout
+	title="Garage Cleaning & Organization | Sky House Cleaning"
+	description="Professional garage cleaning and organization for the San Francisco Bay Area. Custom quotes based on your garage and goals."
+>
+	<PageHero
+		eyebrow="Organization · Custom Quote"
+		title="Garage Cleaning & Organization"
+		lede="We turn a cluttered, hard-to-use garage into a space you actually want to walk into. We roll up our sleeves and organize alongside a full clean, so it stays functional long after we leave."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/contact" class="btn btn--outline">Get a Quote</a>
+		</div>
+	</PageHero>
+
+	<section class="section">
+		<div class="container">
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+			<p class="note">
+				This one's a great fit for a garage that's become a catch-all for clutter, ahead of a
+				move, or as part of a seasonal reset. Need bins or shelving? We can bring those along for
+				an added cost.
+			</p>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Ready to get your garage back?"
+		subtext="Every garage is different, so pricing is custom. Call or email us and we'll put together a quote."
+	/>
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+</style>

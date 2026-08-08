@@ -1,0 +1,94 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "Kitchen",
+		items: [
+			"Wiping down and spot-cleaning cabinet faces",
+			"Cleaning the stovetop, burners, and drip pans",
+			"Freshening the inside of the microwave",
+			"Cleaning the exterior of appliances",
+			"Polishing the sink and wiping counters and backsplash",
+		],
+	},
+	{
+		title: "Bathrooms",
+		items: [
+			"Thorough scrubbing of sinks, toilets, tubs, and showers",
+			"Polished faucets and sparkling mirrors",
+			"Wiped counters and cabinet fronts",
+		],
+	},
+	{
+		title: "Living Areas & Bedrooms",
+		items: [
+			"Tidying pillows, blankets, and common areas",
+			"Making beds (if fresh linens are left out)",
+			"Dusting shelves and blinds",
+			"Wiping window sills",
+		],
+	},
+	{
+		title: "Throughout the Home",
+		items: [
+			"Vacuuming carpets and sweeping/mopping hard surfaces",
+			"Dusting interior shelves and closets",
+			"Wiping down handrails",
+		],
+	},
+];
+---
+
+<Layout
+	title="One-Time Cleaning | Sky House Cleaning"
+	description="A one-time standard cleaning to give your home a real reset. Flat-rate pricing based on your home's square footage, starting at $150."
+>
+	<PageHero
+		eyebrow="Residential Cleaning · From $150"
+		title="One-Time Cleaning"
+		lede="A one-time visit to give your home a real reset. Whether you're expecting guests, catching up after a busy stretch, or just want a professional touch, you'll come home to a space that feels clean, cared for, and like itself again."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/pricing" class="btn btn--outline">See Pricing</a>
+		</div>
+	</PageHero>
+
+	<section class="section">
+		<div class="container">
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+			<p class="note">
+				This service is a great fit for homes that get cleaned regularly. If it's been a while, or
+				you're dealing with heavier buildup, our <a href="/services/deep-cleaning">Deep Cleaning</a>
+				is the better place to start. Want extras like interior windows, an oven clean, or cabinet
+				interiors? Just let us know at booking and we'll add them on.
+			</p>
+		</div>
+	</section>
+
+	<CtaBand />
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+</style>

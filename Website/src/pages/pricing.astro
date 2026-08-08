@@ -1,0 +1,144 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PageHero from "../components/PageHero.astro";
+import CtaBand from "../components/CtaBand.astro";
+import { pricingMatrix } from "../data/content.js";
+---
+
+<Layout
+	title="Pricing | Sky House Cleaning"
+	description="Transparent, flat-rate pricing for home cleaning based on square footage, plus car detailing and garage organization pricing."
+>
+	<PageHero
+		eyebrow="Pricing"
+		title="Straightforward pricing, based on your home"
+		lede="Our home cleaning rates are flat-rate and based on square footage — no surprises. Find your home's size below to see pricing across every service."
+	/>
+
+	<section class="section">
+		<div class="container">
+			<div class="table-wrap">
+				<table class="pricing-table">
+					<thead>
+						<tr>
+							<th>Sq Ft</th>
+							<th>One-Time</th>
+							<th>Weekly</th>
+							<th>Bi-Weekly</th>
+							<th>Monthly</th>
+							<th>Deep Clean</th>
+							<th>Move-In/Out</th>
+						</tr>
+					</thead>
+					<tbody>
+						{pricingMatrix.map((row) => (
+							<tr>
+								<td class="pricing-table__sqft">{row.sqft}</td>
+								<td>${row.oneTime}</td>
+								<td>${row.weekly}</td>
+								<td>${row.biweekly}</td>
+								<td>${row.monthly}</td>
+								<td>${row.deep}</td>
+								<td>${row.moveInOut}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<p class="table-note">
+				Weekly is 30% off One-Time, Bi-Weekly is 20% off, and Monthly is 15% off. Deep Cleaning is
+				1.5&times; One-Time, and Move-In/Move-Out is 1.75&times; One-Time. Rates are rounded to the
+				nearest dollar. Have a home larger than 5,999 sq ft? <a href="/contact">Contact us</a> for a
+				custom quote.
+			</p>
+		</div>
+	</section>
+
+	<section class="section section--tint">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">Other Services</p>
+				<h2>Car detailing &amp; garage organization</h2>
+			</div>
+			<div class="grid grid--2">
+				<div class="card">
+					<h3>Interior Car Detailing</h3>
+					<p>One-time interior detail starting at $275. Monthly membership pricing available.</p>
+					<a href="/services/car-detailing" class="btn btn--outline">Learn More</a>
+				</div>
+				<div class="card">
+					<h3>Garage Cleaning &amp; Organization</h3>
+					<p>
+						Every garage is different, so pricing is custom based on size and scope. Bins and
+						shelving available for an added cost.
+					</p>
+					<a href="/services/garage-organization" class="btn btn--outline">Learn More</a>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Ready to get a cleaning on the calendar?"
+		subtext="Call or email us with your home's square footage and we'll help you find the right plan."
+	/>
+</Layout>
+
+<style>
+	.table-wrap {
+		overflow-x: auto;
+		background: var(--color-white);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+	}
+
+	.pricing-table {
+		width: 100%;
+		border-collapse: collapse;
+		min-width: 640px;
+	}
+
+	.pricing-table th,
+	.pricing-table td {
+		padding: 0.9rem 1.1rem;
+		text-align: left;
+		font-size: 0.92rem;
+		border-bottom: 1px solid var(--color-border);
+		white-space: nowrap;
+	}
+
+	.pricing-table th {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		color: var(--color-ink);
+		background: var(--color-sky-light);
+	}
+
+	.pricing-table td {
+		color: var(--color-slate);
+	}
+
+	.pricing-table__sqft {
+		font-weight: 600;
+		color: var(--color-ink);
+	}
+
+	.pricing-table tbody tr:last-child td {
+		border-bottom: none;
+	}
+
+	.table-note {
+		max-width: 760px;
+		margin: 1.5rem auto 0;
+		text-align: center;
+		font-size: 0.9rem;
+	}
+
+	.card {
+		text-align: left;
+	}
+
+	.card .btn {
+		margin-top: 0.5rem;
+	}
+</style>

@@ -1,12 +1,17 @@
 ---
 import Navbar from "../components/Navbar.astro";
 import Footer from "../components/Footer.astro";
+import "../styles/global.css";
 
 interface Props {
 	title?: string;
+	description?: string;
 }
 
-const { title = "Sky House Cleaning" } = Astro.props;
+const {
+	title = "Sky House Cleaning | Bay Area Home Cleaning",
+	description = "Trusted, detail-oriented home cleaning for the San Francisco Bay Area. One-time, weekly, bi-weekly, and monthly cleaning memberships, plus car detailing and garage organization.",
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -15,8 +20,12 @@ const { title = "Sky House Cleaning" } = Astro.props;
 		<meta charset="utf-8" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="description" content={description} />
 		<meta name="generator" content={Astro.generator} />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:type" content="website" />
 		<title>{title}</title>
 	</head>
 	<body>

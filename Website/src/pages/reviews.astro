@@ -1,0 +1,33 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PageHero from "../components/PageHero.astro";
+import TestimonialCard from "../components/TestimonialCard.astro";
+import CtaBand from "../components/CtaBand.astro";
+import { testimonials } from "../data/content.js";
+---
+
+<Layout
+	title="Reviews | Sky House Cleaning"
+	description="See what Bay Area clients say about Sky House Cleaning's home cleaning and car detailing services."
+>
+	<PageHero
+		eyebrow="Client Experiences"
+		title="Your satisfaction is our top priority"
+		lede="Here's what a few of our clients have said about working with us."
+	/>
+
+	<section class="section">
+		<div class="container">
+			<div class="grid grid--3">
+				{testimonials.map((t) => (
+					<TestimonialCard quote={t.quote} name={t.name} />
+				))}
+			</div>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Ready to see for yourself?"
+		subtext="Call or email us and let's get a cleaning on the calendar."
+	/>
+</Layout>

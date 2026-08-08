@@ -1,0 +1,60 @@
+---
+interface Props {
+	title: string;
+	blurb: string;
+	href: string;
+	startingAt?: string;
+}
+
+const { title, blurb, href, startingAt } = Astro.props;
+---
+
+<a href={href} class="service-card">
+	<h3>{title}</h3>
+	<p>{blurb}</p>
+	{startingAt && <span class="service-card__price">{startingAt}</span>}
+	<span class="service-card__link">Learn more →</span>
+</a>
+
+<style>
+	.service-card {
+		display: flex;
+		flex-direction: column;
+		background: var(--color-white);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		padding: 2rem;
+		text-decoration: none;
+		color: inherit;
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+		height: 100%;
+	}
+
+	.service-card:hover {
+		transform: translateY(-3px);
+		box-shadow: 0 10px 28px rgba(28, 43, 69, 0.14);
+	}
+
+	.service-card h3 {
+		margin-bottom: 0.5rem;
+	}
+
+	.service-card p {
+		flex-grow: 1;
+	}
+
+	.service-card__price {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		color: var(--color-sky-dark);
+		font-size: 0.9rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.service-card__link {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.9rem;
+		color: var(--color-ink);
+	}
+</style>

@@ -1,0 +1,131 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "Kitchen",
+		items: [
+			"Wiping down and spot-cleaning cabinet faces",
+			"Cleaning the stovetop, burners, and drip pans",
+			"Freshening the inside of the microwave",
+			"Cleaning the exterior of appliances",
+			"Polishing the sink and wiping counters and backsplash",
+		],
+	},
+	{
+		title: "Bathrooms",
+		items: [
+			"Thorough scrubbing of sinks, toilets, tubs, and showers",
+			"Polished faucets and sparkling mirrors",
+			"Wiped counters and cabinet fronts",
+		],
+	},
+	{
+		title: "Living Areas & Bedrooms",
+		items: [
+			"Tidying pillows, blankets, and common areas",
+			"Making beds (if fresh linens are left out)",
+			"Dusting shelves and blinds",
+			"Wiping window sills",
+		],
+	},
+	{
+		title: "Throughout the Home",
+		items: [
+			"Vacuuming carpets and sweeping/mopping hard surfaces",
+			"Dusting interior shelves and closets",
+			"Wiping down handrails",
+		],
+	},
+];
+
+const frequencies = [
+	{ name: "Weekly", detail: "30% off One-Time pricing" },
+	{ name: "Bi-Weekly", detail: "20% off One-Time pricing" },
+	{ name: "Monthly", detail: "15% off One-Time pricing" },
+];
+---
+
+<Layout
+	title="Recurring Cleaning | Sky House Cleaning"
+	description="Weekly, bi-weekly, and monthly home cleaning memberships from Sky House Cleaning. The same thorough clean, on a schedule that works for you."
+>
+	<PageHero
+		eyebrow="Residential Cleaning · Memberships"
+		title="Recurring Cleaning"
+		lede="The same thorough Standard Cleaning, brought to your home on a schedule that works for you — weekly, bi-weekly, or monthly. Regular visits keep your home consistently fresh, catch buildup before it turns into a bigger job, and come at a lower rate than booking one-time."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/pricing" class="btn btn--outline">See Pricing</a>
+		</div>
+	</PageHero>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading">
+				<h2>Membership Frequencies</h2>
+			</div>
+			<div class="grid grid--3 freq-grid">
+				{frequencies.map((f) => (
+					<div class="freq-card">
+						<h3>{f.name}</h3>
+						<p>{f.detail}</p>
+					</div>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section section--tint">
+		<div class="container">
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+			<p class="note">
+				Since your home is on a regular schedule, each visit stays lighter than a one-time reset.
+				If things build up more than expected between visits, an occasional
+				<a href="/services/deep-cleaning">Deep Cleaning</a> add-on can help you catch back up.
+			</p>
+		</div>
+	</section>
+
+	<CtaBand />
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.freq-card {
+		background: var(--color-white);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		padding: 1.75rem;
+		text-align: center;
+	}
+
+	.freq-card h3 {
+		color: var(--color-sky-dark);
+	}
+
+	.freq-card p {
+		margin: 0;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+</style>

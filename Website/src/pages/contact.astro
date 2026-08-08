@@ -1,0 +1,81 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PageHero from "../components/PageHero.astro";
+---
+
+<Layout
+	title="Contact | Sky House Cleaning"
+	description="Get in touch with Sky House Cleaning. Call (801) 759-2044 or email info@skyhousecleaning.com to schedule a home cleaning, car detailing, or garage organization."
+>
+	<PageHero
+		eyebrow="Reach Us Anytime"
+		title="Let's get your cleaning on the calendar"
+		lede="Give us a call or send an email with your home's size and the service you're after, and we'll get back to you with a plan and pricing."
+	/>
+
+	<section class="section">
+		<div class="container">
+			<div class="grid grid--2 contact-grid">
+				<a href="tel:+18017592044" class="card contact-card">
+					<h3>Call Us</h3>
+					<p class="contact-card__value">(801) 759-2044</p>
+					<p>The fastest way to reach us and get on the schedule.</p>
+				</a>
+				<a href="mailto:info@skyhousecleaning.com" class="card contact-card">
+					<h3>Email Us</h3>
+					<p class="contact-card__value">info@skyhousecleaning.com</p>
+					<p>Send us the details and we'll follow up with a quote.</p>
+				</a>
+			</div>
+
+			<div class="card service-area">
+				<h3>Service Area</h3>
+				<p>We serve Oakland and the greater San Francisco Bay Area.</p>
+			</div>
+
+			<!-- TODO: swap this section for an online booking widget once a booking tool is set up -->
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.contact-grid {
+		margin-bottom: 1.75rem;
+	}
+
+	.contact-card {
+		text-decoration: none;
+		color: inherit;
+		text-align: center;
+		transition: transform 0.15s ease, box-shadow 0.15s ease;
+	}
+
+	.contact-card:hover {
+		transform: translateY(-3px);
+		box-shadow: 0 10px 28px rgba(28, 43, 69, 0.14);
+	}
+
+	.contact-card h3 {
+		color: var(--color-sky-dark);
+	}
+
+	.contact-card__value {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 1.2rem;
+		color: var(--color-ink);
+	}
+
+	.contact-card p:last-child {
+		margin-bottom: 0;
+		font-size: 0.9rem;
+	}
+
+	.service-area {
+		text-align: center;
+	}
+
+	.service-area p:last-child {
+		margin-bottom: 0;
+	}
+</style>

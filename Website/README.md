@@ -21,7 +21,9 @@ npm run preview   # previews the production build locally
 - `astro.config.mjs` — Astro config, currently default with no integrations added
 
 ## Current State
-Bare scaffold from `npm create astro`. Just a placeholder homepage (`src/pages/index.astro`) — no real content, styling, or integrations yet.
+Full site built out: Home, About, Services (overview + 6 detail pages), Pricing, Reviews, and Contact, with a shared design system (`src/styles/global.css`), Navbar/Footer, and reusable components (`ServiceCard`, `ChecklistCard`, `TestimonialCard`, `PageHero`, `CtaBand`). Content pulled from the reference files listed below. Service/pricing/testimonial data lives in `src/data/content.js`.
+
+There's no online booking tool wired up yet — "Call" and "Email" CTAs are used everywhere instead (see the `TODO` comments in `Footer.astro` and `contact.astro`). Once a booking tool is chosen, swap those in.
 
 ## Content & Branding
 When building out pages and copy, pull from the business reference files one level up:
@@ -31,4 +33,4 @@ When building out pages and copy, pull from the business reference files one lev
 - [Images Overview](../Images/Images.md) — logos and photos
 
 ## Notes
-(Add project-specific notes, decisions, and TODOs here as the site develops.)
+See [AGENTS.md](AGENTS.md) (aliased as `CLAUDE.md`) for agent-specific rules: no npm commands (build is handled by Vercel, dev server is already running locally) and no git commands (handled manually).

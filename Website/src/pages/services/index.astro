@@ -1,0 +1,117 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ServiceCard from "../../components/ServiceCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+import { cleaningServices, otherServices, addOns } from "../../data/content.js";
+---
+
+<Layout
+	title="Services | Sky House Cleaning"
+	description="Residential cleaning, car detailing, and garage organization services from Sky House Cleaning, serving the San Francisco Bay Area."
+>
+	<PageHero
+		eyebrow="What We Offer"
+		title="Services for every home, and every kind of clean"
+		lede="From a single reset clean to a recurring membership, plus car detailing and garage organization — here's everything we offer."
+	/>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading section-heading--left">
+				<p class="eyebrow">Residential Cleaning</p>
+				<h2>Home cleaning, on your terms</h2>
+			</div>
+			<div class="grid grid--4">
+				{cleaningServices.map((service) => (
+					<ServiceCard
+						title={service.title}
+						blurb={service.blurb}
+						href={`/services/${service.slug}`}
+						startingAt={service.startingAt}
+					/>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section section--tint">
+		<div class="container">
+			<div class="section-heading section-heading--left">
+				<p class="eyebrow">Organization &amp; Vehicle Care</p>
+				<h2>More ways we help</h2>
+			</div>
+			<div class="grid grid--2">
+				{otherServices.map((service) => (
+					<ServiceCard
+						title={service.title}
+						blurb={service.blurb}
+						href={`/services/${service.slug}`}
+						startingAt={service.startingAt}
+					/>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading section-heading--left">
+				<p class="eyebrow">Add-On Services</p>
+				<h2>Make any cleaning your own</h2>
+				<p>
+					Want a little extra attention in a specific spot? Add any of these on to your booking.
+				</p>
+			</div>
+			<ul class="addon-list">
+				{addOns.map((addon) => (
+					<li>{addon}</li>
+				))}
+			</ul>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Not sure which service is right for you?"
+		subtext="Call or email us and we'll help you pick the best fit for your home."
+	/>
+</Layout>
+
+<style>
+	.section-heading--left {
+		text-align: left;
+		max-width: 640px;
+		margin: 0 0 2.5rem;
+	}
+
+	.addon-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.9rem;
+	}
+
+	.addon-list li {
+		background: var(--color-white);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		padding: 1rem 1.4rem;
+		font-family: var(--font-heading);
+		font-weight: 500;
+		font-size: 0.95rem;
+	}
+
+	@media (max-width: 860px) {
+		.addon-list {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (max-width: 560px) {
+		.addon-list {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
