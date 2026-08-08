@@ -1,67 +1,47 @@
 ---
 const year = new Date().getFullYear();
 
-const quickLinks = [
+const navLinks = [
+	{ label: "Home", href: "/" },
 	{ label: "About", href: "/about" },
 	{ label: "Services", href: "/services" },
 	{ label: "Pricing", href: "/pricing" },
 	{ label: "Reviews", href: "/reviews" },
 	{ label: "Contact", href: "/contact" },
 ];
-
-const serviceLinks = [
-	{ label: "One-Time Cleaning", href: "/services/one-time-cleaning" },
-	{ label: "Recurring Cleaning", href: "/services/recurring-cleaning" },
-	{ label: "Deep Cleaning", href: "/services/deep-cleaning" },
-	{ label: "Move-In / Move-Out", href: "/services/move-in-move-out-cleaning" },
-	{ label: "Car Detailing", href: "/services/car-detailing" },
-	{ label: "Garage Organization", href: "/services/garage-organization" },
-];
 ---
 
 <footer class="footer">
 	<div class="container footer__inner">
-		<div class="footer__brand">
-			<a href="/" class="footer__logo-link">
-				<img src="/images/logo-icon.svg" alt="Sky House Cleaning" class="footer__logo" />
-				<span>Sky House Cleaning</span>
-			</a>
-			<p>
-				Dependable, detail-oriented cleaning for homes across the San Francisco Bay Area. We
-				treat your home like it's our own.
-			</p>
-		</div>
+		<a href="/" class="footer__brand">
+			<img
+				src="/images/logo-icon.svg"
+				alt="Sky House Cleaning"
+				class="footer__logo"
+				width="36"
+				height="36"
+			/>
+			<span>Sky House Cleaning</span>
+		</a>
 
-		<div class="footer__col">
-			<h3>Quick Links</h3>
+		<nav class="footer__nav" aria-label="Footer navigation">
 			<ul>
-				{quickLinks.map((link) => (
+				{navLinks.map((link) => (
 					<li><a href={link.href}>{link.label}</a></li>
 				))}
 			</ul>
+		</nav>
+
+		<div class="footer__contact">
+			<a href="tel:+18017592044">(801) 759-2044</a>
+			<a href="mailto:info@skyhousecleaning.com">info@skyhousecleaning.com</a>
 		</div>
 
-		<div class="footer__col">
-			<h3>Services</h3>
-			<ul>
-				{serviceLinks.map((link) => (
-					<li><a href={link.href}>{link.label}</a></li>
-				))}
-			</ul>
-		</div>
-
-		<div class="footer__col">
-			<h3>Reach Us</h3>
-			<ul class="footer__contact">
-				<li><a href="tel:+18017592044">(801) 759-2044</a></li>
-				<li><a href="mailto:info@skyhousecleaning.com">info@skyhousecleaning.com</a></li>
-				<li>Serving Oakland &amp; the greater Bay Area</li>
-			</ul>
-			<!-- TODO: once online booking is set up, add a "Book Now" link here pointing to the booking tool -->
-		</div>
+		<!-- TODO: once online booking is set up, add a "Book Now" link here pointing to the booking tool -->
 	</div>
 
 	<div class="footer__bottom container">
+		<p>Serving Oakland &amp; the greater Bay Area</p>
 		<p>&copy; {year} Sky House Cleaning. All rights reserved.</p>
 	</div>
 </footer>
@@ -74,72 +54,83 @@ const serviceLinks = [
 	}
 
 	.footer__inner {
-		display: grid;
-		grid-template-columns: 1.4fr 1fr 1fr 1fr;
-		gap: 2.5rem;
-		padding: 3.5rem 1.5rem 2.5rem;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1.5rem;
+		padding: 2.25rem 1.5rem;
 	}
 
-	.footer__brand p {
-		color: #aab4c6;
-		font-size: 0.9rem;
-		margin-top: 0.75rem;
-	}
-
-	.footer__logo-link {
+	.footer__brand {
 		display: flex;
 		align-items: center;
-		gap: 0.6rem;
+		gap: 0.65rem;
 		text-decoration: none;
 		color: #fff;
 		font-family: var(--font-heading);
-		font-weight: 600;
-		font-size: 1.05rem;
+		font-weight: 700;
+		font-size: 1.1rem;
+		flex-shrink: 0;
 	}
 
 	.footer__logo {
-		height: 30px;
-		width: auto;
+		display: block;
+		width: 36px;
+		height: 36px;
 		filter: brightness(0) invert(1);
 	}
 
-	.footer h3 {
-		color: #fff;
-		font-size: 0.85rem;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
-		margin-bottom: 1rem;
-	}
-
-	.footer__col ul {
+	.footer__nav ul {
 		list-style: none;
-		padding: 0;
-		margin: 0;
 		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.5rem 1.75rem;
+		margin: 0;
+		padding: 0;
 	}
 
-	.footer__col a {
-		color: #cfd7e4;
+	.footer__nav a {
+		color: #f2f4f8;
 		text-decoration: none;
-		font-size: 0.9rem;
+		font-weight: 500;
+		font-size: 0.95rem;
 	}
 
-	.footer__col a:hover {
-		color: #fff;
+	.footer__nav a:hover {
+		color: var(--color-sky);
 		text-decoration: underline;
 	}
 
-	.footer__contact li {
-		color: #cfd7e4;
-		font-size: 0.9rem;
+	.footer__contact {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.35rem;
+		flex-shrink: 0;
+	}
+
+	.footer__contact a {
+		display: block;
+		color: #f2f4f8;
+		text-decoration: none;
+		font-weight: 500;
+		font-size: 0.95rem;
+	}
+
+	.footer__contact a:hover {
+		color: var(--color-sky);
+		text-decoration: underline;
 	}
 
 	.footer__bottom {
 		border-top: 1px solid rgba(255, 255, 255, 0.12);
-		padding: 1.25rem 1.5rem;
-		text-align: center;
+		padding: 1.1rem 1.5rem;
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 0.5rem;
 	}
 
 	.footer__bottom p {
@@ -148,15 +139,23 @@ const serviceLinks = [
 		font-size: 0.8rem;
 	}
 
-	@media (max-width: 860px) {
+	@media (max-width: 720px) {
 		.footer__inner {
-			grid-template-columns: 1fr 1fr;
+			flex-direction: column;
+			text-align: center;
 		}
-	}
 
-	@media (max-width: 560px) {
-		.footer__inner {
-			grid-template-columns: 1fr;
+		.footer__nav ul {
+			justify-content: center;
+		}
+
+		.footer__contact {
+			align-items: center;
+		}
+
+		.footer__bottom {
+			justify-content: center;
+			text-align: center;
 		}
 	}
 </style>

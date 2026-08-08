@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import ServiceCard from "../components/ServiceCard.astro";
 import TestimonialCard from "../components/TestimonialCard.astro";
 import CtaBand from "../components/CtaBand.astro";
+import BeforeAfterSlider from "../components/BeforeAfterSlider.astro";
 import { cleaningServices, otherServices, testimonials } from "../data/content.js";
 ---
 
@@ -73,6 +74,23 @@ import { cleaningServices, otherServices, testimonials } from "../data/content.j
 	<section class="section">
 		<div class="container">
 			<div class="section-heading">
+				<p class="eyebrow">See the Difference</p>
+				<h2>A real kitchen, before and after</h2>
+				<p>Drag the slider to see what a Sky House Cleaning visit looks like in person.</p>
+			</div>
+			<div class="before-after-wrap">
+				<BeforeAfterSlider
+					beforeSrc="/images/before-after/kitchen-before.jpg"
+					afterSrc="/images/before-after/kitchen-after.jpg"
+					alt="Kitchen cleaned by Sky House Cleaning"
+				/>
+			</div>
+		</div>
+	</section>
+
+	<section class="section section--tint">
+		<div class="container">
+			<div class="section-heading">
 				<p class="eyebrow">Client Experiences</p>
 				<h2>Your satisfaction is our top priority</h2>
 			</div>
@@ -110,6 +128,11 @@ import { cleaningServices, otherServices, testimonials } from "../data/content.j
 		gap: 1rem;
 		justify-content: center;
 		flex-wrap: wrap;
+	}
+
+	.before-after-wrap {
+		max-width: 760px;
+		margin: 0 auto;
 	}
 
 	@media (max-width: 640px) {
