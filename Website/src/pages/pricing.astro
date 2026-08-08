@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import PageHero from "../components/PageHero.astro";
 import CtaBand from "../components/CtaBand.astro";
+import PricingConfigurator from "../components/PricingConfigurator.astro";
 import { pricingMatrix } from "../data/content.js";
 ---
 
@@ -17,6 +18,16 @@ import { pricingMatrix } from "../data/content.js";
 
 	<section class="section">
 		<div class="container">
+			<PricingConfigurator />
+		</div>
+	</section>
+
+	<section class="section section--tint">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">Full Pricing Reference</p>
+				<h2>See every rate at a glance</h2>
+			</div>
 			<div class="table-wrap">
 				<table class="pricing-table">
 					<thead>
@@ -54,7 +65,7 @@ import { pricingMatrix } from "../data/content.js";
 		</div>
 	</section>
 
-	<section class="section section--tint">
+	<section class="section">
 		<div class="container">
 			<div class="section-heading">
 				<p class="eyebrow">Other Services</p>

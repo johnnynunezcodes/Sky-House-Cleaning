@@ -188,6 +188,8 @@
   },
   "active": "841a8f9f869b120f",
   "lastOpenFiles": [
+    "Website/src/components/YouTubeEmbed.astro",
+    "Website/src/components/PricingConfigurator.astro",
     "Website/public/images/before-after/kitchen-before.jpg",
     "Website/public/images/before-after/kitchen-after.jpg",
     "Website/public/images/Lennox/kitchen-after.jpg",
@@ -208,8 +210,6 @@
     "Website/node_modules/@bruits/satteri-wasm32-wasi/node_modules/@emnapi/wasi-threads",
     "Website/node_modules/@bruits/satteri-wasm32-wasi/node_modules/@emnapi/runtime",
     "Website/node_modules/@bruits/satteri-wasm32-wasi/node_modules/@emnapi/core",
-    "Website/node_modules/@bruits/satteri-wasm32-wasi/node_modules/@emnapi",
-    "Website/public/images/logo-icon.png",
     "Website/README.md",
     "CLAUDE.md",
     "Services/Overview.md",

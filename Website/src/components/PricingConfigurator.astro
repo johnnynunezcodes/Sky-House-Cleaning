@@ -1,0 +1,278 @@
+---
+import { pricingMatrix } from "../data/content.js";
+
+interface Props {
+	ctaHref?: string;
+	ctaLabel?: string;
+}
+
+const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
+---
+
+<div class="pc" id="pricing-configurator">
+	<div class="pc__fields">
+		<div class="pc__field">
+			<label class="pc__label" for="pc-frequency">Cleaning Frequency</label>
+			<select id="pc-frequency" class="pc__select">
+				<option value="oneTime">One-Time</option>
+				<option value="weekly">Weekly</option>
+				<option value="biweekly">Bi-Weekly</option>
+				<option value="monthly">Monthly</option>
+			</select>
+		</div>
+
+		<div class="pc__field">
+			<span class="pc__label">Cleaning Type</span>
+			<div class="pc__radio-group" role="radiogroup" aria-label="Cleaning type">
+				<label class="pc__radio">
+					<input type="radio" name="pc-type" value="standard" checked />
+					<span>Standard</span>
+				</label>
+				<label class="pc__radio pc__radio--conditional" data-requires="oneTime">
+					<input type="radio" name="pc-type" value="deep" />
+					<span>Deep Clean</span>
+				</label>
+				<label class="pc__radio pc__radio--conditional" data-requires="oneTime">
+					<input type="radio" name="pc-type" value="moveInOut" />
+					<span>Move-In / Move-Out</span>
+				</label>
+			</div>
+		</div>
+
+		<div class="pc__field pc__field--full">
+			<label class="pc__label" for="pc-sqft">
+				Home Size — <span id="pc-sqft-value">1,500</span> sq ft
+			</label>
+			<input type="range" id="pc-sqft" class="pc__slider" min="500" max="5999" step="50" value="1500" />
+			<div class="pc__slider-scale">
+				<span>500 sq ft</span>
+				<span>6,000+ sq ft</span>
+			</div>
+			<p class="pc__hint" id="pc-hint">
+				Deep Clean and Move-In/Move-Out are only available as one-time services.
+			</p>
+		</div>
+	</div>
+
+	<div class="pc__result">
+		<p class="pc__result-label">Estimated Price</p>
+		<p class="pc__price" id="pc-price">$150</p>
+		<a href={ctaHref} class="btn btn--primary pc__cta" id="pc-cta">{ctaLabel}</a>
+	</div>
+</div>
+
+<style>
+	.pc {
+		background: var(--color-white);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		padding: 2.5rem;
+		display: grid;
+		grid-template-columns: 1.4fr 1fr;
+		gap: 2.5rem;
+		align-items: start;
+	}
+
+	.pc__fields {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.75rem 2rem;
+	}
+
+	.pc__field--full {
+		grid-column: 1 / -1;
+	}
+
+	.pc__label {
+		display: block;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.85rem;
+		color: var(--color-ink);
+		margin-bottom: 0.6rem;
+	}
+
+	.pc__select {
+		width: 100%;
+		font-family: var(--font-body);
+		font-size: 0.95rem;
+		color: var(--color-ink);
+		background: var(--color-cream);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		padding: 0.7rem 0.9rem;
+		cursor: pointer;
+	}
+
+	.pc__select:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.pc__radio-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.pc__radio {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-size: 0.92rem;
+		color: var(--color-slate);
+		cursor: pointer;
+	}
+
+	.pc__radio input {
+		accent-color: var(--color-sky);
+		width: 16px;
+		height: 16px;
+		cursor: pointer;
+	}
+
+	.pc__slider {
+		width: 100%;
+		accent-color: var(--color-sky);
+		cursor: pointer;
+	}
+
+	.pc__slider-scale {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.8rem;
+		color: var(--color-slate-light);
+		margin-top: 0.35rem;
+	}
+
+	.pc__hint {
+		margin: 0.9rem 0 0;
+		font-size: 0.82rem;
+		color: var(--color-slate-light);
+		transition: opacity 0.15s ease;
+	}
+
+	.pc__result {
+		background: var(--color-sky-light);
+		border-radius: var(--radius);
+		padding: 2rem;
+		text-align: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.35rem;
+	}
+
+	.pc__result-label {
+		margin: 0;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.8rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--color-sky-dark);
+	}
+
+	.pc__price {
+		margin: 0 0 0.5rem;
+		font-family: var(--font-heading);
+		font-weight: 700;
+		font-size: 2.75rem;
+		color: var(--color-ink);
+		line-height: 1;
+	}
+
+	.pc__cta {
+		width: 100%;
+	}
+
+	@media (max-width: 860px) {
+		.pc {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 560px) {
+		.pc {
+			padding: 1.75rem;
+		}
+
+		.pc__fields {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
+
+<script define:vars={{ pricingMatrix }}>
+	function initPricingConfigurator() {
+		const root = document.getElementById("pricing-configurator");
+		if (!root || root.dataset.pcInit === "true") return;
+		root.dataset.pcInit = "true";
+
+		const frequencyEl = root.querySelector("#pc-frequency");
+		const sqftEl = root.querySelector("#pc-sqft");
+		const sqftValueEl = root.querySelector("#pc-sqft-value");
+		const typeEls = root.querySelectorAll('input[name="pc-type"]');
+		const standardEl = root.querySelector('input[name="pc-type"][value="standard"]');
+		const conditionalLabels = root.querySelectorAll(".pc__radio--conditional");
+		const priceEl = root.querySelector("#pc-price");
+
+		function tierIndexFor(sqft) {
+			if (sqft < 1000) return 0;
+			const idx = 1 + Math.floor((sqft - 1000) / 500);
+			return Math.min(idx, pricingMatrix.length - 1);
+		}
+
+		function formatMoney(n) {
+			return "$" + Number(n).toLocaleString("en-US");
+		}
+
+		function currentType() {
+			const checked = Array.from(typeEls).find((el) => el.checked);
+			return checked ? checked.value : "standard";
+		}
+
+		function syncTypeAvailability() {
+			const isRecurring = frequencyEl.value !== "oneTime";
+
+			conditionalLabels.forEach((label) => {
+				label.hidden = isRecurring;
+				const input = label.querySelector("input");
+				if (isRecurring && input.checked) {
+					standardEl.checked = true;
+				}
+			});
+		}
+
+		function update() {
+			syncTypeAvailability();
+
+			const sqft = Number(sqftEl.value);
+			sqftValueEl.textContent = sqft.toLocaleString("en-US");
+
+			const tier = pricingMatrix[tierIndexFor(sqft)];
+			const type = currentType();
+
+			let price;
+			if (type === "deep") {
+				price = tier.deep;
+			} else if (type === "moveInOut") {
+				price = tier.moveInOut;
+			} else {
+				price = tier[frequencyEl.value];
+			}
+
+			priceEl.textContent = formatMoney(price);
+		}
+
+		frequencyEl.addEventListener("change", update);
+		sqftEl.addEventListener("input", update);
+		typeEls.forEach((el) => el.addEventListener("change", update));
+
+		update();
+	}
+
+	initPricingConfigurator();
+	document.addEventListener("astro:page-load", initPricingConfigurator);
+</script>
