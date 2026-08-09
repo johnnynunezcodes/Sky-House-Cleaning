@@ -16,10 +16,21 @@ function getAuth() {
 	// newlines cleanly, so we store it with literal "\n" and unescape here.
 	const privateKey = rawKey.replace(/\\n/g, "\n");
 
+	// Google Calendar's sharing UI only lets you grant "Make changes to
+	// events" to accounts inside your own Workspace domain — a service
+	// account is always treated as external, so it gets capped at read
+	// access no matter what's picked in the sharing dialog. Domain-Wide
+	// Delegation works around this: instead of relying on a calendar-level
+	// share, the service account impersonates a real Workspace mailbox
+	// (GOOGLE_IMPERSONATE_EMAIL) that already owns/can edit the calendar,
+	// and inherits its access. See AGENTS.md for the one-time setup.
+	const impersonate = import.meta.env.GOOGLE_IMPERSONATE_EMAIL;
+
 	return new google.auth.JWT({
 		email,
 		key: privateKey,
 		scopes: ["https://www.googleapis.com/auth/calendar"],
+		subject: impersonate || undefined,
 	});
 }
 

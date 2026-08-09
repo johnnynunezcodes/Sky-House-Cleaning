@@ -156,7 +156,13 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 		margin-bottom: 1.25rem;
 	}
 
-	.book-date-btn {
+	/* :global() below is required, not optional style: these date/time
+	   buttons (and the times placeholder/empty/error text) are created by
+	   client-side JS via document.createElement/innerHTML, not written in
+	   this page's template — so Astro never tags them with its scoped-style
+	   attribute, and a normal (scoped) rule here would silently never match
+	   them at all. */
+	:global(.book-date-btn) {
 		flex: 0 0 auto;
 		display: flex;
 		flex-direction: column;
@@ -172,24 +178,24 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 		cursor: pointer;
 	}
 
-	.book-date-btn:hover {
+	:global(.book-date-btn:hover) {
 		border-color: var(--color-sky);
 	}
 
-	.book-date-btn.is-selected {
+	:global(.book-date-btn.is-selected) {
 		background: var(--color-sky);
 		border-color: var(--color-sky);
 		color: var(--color-white);
 	}
 
-	.book-date-btn__day {
+	:global(.book-date-btn__day) {
 		font-size: 0.75rem;
 		text-transform: uppercase;
 		letter-spacing: 0.03em;
 		opacity: 0.8;
 	}
 
-	.book-date-btn__num {
+	:global(.book-date-btn__num) {
 		font-family: var(--font-heading);
 		font-weight: 700;
 		font-size: 1.1rem;
@@ -201,15 +207,15 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 		gap: 0.6rem;
 	}
 
-	.book-times__placeholder,
-	.book-times__empty,
-	.book-times__error {
+	:global(.book-times__placeholder),
+	:global(.book-times__empty),
+	:global(.book-times__error) {
 		margin: 0;
 		font-size: 0.9rem;
 		color: var(--color-slate-light);
 	}
 
-	.book-time-btn {
+	:global(.book-time-btn) {
 		padding: 0.55rem 1rem;
 		border-radius: 999px;
 		border: 1px solid var(--color-border);
@@ -220,11 +226,11 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 		cursor: pointer;
 	}
 
-	.book-time-btn:hover {
+	:global(.book-time-btn:hover) {
 		border-color: var(--color-sky);
 	}
 
-	.book-time-btn.is-selected {
+	:global(.book-time-btn.is-selected) {
 		background: var(--color-sky);
 		border-color: var(--color-sky);
 		color: var(--color-white);
