@@ -81,6 +81,17 @@ import "../../styles/global.css";
 				return `${hour}:${minute}`;
 			}
 
+			function statusLabel(status) {
+				const labels = {
+					trialing: "Trialing (billing date was just re-anchored — expected, not an error)",
+					past_due: "Past due — card was declined",
+					unpaid: "Unpaid — repeated card declines",
+					paused: "Paused",
+					incomplete: "Incomplete — first charge hasn't gone through",
+				};
+				return labels[status] || status;
+			}
+
 			function setStatus(message, isError = false) {
 				searchStatus.hidden = !message;
 				searchStatus.textContent = message;
@@ -103,6 +114,7 @@ import "../../styles/global.css";
 						<p class="admin-card__meta">${sub.address || ""}${sub.phone ? " · " + sub.phone : ""}</p>
 						<p class="admin-card__meta">
 							Plan: ${sub.frequency || "—"} · Current schedule: <strong>${fmt(sub.lastVisitStart)}</strong>
+							${sub.status && sub.status !== "active" ? ` · Status: <strong>${statusLabel(sub.status)}</strong>` : ""}
 						</p>
 						<form class="book-form admin-reschedule-form">
 							<div class="book-form__row">

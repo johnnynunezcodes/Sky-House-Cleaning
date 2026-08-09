@@ -25,8 +25,17 @@ export async function GET({ url }) {
 
 		const subscriptions = [];
 		for (const customer of customers.data) {
-			const subs = await stripe.subscriptions.list({ customer: customer.id, status: "active", limit: 10 });
+			// `status: "active"` alone is too narrow here — this app briefly
+			// puts a subscription into "trialing" every time billing gets
+			// re-anchored to a new date (skip-visit.js, reschedule-subscription.js;
+			// see "Billing date alignment" in AGENTS.md), which is expected and
+			// harmless, but a plain active-only search would make staff unable
+			// to find a plan right after using those tools. Fetch every status
+			// and just filter out the ones that are actually done.
+			const subs = await stripe.subscriptions.list({ customer: customer.id, status: "all", limit: 10 });
 			for (const sub of subs.data) {
+				if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
+
 				const metadata = sub.metadata || {};
 
 				// The visit after the currently-scheduled one — used to prefill a
@@ -41,6 +50,7 @@ export async function GET({ url }) {
 				subscriptions.push({
 					subscriptionId: sub.id,
 					customerEmail: customer.email,
+					status: sub.status,
 					name: metadata.name || "",
 					phone: metadata.phone || "",
 					address: metadata.address || "",
