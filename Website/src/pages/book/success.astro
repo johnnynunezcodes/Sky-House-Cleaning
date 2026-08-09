@@ -48,6 +48,10 @@ if (!sessionId) {
 const amountPaid = session?.amount_total != null ? (session.amount_total / 100).toFixed(2) : null;
 const email = session?.customer_details?.email || session?.customer_email;
 const isRecurring = session?.mode === "subscription";
+// Recurring plans bill on the actual cleaning date (see AGENTS.md), so
+// nothing is charged today — no receipt is on its way yet either, since
+// Stripe doesn't generate an invoice until that date.
+const isZeroToday = session?.amount_total === 0;
 ---
 
 <Layout title="Booking Confirmed | Sky House Cleaning" description="Your Sky House Cleaning booking is confirmed.">
@@ -56,9 +60,11 @@ const isRecurring = session?.mode === "subscription";
 		title={errorMessage ? "Thanks for booking!" : "Booking Confirmed"}
 		lede={
 			errorMessage ||
-			`We've received your payment${amountPaid ? ` of $${amountPaid}` : ""}${
-				email ? ` and a receipt is on its way to ${email}` : ""
-			}. Your cleaning is on the calendar for the date and time you picked.`
+			(isRecurring && isZeroToday
+				? "No payment was made today — your first cleaning is on the calendar, and your card will be billed automatically on the day of each visit, starting with this one."
+				: `We've received your payment${amountPaid ? ` of $${amountPaid}` : ""}${
+						email ? ` and a receipt is on its way to ${email}` : ""
+					}. Your cleaning is on the calendar for the date and time you picked.`)
 		}
 	/>
 
