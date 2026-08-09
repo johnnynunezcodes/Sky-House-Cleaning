@@ -57,6 +57,30 @@ import "../../styles/global.css";
 				});
 			}
 
+			function toDateInputValue(iso) {
+				if (!iso) return "";
+				return new Intl.DateTimeFormat("en-CA", {
+					timeZone: "America/Los_Angeles",
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+				}).format(new Date(iso));
+			}
+
+			function toTimeInputValue(iso) {
+				if (!iso) return "";
+				const parts = new Intl.DateTimeFormat("en-US", {
+					timeZone: "America/Los_Angeles",
+					hour: "2-digit",
+					minute: "2-digit",
+					hour12: false,
+				}).formatToParts(new Date(iso));
+				const rawHour = parts.find((p) => p.type === "hour")?.value || "00";
+				const minute = (parts.find((p) => p.type === "minute")?.value || "00").padStart(2, "0");
+				const hour = (rawHour === "24" ? "00" : rawHour).padStart(2, "0");
+				return `${hour}:${minute}`;
+			}
+
 			function setStatus(message, isError = false) {
 				searchStatus.hidden = !message;
 				searchStatus.textContent = message;
@@ -99,12 +123,30 @@ import "../../styles/global.css";
 							<button type="button" class="btn btn--outline admin-skip-visit">
 								Cancel Next Visit — Skip Charge
 							</button>
-							<button type="button" class="btn btn--outline admin-cancel-period">
-								Cancel Plan — After Current Period
-							</button>
 							<button type="button" class="btn btn--outline admin-cancel-now">
 								Cancel Plan — Immediately
 							</button>
+						</div>
+
+						<div class="admin-cancel-period-block">
+							<p class="admin-hint admin-hint--tight">
+								Cancel the plan on a specific date — visits keep billing normally, right on
+								schedule, up through that date; nothing after it. Defaults to right after the
+								${fmt(sub.lastVisitStart)} visit, so that one still happens and gets billed.
+							</p>
+							<form class="book-form admin-cancel-period-form">
+								<div class="book-form__row">
+									<label>Cancel on date</label>
+									<input type="date" name="cancelDate" value="${toDateInputValue(sub.afterNextVisitStart)}" required />
+								</div>
+								<div class="book-form__row">
+									<label>Time</label>
+									<input type="time" name="cancelTime" value="${toTimeInputValue(sub.afterNextVisitStart)}" required />
+								</div>
+								<button type="submit" class="btn btn--outline admin-cancel-period">
+									Cancel Plan — On This Date
+								</button>
+							</form>
 						</div>
 
 						<p class="admin-result-message" hidden></p>
@@ -233,20 +275,42 @@ import "../../styles/global.css";
 						}
 					});
 
-					const cancelPeriodBtn = card.querySelector(".admin-cancel-period");
-					cancelPeriodBtn.addEventListener("click", async () => {
-						if (!confirm(`Cancel ${sub.name || "this customer"}'s recurring plan after their current paid period? Their already-scheduled visit still happens; no charges after that.`)) return;
-						cancelPeriodBtn.disabled = true;
+					const cancelPeriodForm = card.querySelector(".admin-cancel-period-form");
+					cancelPeriodForm.addEventListener("submit", async (e) => {
+						e.preventDefault();
+						const cancelDate = cancelPeriodForm.cancelDate.value;
+						const cancelTime = cancelPeriodForm.cancelTime.value;
+						const submitBtn = cancelPeriodForm.querySelector("button[type=submit]");
+						if (
+							!confirm(
+								`Schedule ${sub.name || "this customer"}'s plan to cancel on ${cancelDate} at ${cancelTime}? Visits keep billing normally, right on schedule, up through then.`,
+							)
+						)
+							return;
+						submitBtn.disabled = true;
 						try {
 							const { ok, data } = await postJson("/api/admin/cancel-subscription", {
 								subscriptionId: sub.subscriptionId,
 								immediate: false,
+								cancelDate,
+								cancelTime,
 							});
-							showMessage(ok ? "Plan will end after the current paid period — no further charges." : (data.error || "Something went wrong."), !ok);
+							if (ok && data.warning) {
+								showMessage(data.warning, true);
+							} else if (ok && data.note) {
+								showMessage(`Plan will cancel on ${fmt(data.cancelAt)}. ${data.note}`, false);
+							} else {
+								showMessage(
+									ok
+										? `Plan will cancel on ${fmt(data.cancelAt)} — billed normally, right on schedule, until then.`
+										: data.error || "Something went wrong.",
+									!ok,
+								);
+							}
 						} catch {
 							showMessage("Network error — please try again.", true);
 						} finally {
-							cancelPeriodBtn.disabled = false;
+							submitBtn.disabled = false;
 						}
 					});
 
@@ -356,6 +420,29 @@ import "../../styles/global.css";
 			}
 
 			.admin-cancel-actions .btn {
+				border-color: #b3261e;
+				color: #b3261e;
+			}
+
+			.admin-cancel-period-block {
+				margin-top: 1rem;
+				padding-top: 1rem;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.admin-hint--tight {
+				margin: 0 0 0.75rem;
+				font-size: 0.9rem;
+			}
+
+			.admin-cancel-period-form {
+				display: flex;
+				align-items: flex-end;
+				gap: 1rem;
+				flex-wrap: wrap;
+			}
+
+			.admin-cancel-period-form .btn {
 				border-color: #b3261e;
 				color: #b3261e;
 			}

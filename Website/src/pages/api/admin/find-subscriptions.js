@@ -5,6 +5,7 @@
 export const prerender = false;
 
 import Stripe from "stripe";
+import { nextVisitWindow } from "../../../lib/pricing.js";
 
 export async function GET({ url }) {
 	const secretKey = import.meta.env.STRIPE_SECRET_KEY;
@@ -27,6 +28,16 @@ export async function GET({ url }) {
 			const subs = await stripe.subscriptions.list({ customer: customer.id, status: "active", limit: 10 });
 			for (const sub of subs.data) {
 				const metadata = sub.metadata || {};
+
+				// The visit after the currently-scheduled one — used to prefill a
+				// sensible default in the admin UI's "cancel on a date" tool, so
+				// the already-scheduled next visit still happens and gets billed,
+				// and the plan stops right before the one after that.
+				const nextStop =
+					metadata.lastVisitStart && metadata.lastVisitEnd && metadata.frequency
+						? nextVisitWindow(metadata.lastVisitStart, metadata.lastVisitEnd, metadata.frequency)
+						: null;
+
 				subscriptions.push({
 					subscriptionId: sub.id,
 					customerEmail: customer.email,
@@ -38,6 +49,7 @@ export async function GET({ url }) {
 					sqft: metadata.sqft || "",
 					lastVisitStart: metadata.lastVisitStart || "",
 					lastVisitEnd: metadata.lastVisitEnd || "",
+					afterNextVisitStart: nextStop?.start || "",
 				});
 			}
 		}
