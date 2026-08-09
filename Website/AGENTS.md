@@ -62,6 +62,14 @@ Neither of these changes when the customer is actually billed — visit date/tim
 
 All three require finding the subscription first via the email search at the top of the page, same as rescheduling.
 
+### Billing date alignment
+
+Customers are charged **on the day of each actual cleaning**, not on the day they signed up:
+
+- At checkout, `subscription_data.billing_cycle_anchor` (in `create-checkout-session.js`) is set to the first picked slot's timestamp, with `proration_behavior: "none"` — Stripe generates no invoice at all until that date, so the first real charge lands exactly on the first cleaning, and every renewal after that follows the same cadence from that anchor.
+- When staff permanently reschedules a plan via `/admin/reschedule`, `reschedule-subscription.js` also re-anchors billing to the new date using the `trial_end` mechanism (the only way Stripe allows moving an *existing* subscription's billing date to an arbitrary future timestamp — setting `billing_cycle_anchor` directly only works at creation). This briefly shows the subscription as **"Trialing"** in the Stripe Dashboard until that date arrives — expected and harmless, not an error.
+- `stripe-webhook.js`'s renewal handler has a belt-and-suspenders check comparing each `invoice.paid` event's billing period to the subscription's stored `lastVisitStart`, skipping calendar event creation if they match — this prevents a duplicate visit from ever being created for a charge that corresponds to a visit already on the calendar (e.g. the delayed first charge, or the charge right after a reschedule).
+
 ### What I (Johnny) still need to do to make this live
 
 **1. Run `npm install` locally.** `package.json` now includes `@astrojs/vercel`, `stripe`, and `googleapis`, but agents never run npm per the rule above — I need to install these myself.

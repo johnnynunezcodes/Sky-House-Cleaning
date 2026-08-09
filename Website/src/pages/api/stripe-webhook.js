@@ -137,7 +137,25 @@ export async function POST({ request }) {
 				const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
 				const metadata = subscription.metadata || {};
 
-				if (isCalendarConfigured() && metadata.lastVisitStart && metadata.lastVisitEnd && metadata.frequency) {
+				// Defense-in-depth: if this invoice's billing period is actually
+				// for the visit already on file (e.g. the delayed first charge
+				// aligned to the first cleaning date, or the charge right after a
+				// staff reschedule re-anchored billing to a new date), skip
+				// creating a second calendar event for the same visit. Only
+				// proceed when this is genuinely a new period.
+				const lastVisitSeconds = metadata.lastVisitStart ? Date.parse(metadata.lastVisitStart) / 1000 : null;
+				const alreadyScheduled =
+					lastVisitSeconds != null &&
+					typeof invoice.period_start === "number" &&
+					Math.abs(invoice.period_start - lastVisitSeconds) < 3600;
+
+				if (
+					!alreadyScheduled &&
+					isCalendarConfigured() &&
+					metadata.lastVisitStart &&
+					metadata.lastVisitEnd &&
+					metadata.frequency
+				) {
 					const nextWindow = nextVisitWindow(metadata.lastVisitStart, metadata.lastVisitEnd, metadata.frequency);
 
 					if (nextWindow) {

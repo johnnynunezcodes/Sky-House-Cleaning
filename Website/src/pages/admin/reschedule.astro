@@ -151,8 +151,13 @@ import "../../styles/global.css";
 								}
 
 								messageEl.hidden = false;
-								messageEl.classList.remove("admin-result-message--error");
-								messageEl.textContent = `Done — all future visits now scheduled for ${fmt(data.newVisitStart)}.`;
+								if (data.warning) {
+									messageEl.classList.add("admin-result-message--error");
+									messageEl.textContent = data.warning;
+								} else {
+									messageEl.classList.remove("admin-result-message--error");
+									messageEl.textContent = `Done — all future visits, and billing, now aligned to ${fmt(data.newVisitStart)}.`;
+								}
 							} catch {
 								messageEl.hidden = false;
 								messageEl.textContent = "Network error — please try again.";

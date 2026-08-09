@@ -127,10 +127,28 @@ export async function POST({ request }) {
 		);
 	}
 
+	// Keep billing glued to the cleaning date, not just the calendar/metadata.
+	// Stripe only allows moving an *existing* subscription's billing date to
+	// an arbitrary future timestamp via the `trial_end` mechanism (setting a
+	// future billing_cycle_anchor directly is only possible at creation) —
+	// this briefly shows the subscription as "Trialing" in the Stripe
+	// Dashboard until that date, which is expected and harmless.
+	// proration_behavior: "none" means no surprise charge happens right now.
+	let billingWarning = null;
+	try {
+		await stripe.subscriptions.update(subscriptionId, {
+			trial_end: Math.floor(start.getTime() / 1000),
+			proration_behavior: "none",
+		});
+	} catch (err) {
+		billingWarning = "Calendar and schedule were updated, but re-aligning the billing date failed: " + err.message;
+	}
+
 	return json({
 		success: true,
 		newVisitStart: start.toISOString(),
 		newVisitEnd: end.toISOString(),
+		warning: billingWarning || undefined,
 	});
 }
 

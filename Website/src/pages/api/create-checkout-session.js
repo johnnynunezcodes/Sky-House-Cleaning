@@ -137,6 +137,18 @@ export async function POST({ request }) {
 			...(isRecurring && {
 				subscription_data: {
 					metadata: { ...bookingMetadata, lastVisitStart: slot.start, lastVisitEnd: slot.end },
+					// Bill on the day of the actual first cleaning, not the day
+					// they signed up — `proration_behavior: "none"` means no
+					// invoice is generated at all until that date (not even a
+					// $0 one), so this doesn't create any duplicate-charge risk
+					// with the renewal logic in stripe-webhook.js. Every
+					// following charge then follows the same cadence from this
+					// anchor, so it naturally keeps landing on the cleaning day.
+					billing_cycle_anchor: Math.max(
+						Math.floor(new Date(slot.start).getTime() / 1000),
+						Math.floor(Date.now() / 1000) + 60,
+					),
+					proration_behavior: "none",
 				},
 			}),
 		});
