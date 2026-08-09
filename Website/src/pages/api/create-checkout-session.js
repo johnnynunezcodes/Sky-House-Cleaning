@@ -9,7 +9,7 @@
 export const prerender = false;
 
 import Stripe from "stripe";
-import { calculatePrice } from "../../lib/pricing.js";
+import { calculatePrice, RECURRING_INTERVALS, isRecurringFrequency } from "../../lib/pricing.js";
 import { isConfigured as isCalendarConfigured, isSlotStillFree } from "../../lib/googleCalendar.js";
 
 const REQUIRED_CUSTOMER_FIELDS = ["name", "email", "phone", "address", "access"];
@@ -87,37 +87,58 @@ export async function POST({ request }) {
 	const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
 	const origin = new URL(request.url).origin;
 
+	// Weekly / bi-weekly / monthly standard cleanings are recurring plans —
+	// everything else (one-time, deep clean, move-in/out) is a single charge.
+	// Deep/move-in-out never recur even if `frequency` happens to be set,
+	// since those service types don't have recurring prices in the matrix.
+	const isRecurring = selections?.type === "standard" && isRecurringFrequency(selections?.frequency);
+	const recurring = isRecurring ? RECURRING_INTERVALS[selections.frequency] : null;
+
+	// Everything here rides along as metadata so the webhook
+	// (src/pages/api/stripe-webhook.js) can create the real calendar event(s)
+	// once payment actually succeeds — the first calendar event is never
+	// created before that point, so an abandoned checkout never holds a slot.
+	const bookingMetadata = {
+		name: customer.name,
+		phone: customer.phone,
+		address: customer.address,
+		access: customer.access,
+		pets: customer.pets || "",
+		notes: customer.notes || "",
+		slotStart: slot.start,
+		slotEnd: slot.end,
+		frequency: selections?.frequency || "",
+		type: selections?.type || "",
+		sqft: String(selections?.sqft || ""),
+	};
+
 	try {
-		// Everything here rides along as Stripe metadata so the webhook
-		// (src/pages/api/stripe-webhook.js) can create the real calendar event
-		// once payment actually succeeds — the calendar event is never created
-		// before that point, so an abandoned checkout never holds a slot.
 		const session = await stripe.checkout.sessions.create({
-			mode: "payment",
+			mode: isRecurring ? "subscription" : "payment",
 			customer_email: customer.email,
 			line_items: lineItems.map((line) => ({
 				price_data: {
 					currency: "usd",
 					product_data: { name: line.label },
 					unit_amount: Math.round(line.amount * 100),
+					...(recurring && {
+						recurring: { interval: recurring.interval, interval_count: recurring.interval_count },
+					}),
 				},
 				quantity: 1,
 			})),
 			success_url: `${origin}/book/success?session_id={CHECKOUT_SESSION_ID}`,
 			cancel_url: `${origin}/book/canceled`,
-			metadata: {
-				name: customer.name,
-				phone: customer.phone,
-				address: customer.address,
-				access: customer.access,
-				pets: customer.pets || "",
-				notes: customer.notes || "",
-				slotStart: slot.start,
-				slotEnd: slot.end,
-				frequency: selections?.frequency || "",
-				type: selections?.type || "",
-				sqft: String(selections?.sqft || ""),
-			},
+			metadata: bookingMetadata,
+			// Subscriptions don't automatically inherit the Checkout Session's
+			// metadata, so it's duplicated onto the subscription itself —
+			// that's what future `invoice.paid` webhook events read from to
+			// know where/when to schedule each recurring visit.
+			...(isRecurring && {
+				subscription_data: {
+					metadata: { ...bookingMetadata, lastVisitStart: slot.start, lastVisitEnd: slot.end },
+				},
+			}),
 		});
 
 		return new Response(JSON.stringify({ url: session.url }), {

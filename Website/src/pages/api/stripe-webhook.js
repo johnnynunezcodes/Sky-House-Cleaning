@@ -13,7 +13,8 @@
 export const prerender = false;
 
 import Stripe from "stripe";
-import { isConfigured as isCalendarConfigured, createBookingEvent } from "../../lib/googleCalendar.js";
+import { isConfigured as isCalendarConfigured, createBookingEvent, isSlotStillFree } from "../../lib/googleCalendar.js";
+import { RECURRING_INTERVALS } from "../../lib/pricing.js";
 
 function describeService(type, frequency) {
 	if (type === "deep") return "Deep Cleaning";
@@ -25,6 +26,28 @@ function describeService(type, frequency) {
 		monthly: "Monthly Cleaning",
 	};
 	return names[frequency] || "Cleaning";
+}
+
+// Advances a recurring plan's last-scheduled visit forward by one billing
+// interval to get the next visit's date/time. Week-based intervals shift by
+// an exact number of days; monthly shifts by calendar month (same day-of
+// month/time), which can land a day or two off around short months (e.g. a
+// visit scheduled for the 31st rolling into early March after February) —
+// an acceptable, rare edge case rather than pulling in a date library.
+function nextVisitWindow(lastStart, lastEnd, frequency) {
+	const interval = RECURRING_INTERVALS[frequency];
+	if (!interval) return null;
+
+	const start = new Date(lastStart);
+	const end = new Date(lastEnd);
+	if (interval.days) {
+		start.setUTCDate(start.getUTCDate() + interval.days);
+		end.setUTCDate(end.getUTCDate() + interval.days);
+	} else if (interval.months) {
+		start.setUTCMonth(start.getUTCMonth() + interval.months);
+		end.setUTCMonth(end.getUTCMonth() + interval.months);
+	}
+	return { start: start.toISOString(), end: end.toISOString() };
 }
 
 export async function POST({ request }) {
@@ -70,7 +93,7 @@ export async function POST({ request }) {
 			].filter(Boolean);
 
 			try {
-				await createBookingEvent({
+				const createdEvent = await createBookingEvent({
 					start: metadata.slotStart,
 					end: metadata.slotEnd,
 					summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
@@ -78,11 +101,99 @@ export async function POST({ request }) {
 					location: metadata.address || undefined,
 					attendeeEmail: email,
 				});
+
+				// For subscriptions, remember which calendar event is the "current"
+				// one so the staff reschedule tool (src/pages/admin/reschedule.astro)
+				// can find and move it later without guessing which event is theirs.
+				if (session.mode === "subscription" && session.subscription) {
+					try {
+						const subscription = await stripe.subscriptions.retrieve(session.subscription);
+						await stripe.subscriptions.update(session.subscription, {
+							metadata: { ...subscription.metadata, lastEventId: createdEvent.id },
+						});
+					} catch (err) {
+						console.error("Failed to save calendar event id on subscription:", err?.message);
+					}
+				}
 			} catch (err) {
 				// Log for now (visible in Vercel's function logs) rather than
 				// failing the webhook — retrying won't help if this is a
 				// configuration problem, and the payment already succeeded.
 				console.error("Failed to create Google Calendar event for booking:", err?.message);
+			}
+		}
+	}
+
+	// Fires on every recurring subscription charge, including the very first
+	// one — `billing_reason` is how we tell them apart. The first cycle
+	// ("subscription_create") is already handled above by
+	// checkout.session.completed, so only act on renewals here to avoid
+	// double-booking the first visit.
+	if (event.type === "invoice.paid") {
+		const invoice = event.data.object;
+
+		if (invoice.billing_reason === "subscription_cycle" && invoice.subscription) {
+			try {
+				const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+				const metadata = subscription.metadata || {};
+
+				if (isCalendarConfigured() && metadata.lastVisitStart && metadata.lastVisitEnd && metadata.frequency) {
+					const nextWindow = nextVisitWindow(metadata.lastVisitStart, metadata.lastVisitEnd, metadata.frequency);
+
+					if (nextWindow) {
+						const service = describeService(metadata.type, metadata.frequency);
+						const email = invoice.customer_email || undefined;
+
+						const descriptionLines = [
+							`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
+							"Recurring cleaning — billed automatically",
+							metadata.phone ? `Phone: ${metadata.phone}` : null,
+							email ? `Email: ${email}` : null,
+							metadata.address ? `Address: ${metadata.address}` : null,
+							metadata.access ? `Access: ${metadata.access}` : null,
+							metadata.pets ? `Pets: ${metadata.pets}` : null,
+							metadata.notes ? `Notes: ${metadata.notes}` : null,
+						].filter(Boolean);
+
+						// Best-effort only — a busy slot doesn't stop the visit from
+						// being scheduled (the customer already paid), it just flags
+						// it for a human to double check.
+						try {
+							const stillFree = await isSlotStillFree(nextWindow);
+							if (!stillFree) {
+								descriptionLines.unshift(
+									"⚠️ This time showed as busy on the calendar — please confirm there's no conflict.",
+								);
+							}
+						} catch {
+							// ignore — proceed without the freshness check
+						}
+
+						const createdEvent = await createBookingEvent({
+							start: nextWindow.start,
+							end: nextWindow.end,
+							summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
+							description: descriptionLines.join("\n"),
+							location: metadata.address || undefined,
+							attendeeEmail: email,
+						});
+
+						// Advance the stored "last visit" (and which calendar event is
+						// the current one) so the next renewal computes the correct
+						// following date, and the staff reschedule tool always finds
+						// the right event.
+						await stripe.subscriptions.update(invoice.subscription, {
+							metadata: {
+								...metadata,
+								lastVisitStart: nextWindow.start,
+								lastVisitEnd: nextWindow.end,
+								lastEventId: createdEvent.id,
+							},
+						});
+					}
+				}
+			} catch (err) {
+				console.error("Failed to create recurring calendar event:", err?.message);
 			}
 		}
 	}

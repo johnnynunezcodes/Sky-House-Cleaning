@@ -64,8 +64,10 @@ function getUtcOffsetMinutes(date, timeZone) {
 
 // Converts a wall-clock time (e.g. "8:00 AM") on `dateStr` in `timeZone` into
 // the correct absolute UTC instant, regardless of what time zone the server
-// process itself is running in.
-function zonedTimeToUtc(dateStr, hour, minute, timeZone) {
+// process itself is running in. Exported for reuse by the staff reschedule
+// tool (src/pages/api/admin/reschedule-subscription.js), which also needs to
+// turn a staff-entered date/time into the right UTC instant.
+export function zonedTimeToUtc(dateStr, hour, minute, timeZone) {
 	const [year, month, day] = dateStr.split("-").map(Number);
 	const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
 	const offsetMinutes = getUtcOffsetMinutes(new Date(naiveUtc), timeZone);
@@ -206,5 +208,30 @@ export async function createBookingEvent({
 	}
 
 	const event = await calendar.events.insert({ calendarId, requestBody: baseEvent });
+	return event.data;
+}
+
+/**
+ * Moves an existing calendar event to a new start/end time in place, rather
+ * than deleting and recreating it — used by the staff reschedule tool
+ * (src/pages/api/admin/reschedule-subscription.js) when permanently shifting
+ * a recurring plan's day/time, so the event keeps its history/attendee state
+ * instead of becoming a brand new event each time.
+ */
+export async function updateBookingEvent({ eventId, start, end, timeZone = DEFAULT_TIME_ZONE }) {
+	const auth = getAuth();
+	if (!auth) throw new Error("Google Calendar isn't configured yet.");
+
+	const calendar = google.calendar({ version: "v3", auth });
+	const calendarId = getCalendarId();
+
+	const event = await calendar.events.patch({
+		calendarId,
+		eventId,
+		requestBody: {
+			start: { dateTime: start, timeZone },
+			end: { dateTime: end, timeZone },
+		},
+	});
 	return event.data;
 }

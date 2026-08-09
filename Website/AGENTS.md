@@ -25,6 +25,33 @@ The site has a full booking flow, in order:
 
 Important: the price shown in the URL/order summary is **never trusted for the actual charge**. `src/lib/pricing.js` (`calculatePrice()`) re-derives the price server-side from `src/data/content.js` on every checkout request, so the amount charged always matches the site's real pricing data, even if someone tampers with the URL.
 
+### Recurring billing (subscriptions)
+
+Weekly / bi-weekly / monthly **standard** cleanings are real Stripe subscriptions, not one-time charges — the card is saved and future visits bill automatically. One-time, deep clean, and move-in/out are always single payments.
+
+- `src/lib/pricing.js` exports `RECURRING_INTERVALS` (the Stripe billing interval + how many days/months apart each plan's visits are) and `isRecurringFrequency()`.
+- `src/pages/api/create-checkout-session.js` creates the Checkout Session with `mode: "subscription"` for recurring plans, using `price_data.recurring` on each line item. The customer/slot metadata is duplicated onto `subscription_data.metadata` (including `lastVisitStart`/`lastVisitEnd`, seeded to the first picked slot) — this is what lets the webhook figure out future visit dates, since Stripe doesn't automatically carry Checkout Session metadata onto the subscription or its invoices.
+- `src/pages/api/stripe-webhook.js` handles `invoice.paid`: for the first billing cycle (`billing_reason: "subscription_create"`) it does nothing, since `checkout.session.completed` already created that first calendar event. For renewals (`billing_reason: "subscription_cycle"`) it computes the next visit's date/time (same day-of-week/time as the last one, advanced by the plan's interval), creates that calendar event, and updates the subscription's `lastVisitStart`/`lastVisitEnd` so the cycle after that computes correctly too.
+- `src/pages/book/success.astro` creates a Stripe Billing Portal session for subscription bookings and shows a "Manage Your Subscription" link/button, so customers can update their card, view invoices, or cancel without calling in.
+
+**Two one-time Stripe Dashboard steps this needs** (do these in **both** test and live mode):
+
+1. **Turn on the Customer Portal** — Settings → Billing → Customer portal → configure and save (defaults are fine to start: allow canceling, updating payment method, viewing invoices). Until this is turned on, the "Manage Your Subscription" link just won't appear (fails silently) rather than breaking the booking confirmation.
+2. **Add `invoice.paid` to the registered webhook** — Developers → Webhooks → your endpoint → Edit destination → add `invoice.paid` alongside the existing `checkout.session.completed`. Without this, recurring visits after the first one won't get scheduled (the customer will still be charged correctly by Stripe either way — this only affects whether the follow-up calendar event gets created automatically).
+
+Known limitation: monthly plans advance by calendar month, so a visit booked for the 31st can land on the 1st–3rd of the following month depending on how many days that month has. Rare in practice, but worth knowing about.
+
+### Rescheduling recurring plans
+
+Two different situations, handled two different ways:
+
+- **One-time reschedule (reverts back automatically afterward)** — e.g. moving just next week's visit to a different day, then back to normal after that. Just edit that one event directly in Google Calendar (drag it, or edit the date/time). Don't touch anything in Stripe. The subscription's stored schedule (`lastVisitStart`/`lastVisitEnd` in its metadata) is what every future visit is computed from, and it's never affected by manually moving a calendar event — so the cycle after the one you moved automatically lands back on the regular day.
+- **Permanent reschedule (every future visit shifts)** — e.g. moving a customer from Tuesdays to Wednesdays going forward. Use the staff tool at `/admin/reschedule` (password-protected — see below). Search by the customer's email, pick the new date/time, and save. This updates both the subscription's stored schedule *and* moves their current upcoming calendar event to match, so it takes effect immediately.
+
+Neither of these changes when the customer is actually billed — visit date/time and billing date are tracked separately.
+
+**Staff tools setup:** `/admin/*` and `/api/admin/*` are gated by HTTP Basic Auth (`src/middleware.js`), using the `ADMIN_USERNAME`/`ADMIN_PASSWORD` env vars — pick your own values (not tied to any Google/Stripe account) and set them in `.env` locally and in Vercel's Production environment variables. Until both are set, those routes return a 503 instead of prompting for a login.
+
 ### What I (Johnny) still need to do to make this live
 
 **1. Run `npm install` locally.** `package.json` now includes `@astrojs/vercel`, `stripe`, and `googleapis`, but agents never run npm per the rule above — I need to install these myself.

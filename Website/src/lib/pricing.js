@@ -22,6 +22,20 @@ const FREQUENCY_LABELS = {
 	monthly: "Monthly Cleaning",
 };
 
+// How far apart each recurring plan's cleanings are — used both to build the
+// Stripe subscription's billing interval (create-checkout-session.js) and to
+// compute each subsequent visit's calendar date (stripe-webhook.js). `days`
+// is used for exact day-based intervals; `months` for calendar-month math.
+export const RECURRING_INTERVALS = {
+	weekly: { interval: "week", interval_count: 1, days: 7 },
+	biweekly: { interval: "week", interval_count: 2, days: 14 },
+	monthly: { interval: "month", interval_count: 1, months: 1 },
+};
+
+export function isRecurringFrequency(frequency) {
+	return Object.prototype.hasOwnProperty.call(RECURRING_INTERVALS, frequency);
+}
+
 const LAUNDRY_MULTIPLIERS = laundryUnitTiers.map((tier) => tier.multiplier);
 
 function tierIndexFor(sqft) {

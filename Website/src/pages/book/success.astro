@@ -12,22 +12,42 @@ const secretKey = import.meta.env.STRIPE_SECRET_KEY;
 
 let session = null;
 let errorMessage = null;
+let portalUrl = null;
 
 if (!sessionId) {
 	errorMessage = "We couldn't find your booking details.";
 } else if (!secretKey) {
 	errorMessage = "Payments aren't fully configured yet.";
 } else {
+	const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
+
 	try {
-		const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
 		session = await stripe.checkout.sessions.retrieve(sessionId);
 	} catch {
 		errorMessage = "We couldn't verify your payment. If you were charged, don't worry — we'll be in touch.";
+	}
+
+	// Recurring plans get a self-service link (update card, view invoices,
+	// cancel) via Stripe's hosted Customer Portal. This requires the portal
+	// to be turned on once in the Stripe Dashboard (Settings → Billing →
+	// Customer portal) for both test and live mode — if it isn't configured
+	// yet, this just fails quietly and the link is left off the page.
+	if (session?.mode === "subscription" && session?.customer) {
+		try {
+			const portalSession = await stripe.billingPortal.sessions.create({
+				customer: session.customer,
+				return_url: `${Astro.url.origin}/`,
+			});
+			portalUrl = portalSession.url;
+		} catch {
+			portalUrl = null;
+		}
 	}
 }
 
 const amountPaid = session?.amount_total != null ? (session.amount_total / 100).toFixed(2) : null;
 const email = session?.customer_details?.email || session?.customer_email;
+const isRecurring = session?.mode === "subscription";
 ---
 
 <Layout title="Booking Confirmed | Sky House Cleaning" description="Your Sky House Cleaning booking is confirmed.">
@@ -45,11 +65,22 @@ const email = session?.customer_details?.email || session?.customer_email;
 	<section class="section">
 		<div class="container">
 			<div class="card success-card">
+				{isRecurring && (
+					<p>
+						Your card is on file and future cleanings on this plan will be billed and scheduled
+						automatically for the same day and time — no need to rebook.
+					</p>
+				)}
 				<p>
 					If anything about your appointment needs to change, just give us a call at{" "}
 					<a href="tel:+18017592044">(801) 759-2044</a> and we'll take care of it.
 				</p>
-				<a href="/" class="btn btn--primary">Back to Home</a>
+				<div class="success-card__actions">
+					{portalUrl && (
+						<a href={portalUrl} class="btn btn--outline">Manage Your Subscription</a>
+					)}
+					<a href="/" class="btn btn--primary">Back to Home</a>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -62,7 +93,15 @@ const email = session?.customer_details?.email || session?.customer_email;
 		text-align: center;
 	}
 
-	.success-card .btn {
+	.success-card__actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.75rem;
 		margin-top: 1rem;
+	}
+
+	.success-card__actions .btn {
+		margin-top: 0;
 	}
 </style>

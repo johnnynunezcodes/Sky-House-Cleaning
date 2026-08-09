@@ -1,0 +1,238 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Not part
+// of the public marketing site, so it intentionally skips the shared
+// Layout/Navbar/Footer and just pulls in the site's base styles for a
+// consistent look.
+export const prerender = false;
+
+import "../../styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Reschedule Recurring Cleaning | Sky House Cleaning Staff Tools</title>
+	</head>
+	<body>
+		<main class="section">
+			<div class="container admin-container">
+				<h1>Reschedule a Recurring Plan</h1>
+				<p class="admin-hint">
+					Use this to permanently move a customer's recurring cleaning to a new day/time — every
+					future visit shifts too. For a <strong>one-time</strong> reschedule that should revert back
+					afterward, just edit that one event directly in Google Calendar instead; don't use this tool.
+				</p>
+
+				<form id="search-form" class="book-form admin-search">
+					<div class="book-form__row book-form__row--full">
+						<label for="search-email">Customer email</label>
+						<input type="email" id="search-email" required autocomplete="off" />
+					</div>
+					<button type="submit" class="btn btn--primary">Search</button>
+				</form>
+
+				<p id="search-status" class="admin-status" hidden></p>
+
+				<div id="results"></div>
+			</div>
+		</main>
+
+		<script>
+			const searchForm = document.getElementById("search-form");
+			const searchStatus = document.getElementById("search-status");
+			const resultsEl = document.getElementById("results");
+
+			function fmt(iso) {
+				if (!iso) return "—";
+				return new Date(iso).toLocaleString("en-US", {
+					timeZone: "America/Los_Angeles",
+					weekday: "short",
+					month: "short",
+					day: "numeric",
+					hour: "numeric",
+					minute: "2-digit",
+				});
+			}
+
+			function setStatus(message, isError = false) {
+				searchStatus.hidden = !message;
+				searchStatus.textContent = message;
+				searchStatus.classList.toggle("admin-status--error", isError);
+			}
+
+			function renderResults(subscriptions) {
+				resultsEl.innerHTML = "";
+				if (!subscriptions.length) {
+					setStatus("No active recurring plans found for that email.");
+					return;
+				}
+				setStatus("");
+
+				for (const sub of subscriptions) {
+					const card = document.createElement("div");
+					card.className = "card admin-card";
+					card.innerHTML = `
+						<h3>${sub.name || "(no name on file)"}</h3>
+						<p class="admin-card__meta">${sub.address || ""}${sub.phone ? " · " + sub.phone : ""}</p>
+						<p class="admin-card__meta">
+							Plan: ${sub.frequency || "—"} · Current schedule: <strong>${fmt(sub.lastVisitStart)}</strong>
+						</p>
+						<form class="book-form admin-reschedule-form">
+							<div class="book-form__row">
+								<label>New date</label>
+								<input type="date" name="date" required />
+							</div>
+							<div class="book-form__row">
+								<label>New time</label>
+								<input type="time" name="time" required />
+							</div>
+							<button type="submit" class="btn btn--outline">Save New Schedule</button>
+						</form>
+						<p class="admin-result-message" hidden></p>
+					`;
+
+					const form = card.querySelector(".admin-reschedule-form");
+					const messageEl = card.querySelector(".admin-result-message");
+
+					form.addEventListener("submit", async (e) => {
+						e.preventDefault();
+						const date = form.date.value;
+						const time = form.time.value;
+						const submitBtn = form.querySelector("button[type=submit]");
+
+						await submitReschedule({ subscriptionId: sub.subscriptionId, date, time, force: false });
+
+						async function submitReschedule(payload) {
+							submitBtn.disabled = true;
+							messageEl.hidden = true;
+							try {
+								const res = await fetch("/api/admin/reschedule-subscription", {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify(payload),
+								});
+								const data = await res.json();
+
+								if (res.status === 409 && data.conflict && !payload.force) {
+									const confirmed = confirm(
+										"That time already has something on the calendar. Schedule it anyway?",
+									);
+									if (confirmed) {
+										await submitReschedule({ ...payload, force: true });
+										return;
+									}
+									messageEl.hidden = false;
+									messageEl.textContent = "Not scheduled — pick a different time or confirm the overlap.";
+									messageEl.classList.add("admin-result-message--error");
+									return;
+								}
+
+								if (!res.ok) {
+									messageEl.hidden = false;
+									messageEl.textContent = data.error || "Something went wrong.";
+									messageEl.classList.add("admin-result-message--error");
+									return;
+								}
+
+								messageEl.hidden = false;
+								messageEl.classList.remove("admin-result-message--error");
+								messageEl.textContent = `Done — all future visits now scheduled for ${fmt(data.newVisitStart)}.`;
+							} catch {
+								messageEl.hidden = false;
+								messageEl.textContent = "Network error — please try again.";
+								messageEl.classList.add("admin-result-message--error");
+							} finally {
+								submitBtn.disabled = false;
+							}
+						}
+					});
+
+					resultsEl.appendChild(card);
+				}
+			}
+
+			searchForm.addEventListener("submit", async (e) => {
+				e.preventDefault();
+				const email = document.getElementById("search-email").value.trim();
+				if (!email) return;
+
+				resultsEl.innerHTML = "";
+				setStatus("Searching…");
+
+				try {
+					const res = await fetch(`/api/admin/find-subscriptions?email=${encodeURIComponent(email)}`);
+					const data = await res.json();
+					if (!res.ok) {
+						setStatus(data.error || "Search failed.", true);
+						return;
+					}
+					renderResults(data.subscriptions || []);
+				} catch {
+					setStatus("Network error — please try again.", true);
+				}
+			});
+		</script>
+
+		<style>
+			.admin-container {
+				max-width: 680px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 2rem;
+			}
+
+			.admin-search {
+				display: flex;
+				align-items: flex-end;
+				gap: 1rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-search .book-form__row {
+				flex: 1;
+			}
+
+			.admin-status {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status--error {
+				color: #b3261e;
+			}
+
+			.admin-card {
+				margin-bottom: 1.25rem;
+				padding: 1.5rem;
+			}
+
+			.admin-card__meta {
+				color: var(--color-slate);
+				margin: 0.25rem 0;
+			}
+
+			.admin-reschedule-form {
+				display: flex;
+				align-items: flex-end;
+				gap: 1rem;
+				flex-wrap: wrap;
+				margin-top: 1rem;
+			}
+
+			.admin-result-message {
+				margin-top: 0.75rem;
+				font-weight: 600;
+			}
+
+			.admin-result-message--error {
+				color: #b3261e;
+			}
+		</style>
+	</body>
+</html>
