@@ -255,7 +255,13 @@ export async function deleteBookingEvent({ eventId }) {
 	} catch (err) {
 		// Already deleted / doesn't exist — treat as success rather than
 		// failing the whole cancellation over a calendar event that's gone
-		// either way.
-		if (err?.code !== 404 && err?.response?.status !== 404) throw err;
+		// either way. An event that no longer exists at all comes back as a
+		// plain 404. An event that *was* deleted directly in the Google
+		// Calendar UI leaves a tombstone instead, so a second delete call
+		// against that same id comes back as a 410 with the message
+		// "Resource has been deleted" — same end state, just a different
+		// status code, so it needs the same pass-through.
+		const status = err?.code ?? err?.response?.status;
+		if (status !== 404 && status !== 410) throw err;
 	}
 }
