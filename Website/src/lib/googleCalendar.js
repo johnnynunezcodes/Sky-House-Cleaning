@@ -126,6 +126,7 @@ export async function createBookingEvent({
 	end,
 	summary,
 	description,
+	location,
 	attendeeEmail,
 	timeZone = DEFAULT_TIME_ZONE,
 }) {
@@ -138,6 +139,11 @@ export async function createBookingEvent({
 	const baseEvent = {
 		summary,
 		description,
+		// Setting the dedicated `location` field (rather than only mentioning
+		// the address in the description) is what makes it show up as a
+		// tappable link in Google Calendar / Apple Calendar — tapping it opens
+		// Maps directly with the address pre-filled.
+		location,
 		start: { dateTime: start, timeZone },
 		end: { dateTime: end, timeZone },
 	};

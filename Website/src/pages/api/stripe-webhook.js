@@ -75,6 +75,7 @@ export async function POST({ request }) {
 					end: metadata.slotEnd,
 					summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
 					description: descriptionLines.join("\n"),
+					location: metadata.address || undefined,
 					attendeeEmail: email,
 				});
 			} catch (err) {
