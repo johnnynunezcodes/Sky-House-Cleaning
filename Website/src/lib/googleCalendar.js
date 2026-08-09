@@ -235,3 +235,27 @@ export async function updateBookingEvent({ eventId, start, end, timeZone = DEFAU
 	});
 	return event.data;
 }
+
+/**
+ * Removes a single calendar event outright — used by the staff tool to
+ * cancel one upcoming visit (the recurring plan continues normally; the
+ * cycle after this one is still computed from the subscription's stored
+ * schedule, which this doesn't touch) or to clear the upcoming visit when a
+ * whole plan is canceled immediately.
+ */
+export async function deleteBookingEvent({ eventId }) {
+	const auth = getAuth();
+	if (!auth) throw new Error("Google Calendar isn't configured yet.");
+
+	const calendar = google.calendar({ version: "v3", auth });
+	const calendarId = getCalendarId();
+
+	try {
+		await calendar.events.delete({ calendarId, eventId });
+	} catch (err) {
+		// Already deleted / doesn't exist — treat as success rather than
+		// failing the whole cancellation over a calendar event that's gone
+		// either way.
+		if (err?.code !== 404 && err?.response?.status !== 404) throw err;
+	}
+}

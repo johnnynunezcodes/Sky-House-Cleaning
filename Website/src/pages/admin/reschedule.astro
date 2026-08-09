@@ -91,6 +91,19 @@ import "../../styles/global.css";
 							</div>
 							<button type="submit" class="btn btn--outline">Save New Schedule</button>
 						</form>
+
+						<div class="admin-cancel-actions">
+							<button type="button" class="btn btn--outline admin-cancel-visit">
+								Cancel Next Visit Only
+							</button>
+							<button type="button" class="btn btn--outline admin-cancel-period">
+								Cancel Plan — After Current Period
+							</button>
+							<button type="button" class="btn btn--outline admin-cancel-now">
+								Cancel Plan — Immediately
+							</button>
+						</div>
+
 						<p class="admin-result-message" hidden></p>
 					`;
 
@@ -147,6 +160,76 @@ import "../../styles/global.css";
 							} finally {
 								submitBtn.disabled = false;
 							}
+						}
+					});
+
+					function showMessage(text, isError = false) {
+						messageEl.hidden = false;
+						messageEl.textContent = text;
+						messageEl.classList.toggle("admin-result-message--error", isError);
+					}
+
+					async function postJson(url, payload) {
+						const res = await fetch(url, {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify(payload),
+						});
+						const data = await res.json().catch(() => ({}));
+						return { ok: res.ok, data };
+					}
+
+					const cancelVisitBtn = card.querySelector(".admin-cancel-visit");
+					cancelVisitBtn.addEventListener("click", async () => {
+						if (!confirm(`Cancel the next scheduled visit for ${sub.name || "this customer"}? The plan keeps billing and scheduling normally after that.`)) return;
+						cancelVisitBtn.disabled = true;
+						try {
+							const { ok, data } = await postJson("/api/admin/cancel-visit", {
+								subscriptionId: sub.subscriptionId,
+							});
+							showMessage(ok ? "Next visit canceled — the plan continues normally after that." : (data.error || "Something went wrong."), !ok);
+						} catch {
+							showMessage("Network error — please try again.", true);
+						} finally {
+							cancelVisitBtn.disabled = false;
+						}
+					});
+
+					const cancelPeriodBtn = card.querySelector(".admin-cancel-period");
+					cancelPeriodBtn.addEventListener("click", async () => {
+						if (!confirm(`Cancel ${sub.name || "this customer"}'s recurring plan after their current paid period? Their already-scheduled visit still happens; no charges after that.`)) return;
+						cancelPeriodBtn.disabled = true;
+						try {
+							const { ok, data } = await postJson("/api/admin/cancel-subscription", {
+								subscriptionId: sub.subscriptionId,
+								immediate: false,
+							});
+							showMessage(ok ? "Plan will end after the current paid period — no further charges." : (data.error || "Something went wrong."), !ok);
+						} catch {
+							showMessage("Network error — please try again.", true);
+						} finally {
+							cancelPeriodBtn.disabled = false;
+						}
+					});
+
+					const cancelNowBtn = card.querySelector(".admin-cancel-now");
+					cancelNowBtn.addEventListener("click", async () => {
+						if (!confirm(`Cancel ${sub.name || "this customer"}'s recurring plan immediately and remove their upcoming visit from the calendar? If that visit was already paid for, you'll need to refund it by hand in Stripe.`)) return;
+						cancelNowBtn.disabled = true;
+						try {
+							const { ok, data } = await postJson("/api/admin/cancel-subscription", {
+								subscriptionId: sub.subscriptionId,
+								immediate: true,
+							});
+							if (ok && data.warning) {
+								showMessage(data.warning, true);
+							} else {
+								showMessage(ok ? "Plan canceled immediately and the upcoming visit was removed from the calendar." : (data.error || "Something went wrong."), !ok);
+							}
+						} catch {
+							showMessage("Network error — please try again.", true);
+						} finally {
+							cancelNowBtn.disabled = false;
 						}
 					});
 
@@ -223,6 +306,20 @@ import "../../styles/global.css";
 				gap: 1rem;
 				flex-wrap: wrap;
 				margin-top: 1rem;
+			}
+
+			.admin-cancel-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.75rem;
+				margin-top: 1.25rem;
+				padding-top: 1.25rem;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.admin-cancel-actions .btn {
+				border-color: #b3261e;
+				color: #b3261e;
 			}
 
 			.admin-result-message {

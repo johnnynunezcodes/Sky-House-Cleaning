@@ -52,6 +52,16 @@ Neither of these changes when the customer is actually billed — visit date/tim
 
 **Staff tools setup:** `/admin/*` and `/api/admin/*` are gated by HTTP Basic Auth (`src/middleware.js`), using the `ADMIN_USERNAME`/`ADMIN_PASSWORD` env vars — pick your own values (not tied to any Google/Stripe account) and set them in `.env` locally and in Vercel's Production environment variables. Until both are set, those routes return a 503 instead of prompting for a login.
 
+### Canceling recurring plans
+
+`/admin/reschedule` also has three cancel actions per customer, each calling its own API route:
+
+- **Cancel Next Visit Only** (`/api/admin/cancel-visit.js`) — removes just the upcoming calendar event. Billing and every visit after that continue completely normally; nothing about the subscription's stored schedule changes. Use this for a one-off skip, like the customer being on vacation.
+- **Cancel Plan — After Current Period** (`/api/admin/cancel-subscription.js`, `immediate: false`) — sets `cancel_at_period_end` on the subscription. The already-paid-for upcoming visit still happens as scheduled; no charges or visits after that. Nothing on the calendar changes immediately.
+- **Cancel Plan — Immediately** (`/api/admin/cancel-subscription.js`, `immediate: true`) — cancels the subscription right away *and* deletes the upcoming calendar event, since that visit is being called off. If it was already paid for, issue a refund by hand in the Stripe Dashboard (Payments → find the charge → Refund) — this tool doesn't do that automatically, since not every cancellation should be refunded.
+
+All three require finding the subscription first via the email search at the top of the page, same as rescheduling.
+
 ### What I (Johnny) still need to do to make this live
 
 **1. Run `npm install` locally.** `package.json` now includes `@astrojs/vercel`, `stripe`, and `googleapis`, but agents never run npm per the rule above — I need to install these myself.
