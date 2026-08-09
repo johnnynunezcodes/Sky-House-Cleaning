@@ -14,7 +14,7 @@ export const prerender = false;
 
 import Stripe from "stripe";
 import { isConfigured as isCalendarConfigured, createBookingEvent, isSlotStillFree } from "../../lib/googleCalendar.js";
-import { RECURRING_INTERVALS } from "../../lib/pricing.js";
+import { nextVisitWindow } from "../../lib/pricing.js";
 
 function describeService(type, frequency) {
 	if (type === "deep") return "Deep Cleaning";
@@ -26,28 +26,6 @@ function describeService(type, frequency) {
 		monthly: "Monthly Cleaning",
 	};
 	return names[frequency] || "Cleaning";
-}
-
-// Advances a recurring plan's last-scheduled visit forward by one billing
-// interval to get the next visit's date/time. Week-based intervals shift by
-// an exact number of days; monthly shifts by calendar month (same day-of
-// month/time), which can land a day or two off around short months (e.g. a
-// visit scheduled for the 31st rolling into early March after February) —
-// an acceptable, rare edge case rather than pulling in a date library.
-function nextVisitWindow(lastStart, lastEnd, frequency) {
-	const interval = RECURRING_INTERVALS[frequency];
-	if (!interval) return null;
-
-	const start = new Date(lastStart);
-	const end = new Date(lastEnd);
-	if (interval.days) {
-		start.setUTCDate(start.getUTCDate() + interval.days);
-		end.setUTCDate(end.getUTCDate() + interval.days);
-	} else if (interval.months) {
-		start.setUTCMonth(start.getUTCMonth() + interval.months);
-		end.setUTCMonth(end.getUTCMonth() + interval.months);
-	}
-	return { start: start.toISOString(), end: end.toISOString() };
 }
 
 export async function POST({ request }) {

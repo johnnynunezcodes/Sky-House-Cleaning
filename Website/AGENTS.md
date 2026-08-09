@@ -54,13 +54,14 @@ Neither of these changes when the customer is actually billed — visit date/tim
 
 ### Canceling recurring plans
 
-`/admin/reschedule` also has three cancel actions per customer, each calling its own API route:
+`/admin/reschedule` also has four cancel actions per customer, each calling its own API route:
 
-- **Cancel Next Visit Only** (`/api/admin/cancel-visit.js`) — removes just the upcoming calendar event. Billing and every visit after that continue completely normally; nothing about the subscription's stored schedule changes. Use this for a one-off skip, like the customer being on vacation.
+- **Cancel Next Visit — Still Charge** (`/api/admin/cancel-visit.js`) — removes just the upcoming calendar event. Billing and every visit after that continue completely normally — since billing is anchored to the actual cleaning date (see below), the customer is still charged on that original date even though nothing happens on the calendar. Nothing about the subscription's stored schedule changes. Use this for a late cancellation where the plan's cancellation policy still applies (e.g. short-notice vacation).
+- **Cancel Next Visit — Skip Charge** (`/api/admin/skip-visit.js`) — cancels the upcoming visit *and* the charge for it. Since billing is tied to the cleaning date, "don't charge for the skipped visit" means fast-forwarding the whole plan by one interval: the currently-scheduled calendar event is moved to the *following* visit's date (using the same interval math the renewal webhook uses), the subscription's stored `lastVisitStart`/`lastVisitEnd`/`lastEventId` are updated to match, and billing is re-anchored to that same new date via the `trial_end` mechanism (see "Billing date alignment" below) with `proration_behavior: "none"` so the skipped cycle is never invoiced. The day-of-week/time pattern is preserved automatically. Use this for an approved, no-charge skip (e.g. the customer is out of town and it's within the plan's free-reschedule terms).
 - **Cancel Plan — After Current Period** (`/api/admin/cancel-subscription.js`, `immediate: false`) — sets `cancel_at_period_end` on the subscription. The already-paid-for upcoming visit still happens as scheduled; no charges or visits after that. Nothing on the calendar changes immediately.
 - **Cancel Plan — Immediately** (`/api/admin/cancel-subscription.js`, `immediate: true`) — cancels the subscription right away *and* deletes the upcoming calendar event, since that visit is being called off. If it was already paid for, issue a refund by hand in the Stripe Dashboard (Payments → find the charge → Refund) — this tool doesn't do that automatically, since not every cancellation should be refunded.
 
-All three require finding the subscription first via the email search at the top of the page, same as rescheduling.
+All four require finding the subscription first via the email search at the top of the page, same as rescheduling.
 
 ### Billing date alignment
 

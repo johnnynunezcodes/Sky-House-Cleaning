@@ -94,7 +94,10 @@ import "../../styles/global.css";
 
 						<div class="admin-cancel-actions">
 							<button type="button" class="btn btn--outline admin-cancel-visit">
-								Cancel Next Visit Only
+								Cancel Next Visit — Still Charge
+							</button>
+							<button type="button" class="btn btn--outline admin-skip-visit">
+								Cancel Next Visit — Skip Charge
 							</button>
 							<button type="button" class="btn btn--outline admin-cancel-period">
 								Cancel Plan — After Current Period
@@ -197,6 +200,36 @@ import "../../styles/global.css";
 							showMessage("Network error — please try again.", true);
 						} finally {
 							cancelVisitBtn.disabled = false;
+						}
+					});
+
+					const skipVisitBtn = card.querySelector(".admin-skip-visit");
+					skipVisitBtn.addEventListener("click", async () => {
+						if (
+							!confirm(
+								`Cancel the next visit for ${sub.name || "this customer"} AND skip charging them for it? The plan fast-forwards to the following visit and resumes normally from there.`,
+							)
+						)
+							return;
+						skipVisitBtn.disabled = true;
+						try {
+							const { ok, data } = await postJson("/api/admin/skip-visit", {
+								subscriptionId: sub.subscriptionId,
+							});
+							if (ok && data.warning) {
+								showMessage(data.warning, true);
+							} else {
+								showMessage(
+									ok
+										? "Next visit canceled and unbilled — the plan resumes on the following visit."
+										: data.error || "Something went wrong.",
+									!ok,
+								);
+							}
+						} catch {
+							showMessage("Network error — please try again.", true);
+						} finally {
+							skipVisitBtn.disabled = false;
 						}
 					});
 

@@ -36,6 +36,31 @@ export function isRecurringFrequency(frequency) {
 	return Object.prototype.hasOwnProperty.call(RECURRING_INTERVALS, frequency);
 }
 
+// Advances a recurring plan's last-scheduled visit forward by one billing
+// interval to get the next visit's date/time. Week-based intervals shift by
+// an exact number of days; monthly shifts by calendar month (same day-of
+// month/time), which can land a day or two off around short months (e.g. a
+// visit scheduled for the 31st rolling into early March after February) —
+// an acceptable, rare edge case rather than pulling in a date library.
+// Shared by stripe-webhook.js (renewals) and the admin skip-visit tool
+// (src/pages/api/admin/skip-visit.js), which both need to compute "the
+// following visit" from a stored lastVisitStart/lastVisitEnd.
+export function nextVisitWindow(lastStart, lastEnd, frequency) {
+	const interval = RECURRING_INTERVALS[frequency];
+	if (!interval) return null;
+
+	const start = new Date(lastStart);
+	const end = new Date(lastEnd);
+	if (interval.days) {
+		start.setUTCDate(start.getUTCDate() + interval.days);
+		end.setUTCDate(end.getUTCDate() + interval.days);
+	} else if (interval.months) {
+		start.setUTCMonth(start.getUTCMonth() + interval.months);
+		end.setUTCMonth(end.getUTCMonth() + interval.months);
+	}
+	return { start: start.toISOString(), end: end.toISOString() };
+}
+
 const LAUNDRY_MULTIPLIERS = laundryUnitTiers.map((tier) => tier.multiplier);
 
 function tierIndexFor(sqft) {
