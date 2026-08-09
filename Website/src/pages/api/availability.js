@@ -31,6 +31,10 @@ export async function GET({ url }) {
 			headers: { "Content-Type": "application/json" },
 		});
 	} catch (err) {
+		// Logged so the real cause (bad credentials, missing Domain-Wide
+		// Delegation, malformed private key, etc.) shows up in Vercel's
+		// function logs instead of just a generic 500 on the client.
+		console.error("Failed to load availability:", err?.message, err?.response?.data || "");
 		return new Response(
 			JSON.stringify({ error: "Couldn't load availability right now. Please try again." }),
 			{ status: 500, headers: { "Content-Type": "application/json" } },
