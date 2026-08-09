@@ -91,13 +91,25 @@ export async function POST({ request }) {
 	let eventId = metadata.lastEventId || null;
 
 	try {
+		let moved = false;
 		if (eventId) {
-			// Move the existing event rather than replacing it, so it keeps its
-			// history/any attendee response instead of becoming a new event.
-			await updateBookingEvent({ eventId, start: start.toISOString(), end: end.toISOString() });
-		} else {
-			// Older subscriptions from before this tool existed won't have a
-			// stored event id — create one instead of failing outright.
+			try {
+				// Move the existing event rather than replacing it, so it keeps
+				// its history/any attendee response instead of becoming a new
+				// event.
+				await updateBookingEvent({ eventId, start: start.toISOString(), end: end.toISOString() });
+				moved = true;
+			} catch {
+				// The stored event id points at something that's already gone
+				// (e.g. deleted by an earlier cancellation, or by hand in
+				// Calendar) — fall back to creating a fresh event below rather
+				// than failing the whole request over a stale reference.
+				moved = false;
+			}
+		}
+		if (!moved) {
+			// Also covers older subscriptions from before this tool existed,
+			// which won't have a stored event id at all.
 			const created = await createBookingEvent({
 				start: start.toISOString(),
 				end: end.toISOString(),

@@ -76,13 +76,24 @@ export async function POST({ request }) {
 	let eventId = metadata.lastEventId || null;
 
 	try {
+		let moved = false;
 		if (eventId) {
-			// Move the currently-scheduled (about to be skipped) event forward
-			// to the following visit's date, rather than deleting and
-			// recreating — the net effect is the same (nothing left on the
-			// skipped date, something on the next one).
-			await updateBookingEvent({ eventId, start: nextWindow.start, end: nextWindow.end });
-		} else {
+			try {
+				// Move the currently-scheduled (about to be skipped) event
+				// forward to the following visit's date, rather than deleting
+				// and recreating — the net effect is the same (nothing left on
+				// the skipped date, something on the next one).
+				await updateBookingEvent({ eventId, start: nextWindow.start, end: nextWindow.end });
+				moved = true;
+			} catch {
+				// The stored event id points at something that's already gone
+				// (e.g. deleted by an earlier cancellation, or by hand in
+				// Calendar) — fall back to creating a fresh event below rather
+				// than failing the whole request over a stale reference.
+				moved = false;
+			}
+		}
+		if (!moved) {
 			const created = await createBookingEvent({
 				start: nextWindow.start,
 				end: nextWindow.end,

@@ -78,6 +78,17 @@ export async function POST({ request }) {
 					warning: "Subscription canceled, but couldn't remove the upcoming calendar event: " + err.message,
 				});
 			}
+
+			// Clear the stale reference now that the event is gone, so nothing
+			// else ever mistakes it for a live event and tries to update it.
+			try {
+				await stripe.subscriptions.update(subscriptionId, {
+					metadata: { ...metadata, lastEventId: "" },
+				});
+			} catch {
+				// Non-critical — the subscription and calendar are already in the
+				// right state; this just tidies up the metadata.
+			}
 		}
 
 		return json({ success: true, immediate: true });
@@ -119,6 +130,18 @@ export async function POST({ request }) {
 			await deleteBookingEvent({ eventId: metadata.lastEventId });
 			note =
 				"The already-scheduled visit on the calendar won't be billed under this cancellation date, so it was removed too.";
+
+			// Clear the stale reference now that the event is gone, so no
+			// other tool later mistakes it for a live event and tries to
+			// "update" a deleted one instead of creating a fresh one.
+			try {
+				await stripe.subscriptions.update(subscriptionId, {
+					metadata: { ...metadata, lastEventId: "" },
+				});
+			} catch {
+				// Non-critical — the calendar's already in the right state;
+				// this just tidies up the metadata.
+			}
 		} catch (err) {
 			warning =
 				"Cancellation scheduled, but the upcoming visit on the calendar won't be billed under this date and couldn't be removed automatically: " +

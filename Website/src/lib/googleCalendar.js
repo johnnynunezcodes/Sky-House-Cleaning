@@ -233,6 +233,21 @@ export async function updateBookingEvent({ eventId, start, end, timeZone = DEFAU
 			end: { dateTime: end, timeZone },
 		},
 	});
+
+	// A patch against an event that's already been deleted (by one of our own
+	// cancel tools, or by hand in Google Calendar) can succeed at the API
+	// level while the event stays in a "cancelled" tombstone state — the
+	// fields get updated, but it's permanently hidden from the calendar UI.
+	// Treat that the same as a hard failure so callers (skip-visit.js,
+	// reschedule-subscription.js) fall back to creating a fresh, visible
+	// event instead of silently "succeeding" at updating one nobody will
+	// ever see.
+	if (event.data.status === "cancelled") {
+		const err = new Error("That calendar event no longer exists (it was previously deleted).");
+		err.code = 410;
+		throw err;
+	}
+
 	return event.data;
 }
 
