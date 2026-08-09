@@ -14,10 +14,4 @@ Sky House Cleaning offers:
 - Monthly Interior Car Detailing Membership
 
 ### Add-On Services
-- Interior Windows
-- Inside Oven
-- Inside Refrigerator
-- Inside Cabinets & Drawers
-- Wet-Wipe Blinds
-- Laundry (Wash & Fold)
-- Dishwashing
+See [Add-Ons](Add-Ons.md) for the full list, broken out by which service/frequency each one is available for, with pricing.

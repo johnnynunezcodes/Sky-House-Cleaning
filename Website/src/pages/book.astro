@@ -1,0 +1,565 @@
+---
+import Layout from "../layouts/Layout.astro";
+import PageHero from "../components/PageHero.astro";
+import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
+---
+
+<Layout
+	title="Book Your Cleaning | Sky House Cleaning"
+	description="Pick a date and time for your cleaning, then complete your booking with secure payment."
+>
+	<PageHero
+		eyebrow="Almost There"
+		title="Book Your Cleaning"
+		lede="Pick a date and time that works for you, tell us a bit about your home, and we'll lock in your appointment."
+	/>
+
+	<section class="section" id="book-page" data-working-days={JSON.stringify(WORKING_DAYS)} data-window-days={BOOKING_WINDOW_DAYS}>
+		<div class="container book-layout">
+			<div class="book-main">
+				<div class="book-step" id="book-no-quote" hidden>
+					<h3>Let's start with a quote</h3>
+					<p>
+						We couldn't find a saved price for this session. Head back to the pricing page to build your
+						quote, and you'll land back here ready to pick a date.
+					</p>
+					<a href="/pricing" class="btn btn--primary">Go to Pricing</a>
+				</div>
+
+				<div id="book-steps">
+					<div class="book-step">
+						<h3><span class="book-step__num">1</span> Pick your date &amp; time</h3>
+						<p class="book-step__hint">Choose a day, then an open time slot.</p>
+
+						<div class="book-dates" id="book-dates"></div>
+						<div class="book-times" id="book-times">
+							<p class="book-times__placeholder" id="book-times-placeholder">Pick a date above to see open times.</p>
+						</div>
+					</div>
+
+					<div class="book-step">
+						<h3><span class="book-step__num">2</span> Your details</h3>
+						<p class="book-step__hint">So we know who we're cleaning for and how to get in.</p>
+
+						<form id="book-form" class="book-form">
+							<div class="book-form__row">
+								<label for="book-name">Full Name</label>
+								<input type="text" id="book-name" name="name" required autocomplete="name" />
+							</div>
+							<div class="book-form__row">
+								<label for="book-email">Email</label>
+								<input type="email" id="book-email" name="email" required autocomplete="email" />
+							</div>
+							<div class="book-form__row">
+								<label for="book-phone">Phone</label>
+								<input type="tel" id="book-phone" name="phone" required autocomplete="tel" />
+							</div>
+							<div class="book-form__row">
+								<label for="book-address">Home Address</label>
+								<input type="text" id="book-address" name="address" required autocomplete="street-address" />
+							</div>
+							<div class="book-form__row book-form__row--full">
+								<label for="book-access">How do we get in?</label>
+								<input
+									type="text"
+									id="book-access"
+									name="access"
+									placeholder="Gate code, lockbox code, garage code, or if someone will be home"
+									required
+								/>
+							</div>
+							<div class="book-form__row book-form__row--full">
+								<label for="book-pets">Will pets be home? <span class="book-form__optional">(optional)</span></label>
+								<input type="text" id="book-pets" name="pets" placeholder="Kind, and anything we should know" />
+							</div>
+							<div class="book-form__row book-form__row--full">
+								<label for="book-notes">Anything else? <span class="book-form__optional">(optional)</span></label>
+								<textarea id="book-notes" name="notes" rows="3" placeholder="Parking, allergies, areas to focus on or skip, anything else"></textarea>
+							</div>
+
+							<p class="book-form__error" id="book-form-error" hidden></p>
+
+							<button type="submit" class="btn btn--primary book-form__submit" id="book-submit">
+								Continue to Payment
+							</button>
+						</form>
+					</div>
+				</div>
+			</div>
+
+			<aside class="book-summary card" id="book-summary">
+				<p class="book-summary__label">Order Summary</p>
+				<ul class="book-summary__lines" id="book-summary-lines"></ul>
+				<div class="book-summary__total">
+					<span>Total</span>
+					<span id="book-summary-total">$0</span>
+				</div>
+				<p class="book-summary__note">
+					You'll be charged this amount when you complete payment on the next step.
+				</p>
+			</aside>
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.book-layout {
+		display: grid;
+		grid-template-columns: 1.5fr 1fr;
+		gap: 2.5rem;
+		align-items: start;
+	}
+
+	.book-main {
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
+	}
+
+	.book-step {
+		background: var(--color-white);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		padding: 2rem;
+	}
+
+	.book-step h3 {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.book-step__num {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		background: var(--color-sky);
+		color: var(--color-white);
+		font-size: 0.9rem;
+		flex-shrink: 0;
+	}
+
+	.book-step__hint {
+		font-size: 0.9rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.book-dates {
+		display: flex;
+		gap: 0.6rem;
+		overflow-x: auto;
+		padding-bottom: 0.5rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.book-date-btn {
+		flex: 0 0 auto;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.15rem;
+		min-width: 64px;
+		padding: 0.6rem 0.5rem;
+		border-radius: 10px;
+		border: 1px solid var(--color-border);
+		background: var(--color-cream);
+		color: var(--color-ink);
+		font-family: var(--font-body);
+		cursor: pointer;
+	}
+
+	.book-date-btn:hover {
+		border-color: var(--color-sky);
+	}
+
+	.book-date-btn.is-selected {
+		background: var(--color-sky);
+		border-color: var(--color-sky);
+		color: var(--color-white);
+	}
+
+	.book-date-btn__day {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		opacity: 0.8;
+	}
+
+	.book-date-btn__num {
+		font-family: var(--font-heading);
+		font-weight: 700;
+		font-size: 1.1rem;
+	}
+
+	.book-times {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+	}
+
+	.book-times__placeholder,
+	.book-times__empty,
+	.book-times__error {
+		margin: 0;
+		font-size: 0.9rem;
+		color: var(--color-slate-light);
+	}
+
+	.book-time-btn {
+		padding: 0.55rem 1rem;
+		border-radius: 999px;
+		border: 1px solid var(--color-border);
+		background: var(--color-cream);
+		color: var(--color-ink);
+		font-family: var(--font-body);
+		font-size: 0.9rem;
+		cursor: pointer;
+	}
+
+	.book-time-btn:hover {
+		border-color: var(--color-sky);
+	}
+
+	.book-time-btn.is-selected {
+		background: var(--color-sky);
+		border-color: var(--color-sky);
+		color: var(--color-white);
+	}
+
+	.book-form {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.25rem 1.5rem;
+	}
+
+	.book-form__row {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.book-form__row--full {
+		grid-column: 1 / -1;
+	}
+
+	.book-form label {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.85rem;
+		color: var(--color-ink);
+	}
+
+	.book-form__optional {
+		font-weight: 400;
+		color: var(--color-slate-light);
+	}
+
+	.book-form input,
+	.book-form textarea {
+		width: 100%;
+		font-family: var(--font-body);
+		font-size: 0.95rem;
+		color: var(--color-ink);
+		background: var(--color-cream);
+		border: 1px solid var(--color-border);
+		border-radius: 10px;
+		padding: 0.7rem 0.9rem;
+		resize: vertical;
+	}
+
+	.book-form input:focus,
+	.book-form textarea:focus {
+		outline: 2px solid var(--color-sky);
+		outline-offset: 1px;
+	}
+
+	.book-form__error {
+		grid-column: 1 / -1;
+		margin: 0;
+		font-size: 0.85rem;
+		color: #b3261e;
+	}
+
+	.book-form__error[hidden] {
+		display: none;
+	}
+
+	.book-form__submit {
+		grid-column: 1 / -1;
+		width: 100%;
+		margin-top: 0.25rem;
+	}
+
+	.book-form__submit[disabled] {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.book-summary {
+		position: sticky;
+		top: 1.5rem;
+	}
+
+	.book-summary__label {
+		margin: 0 0 1rem;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.8rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--color-sky-dark);
+	}
+
+	.book-summary__lines {
+		list-style: none;
+		margin: 0 0 1rem;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+
+	.book-summary__lines li {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		font-size: 0.9rem;
+		color: var(--color-slate);
+	}
+
+	.book-summary__total {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		padding-top: 1rem;
+		border-top: 1px solid var(--color-border);
+		font-family: var(--font-heading);
+		font-weight: 700;
+		font-size: 1.4rem;
+		color: var(--color-ink);
+	}
+
+	.book-summary__note {
+		margin: 1rem 0 0;
+		font-size: 0.8rem;
+		color: var(--color-slate-light);
+	}
+
+	@media (max-width: 900px) {
+		.book-layout {
+			grid-template-columns: 1fr;
+		}
+
+		.book-summary {
+			position: static;
+		}
+	}
+
+	@media (max-width: 560px) {
+		.book-form {
+			grid-template-columns: 1fr;
+		}
+
+		.book-step {
+			padding: 1.5rem;
+		}
+	}
+</style>
+
+<script>
+	function initBookPage() {
+		const root = document.getElementById("book-page");
+		if (!root || root.dataset.bookInit === "true") return;
+		root.dataset.bookInit = "true";
+
+		const workingDays = JSON.parse(root.dataset.workingDays || "[1,2,3,4,5,6]");
+		const windowDays = Number(root.dataset.windowDays) || 21;
+
+		const noQuoteEl = root.querySelector("#book-no-quote");
+		const stepsEl = root.querySelector("#book-steps");
+		const summaryLinesEl = root.querySelector("#book-summary-lines");
+		const summaryTotalEl = root.querySelector("#book-summary-total");
+		const datesEl = root.querySelector("#book-dates");
+		const timesEl = root.querySelector("#book-times");
+		const formEl = root.querySelector("#book-form");
+		const submitBtn = root.querySelector("#book-submit");
+		const errorEl = root.querySelector("#book-form-error");
+
+		let selectedDate = null; // "YYYY-MM-DD"
+		let selectedSlot = null; // { start, end }
+
+		function formatMoney(n) {
+			const value = Number(n) || 0;
+			const hasCents = Math.round(value * 100) % 100 !== 0;
+			return (
+				"$" +
+				value.toLocaleString("en-US", {
+					minimumFractionDigits: hasCents ? 2 : 0,
+					maximumFractionDigits: 2,
+				})
+			);
+		}
+
+		function toDateStr(date) {
+			const y = date.getFullYear();
+			const m = String(date.getMonth() + 1).padStart(2, "0");
+			const d = String(date.getDate()).padStart(2, "0");
+			return `${y}-${m}-${d}`;
+		}
+
+		function parseSelections() {
+			const params = new URLSearchParams(window.location.search);
+			const raw = params.get("s");
+			if (!raw) return null;
+			try {
+				return JSON.parse(raw);
+			} catch {
+				return null;
+			}
+		}
+
+		const selections = parseSelections();
+
+		if (!selections) {
+			if (noQuoteEl) noQuoteEl.hidden = false;
+			if (stepsEl) stepsEl.hidden = true;
+			const summaryEl = root.querySelector("#book-summary");
+			if (summaryEl) summaryEl.hidden = true;
+			return;
+		}
+
+		// Render the display-only order summary (built client-side on the
+		// pricing page). The actual charge is always re-derived server-side
+		// from `selections`, not from these display lines.
+		(selections.lines || []).forEach((line) => {
+			const li = document.createElement("li");
+			const label = document.createElement("span");
+			label.textContent = line.label;
+			const amount = document.createElement("span");
+			amount.textContent = formatMoney(line.amount);
+			li.append(label, amount);
+			summaryLinesEl.append(li);
+		});
+		summaryTotalEl.textContent = formatMoney(selections.total);
+
+		// Build the date strip: the next `windowDays` calendar days, filtered
+		// down to days the business is open.
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		for (let i = 0; i < windowDays; i++) {
+			const date = new Date(today);
+			date.setDate(date.getDate() + i);
+			if (!workingDays.includes(date.getDay())) continue;
+
+			const btn = document.createElement("button");
+			btn.type = "button";
+			btn.className = "book-date-btn";
+			btn.dataset.date = toDateStr(date);
+			btn.innerHTML = `
+				<span class="book-date-btn__day">${date.toLocaleDateString("en-US", { weekday: "short" })}</span>
+				<span class="book-date-btn__num">${date.getDate()}</span>
+			`;
+			btn.addEventListener("click", () => selectDate(btn.dataset.date, btn));
+			datesEl.append(btn);
+		}
+
+		async function selectDate(dateStr, btnEl) {
+			selectedDate = dateStr;
+			selectedSlot = null;
+
+			datesEl.querySelectorAll(".book-date-btn").forEach((b) => b.classList.remove("is-selected"));
+			btnEl.classList.add("is-selected");
+
+			timesEl.innerHTML = `<p class="book-times__placeholder">Loading times…</p>`;
+
+			try {
+				const response = await fetch(
+					`/api/availability?date=${encodeURIComponent(dateStr)}&type=${encodeURIComponent(selections.type || "standard")}`,
+				);
+				const data = await response.json();
+
+				if (!response.ok) {
+					throw new Error(data.error || "Couldn't load availability.");
+				}
+
+				renderTimes(data.slots || []);
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Couldn't load availability.";
+				timesEl.innerHTML = `<p class="book-times__error">${message}</p>`;
+			}
+		}
+
+		function renderTimes(slots) {
+			timesEl.innerHTML = "";
+
+			if (slots.length === 0) {
+				timesEl.innerHTML = `<p class="book-times__empty">No open times this day — try another date.</p>`;
+				return;
+			}
+
+			slots.forEach((slot) => {
+				const btn = document.createElement("button");
+				btn.type = "button";
+				btn.className = "book-time-btn";
+				const label = new Date(slot.start).toLocaleTimeString("en-US", {
+					hour: "numeric",
+					minute: "2-digit",
+				});
+				btn.textContent = label;
+				btn.addEventListener("click", () => {
+					selectedSlot = slot;
+					timesEl.querySelectorAll(".book-time-btn").forEach((b) => b.classList.remove("is-selected"));
+					btn.classList.add("is-selected");
+				});
+				timesEl.append(btn);
+			});
+		}
+
+		formEl?.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			errorEl.hidden = true;
+
+			if (!selectedSlot) {
+				errorEl.textContent = "Please pick a date and time above before continuing.";
+				errorEl.hidden = false;
+				timesEl.scrollIntoView({ behavior: "smooth", block: "center" });
+				return;
+			}
+
+			submitBtn.disabled = true;
+			submitBtn.textContent = "Redirecting to payment…";
+
+			const formData = new FormData(formEl);
+			const customer = Object.fromEntries(formData.entries());
+
+			try {
+				const response = await fetch("/api/create-checkout-session", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ selections, customer, slot: selectedSlot }),
+				});
+
+				const data = await response.json();
+
+				if (!response.ok || !data.url) {
+					throw new Error(data.error || "Something went wrong starting checkout.");
+				}
+
+				window.location.href = data.url;
+			} catch (err) {
+				errorEl.textContent = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+				errorEl.hidden = false;
+				submitBtn.disabled = false;
+				submitBtn.textContent = "Continue to Payment";
+			}
+		});
+	}
+
+	initBookPage();
+	document.addEventListener("astro:page-load", initBookPage);
+</script>

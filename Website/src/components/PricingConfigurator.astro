@@ -1,12 +1,18 @@
 ---
-import { pricingMatrix } from "../data/content.js";
+import {
+	pricingMatrix,
+	addOnCatalog,
+	deepCleanLaundryAddOn,
+	laundryUnitTiers,
+	applianceQuantityTiers,
+} from "../data/content.js";
 
 interface Props {
 	ctaHref?: string;
 	ctaLabel?: string;
 }
 
-const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
+const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 ---
 
 <div class="pc" id="pricing-configurator">
@@ -57,7 +63,152 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 	<div class="pc__result">
 		<p class="pc__result-label">Estimated Price</p>
 		<p class="pc__price" id="pc-price">$150</p>
+		<p class="pc__addons-note" id="pc-addons-note" hidden></p>
 		<a href={ctaHref} class="btn btn--primary pc__cta" id="pc-cta">{ctaLabel}</a>
+	</div>
+
+	<div class="pc__addons" id="pc-addons" hidden>
+		<p class="pc__label">Add-Ons</p>
+		<p class="pc__addons-intro">Add extra detail to your standard cleaning.</p>
+
+		{addOnCatalog.map((group, i) => (
+			<details class="pc__addon-group" open={i === 0}>
+				<summary class="pc__addon-group-heading">
+					<span class="pc__addon-group-heading-text">
+						<h4>{group.category}</h4>
+						<p>{group.note}</p>
+					</span>
+					<span class="pc__addon-group-chevron" aria-hidden="true"></span>
+				</summary>
+				<div class="pc__addon-list">
+					{group.items.map((item) =>
+						item.unit ? (
+							<div class="pc__addon pc__stepper-row">
+								<span class="pc__addon-text">
+									<span class="pc__addon-name">{item.label}</span>
+									<span class="pc__addon-duration">
+										$<span class="pc-unit-rate">{item.pricePerUnit.toFixed(2)}</span> per {item.unit}
+									</span>
+									{item.hasUnitDiscount && (
+										<label class="pc__units-select-wrap">
+											How many washer/dryer units do you have?
+											<select
+												class="pc__units-select pc-laundry-units"
+												aria-label={`Washer/dryer units for ${item.label}`}
+												data-base-price={item.pricePerUnit}
+											>
+												{laundryUnitTiers.map((tier) => (
+													<option value={tier.multiplier}>{tier.label}</option>
+												))}
+											</select>
+										</label>
+									)}
+									{item.hasQuantityDiscount && (
+										<span class="pc__addon-duration">
+											Price drops with each additional {item.unit} (up to {item.maxQuantity})
+										</span>
+									)}
+								</span>
+								<div class="pc__stepper">
+									<button
+										type="button"
+										class="pc__stepper-btn pc-stepper-minus"
+										aria-label={`Decrease ${item.label} quantity`}
+									>
+										−
+									</button>
+									<input
+										type="number"
+										class="pc__stepper-input pc-stepper-input"
+										data-id={item.id}
+										data-price-per-unit={item.pricePerUnit}
+										data-has-quantity-discount={item.hasQuantityDiscount ? "true" : "false"}
+										min="0"
+										max={item.maxQuantity || 10}
+										step="1"
+										value="0"
+										aria-label={`${item.label} quantity`}
+									/>
+									<button
+										type="button"
+										class="pc__stepper-btn pc-stepper-plus"
+										aria-label={`Increase ${item.label} quantity`}
+									>
+										+
+									</button>
+								</div>
+								<span class="pc__addon-price pc-stepper-subtotal">$0</span>
+							</div>
+						) : (
+							<label class="pc__addon">
+								<span class="pc__addon-check">
+									<input type="checkbox" class="pc-addon-input" data-price={item.price} value={item.id} />
+									<span class="pc__addon-text">
+										<span class="pc__addon-name">{item.label}</span>
+										{item.duration && <span class="pc__addon-duration">{item.duration}</span>}
+									</span>
+								</span>
+								<span class="pc__addon-price">${item.price}</span>
+							</label>
+						),
+					)}
+				</div>
+			</details>
+		))}
+	</div>
+
+	<div class="pc__addons pc__addons--deep" id="pc-deep-addons" hidden>
+		<p class="pc__label">Add-On</p>
+		<p class="pc__addons-intro">Add laundry service to your deep clean.</p>
+
+		<div class="pc__addon pc__stepper-row">
+			<span class="pc__addon-text">
+				<span class="pc__addon-name">{deepCleanLaundryAddOn.label}</span>
+				<span class="pc__addon-duration">
+					$<span class="pc-unit-rate">{deepCleanLaundryAddOn.pricePerUnit.toFixed(2)}</span> per {deepCleanLaundryAddOn.unit}
+				</span>
+				<label class="pc__units-select-wrap">
+					How many washer/dryer units do you have?
+					<select
+						class="pc__units-select pc-laundry-units"
+						aria-label={`Washer/dryer units for ${deepCleanLaundryAddOn.label}`}
+						data-base-price={deepCleanLaundryAddOn.pricePerUnit}
+					>
+						{laundryUnitTiers.map((tier) => (
+							<option value={tier.multiplier}>{tier.label}</option>
+						))}
+					</select>
+				</label>
+			</span>
+			<div class="pc__stepper">
+				<button
+					type="button"
+					class="pc__stepper-btn pc-stepper-minus"
+					aria-label={`Decrease ${deepCleanLaundryAddOn.label} quantity`}
+				>
+					−
+				</button>
+				<input
+					type="number"
+					class="pc__stepper-input pc-stepper-input"
+					data-id={deepCleanLaundryAddOn.id}
+					data-price-per-unit={deepCleanLaundryAddOn.pricePerUnit}
+					min="0"
+					max="10"
+					step="1"
+					value="0"
+					aria-label={`${deepCleanLaundryAddOn.label} quantity`}
+				/>
+				<button
+					type="button"
+					class="pc__stepper-btn pc-stepper-plus"
+					aria-label={`Increase ${deepCleanLaundryAddOn.label} quantity`}
+				>
+					+
+				</button>
+			</div>
+			<span class="pc__addon-price pc-stepper-subtotal">$0</span>
+		</div>
 	</div>
 </div>
 
@@ -124,6 +275,10 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 		cursor: pointer;
 	}
 
+	.pc__radio[hidden] {
+		display: none;
+	}
+
 	.pc__radio input {
 		accent-color: var(--color-sky);
 		width: 16px;
@@ -187,6 +342,233 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 		width: 100%;
 	}
 
+	.pc__addons-note {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--color-sky-dark);
+	}
+
+	.pc__addons-note[hidden] {
+		display: none;
+	}
+
+	.pc__addons {
+		grid-column: 1 / -1;
+		margin-top: 0.5rem;
+		padding-top: 2rem;
+		border-top: 1px solid var(--color-border);
+	}
+
+	.pc__addons[hidden] {
+		display: none;
+	}
+
+	.pc__addons-intro {
+		margin: 0 0 1.75rem;
+		font-size: 0.9rem;
+	}
+
+	.pc__addon-group {
+		border: 1px solid var(--color-border);
+		border-radius: 12px;
+	}
+
+	.pc__addon-group + .pc__addon-group {
+		margin-top: 1rem;
+	}
+
+	.pc__addon-group-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 1rem 1.25rem;
+		cursor: pointer;
+		list-style: none;
+	}
+
+	.pc__addon-group-heading::-webkit-details-marker {
+		display: none;
+	}
+
+	.pc__addon-group-heading-text {
+		display: block;
+	}
+
+	.pc__addon-group-heading h4 {
+		margin: 0 0 0.2rem;
+		font-size: 1rem;
+	}
+
+	.pc__addon-group-heading p {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--color-slate-light);
+	}
+
+	.pc__addon-group-chevron {
+		flex-shrink: 0;
+		width: 10px;
+		height: 10px;
+		border-right: 2px solid var(--color-sky-dark);
+		border-bottom: 2px solid var(--color-sky-dark);
+		transform: rotate(45deg);
+		transition: transform 0.15s ease;
+		margin-top: -4px;
+	}
+
+	.pc__addon-group[open] > .pc__addon-group-heading .pc__addon-group-chevron {
+		transform: rotate(-135deg);
+		margin-top: 4px;
+	}
+
+	.pc__addon-group .pc__addon-list {
+		padding: 0 1.25rem 0.5rem;
+		border-top: 1px solid var(--color-border);
+	}
+
+	.pc__addon-list {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.pc__addon {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.85rem 0;
+		border-bottom: 1px solid var(--color-border);
+		cursor: pointer;
+	}
+
+	/* Fixed-width label column so the quantity steppers (and prices) line up
+	   on the same axis from row to row, regardless of how much label/hint
+	   text a given add-on has. */
+	.pc__addon > :first-child {
+		flex: 0 0 260px;
+		width: 260px;
+	}
+
+	.pc__addon-list .pc__addon:last-child {
+		border-bottom: none;
+	}
+
+	.pc__addon-check {
+		display: flex;
+		align-items: center;
+		gap: 0.85rem;
+	}
+
+	.pc__addon-check input {
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+		accent-color: var(--color-sky);
+		cursor: pointer;
+	}
+
+	.pc__addon-text {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.pc__addon-name {
+		font-size: 0.95rem;
+		color: var(--color-ink);
+	}
+
+	.pc__addon-duration {
+		font-size: 0.8rem;
+		color: var(--color-slate-light);
+	}
+
+	.pc__units-select-wrap {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.35rem;
+		margin-top: 0.5rem;
+		font-size: 0.8rem;
+		color: var(--color-slate-light);
+	}
+
+	.pc__units-select {
+		width: 100%;
+		font-family: var(--font-body);
+		font-size: 0.8rem;
+		color: var(--color-ink);
+		background: var(--color-cream);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 0.3rem 0.5rem;
+		cursor: pointer;
+	}
+
+	.pc__addon-price {
+		flex-shrink: 0;
+		margin-left: auto;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.95rem;
+		color: var(--color-ink);
+	}
+
+	.pc__stepper-row {
+		cursor: default;
+		flex-wrap: wrap;
+		gap: 1.25rem;
+	}
+
+	.pc__addons--deep .pc__stepper-row {
+		border-bottom: none;
+		padding-top: 0;
+	}
+
+	.pc__stepper {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.pc__stepper-btn {
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
+		border: 1px solid var(--color-border);
+		background: var(--color-cream);
+		color: var(--color-ink);
+		font-size: 1.1rem;
+		line-height: 1;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.pc__stepper-btn:hover {
+		border-color: var(--color-sky);
+		color: var(--color-sky-dark);
+	}
+
+	.pc__stepper-input {
+		width: 48px;
+		text-align: center;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.95rem;
+		color: var(--color-ink);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 0.4rem 0.2rem;
+		-moz-appearance: textfield;
+	}
+
+	.pc__stepper-input::-webkit-outer-spin-button,
+	.pc__stepper-input::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+
 	@media (max-width: 860px) {
 		.pc {
 			grid-template-columns: 1fr;
@@ -201,10 +583,19 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 		.pc__fields {
 			grid-template-columns: 1fr;
 		}
+
+		.pc__addon > :first-child {
+			flex: 1 1 100%;
+			width: auto;
+		}
+
+		.pc__addon-price {
+			margin-left: 0;
+		}
 	}
 </style>
 
-<script define:vars={{ pricingMatrix }}>
+<script define:vars={{ pricingMatrix, applianceQuantityTiers, ctaHref }}>
 	function initPricingConfigurator() {
 		const root = document.getElementById("pricing-configurator");
 		if (!root || root.dataset.pcInit === "true") return;
@@ -217,6 +608,24 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 		const standardEl = root.querySelector('input[name="pc-type"][value="standard"]');
 		const conditionalLabels = root.querySelectorAll(".pc__radio--conditional");
 		const priceEl = root.querySelector("#pc-price");
+		const addonsEl = root.querySelector("#pc-addons");
+		const addonsNoteEl = root.querySelector("#pc-addons-note");
+		const addonInputs = root.querySelectorAll(".pc-addon-input");
+		const deepAddonsEl = root.querySelector("#pc-deep-addons");
+		const stepperRows = root.querySelectorAll(".pc__stepper-row");
+		const addonGroups = root.querySelectorAll(".pc__addon-group");
+		const ctaEl = root.querySelector("#pc-cta");
+
+		// Accordion behavior: opening one add-on category collapses the rest,
+		// so only one section is expanded at a time.
+		addonGroups.forEach((group) => {
+			group.addEventListener("toggle", () => {
+				if (!group.open) return;
+				addonGroups.forEach((other) => {
+					if (other !== group) other.open = false;
+				});
+			});
+		});
 
 		function tierIndexFor(sqft) {
 			if (sqft < 1000) return 0;
@@ -225,12 +634,26 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 		}
 
 		function formatMoney(n) {
-			return "$" + Number(n).toLocaleString("en-US");
+			const value = Number(n);
+			const hasCents = Math.round(value * 100) % 100 !== 0;
+			return (
+				"$" +
+				value.toLocaleString("en-US", {
+					minimumFractionDigits: hasCents ? 2 : 0,
+					maximumFractionDigits: 2,
+				})
+			);
 		}
 
 		function currentType() {
 			const checked = Array.from(typeEls).find((el) => el.checked);
 			return checked ? checked.value : "standard";
+		}
+
+		function clampQuantity(value, max = 10) {
+			const raw = Math.floor(Number(value));
+			if (!Number.isFinite(raw) || raw < 0) return 0;
+			return Math.min(raw, max);
 		}
 
 		function syncTypeAvailability() {
@@ -245,8 +668,128 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 			});
 		}
 
+		function syncAddonsAvailability() {
+			const isEligible = currentType() === "standard";
+
+			addonsEl.hidden = !isEligible;
+			if (!isEligible) {
+				addonInputs.forEach((input) => {
+					input.checked = false;
+				});
+			}
+
+			return isEligible;
+		}
+
+		function syncDeepAddonsAvailability() {
+			const isEligible = currentType() === "deep";
+			deepAddonsEl.hidden = !isEligible;
+			return isEligible;
+		}
+
+		// Every stepper row (per-unit add-ons) prices itself and resets to 0
+		// whenever it sits inside a currently-hidden section. A row prices
+		// itself one of two ways: rows with a washer/dryer units selector
+		// (laundry) use that multiplier; rows flagged for a quantity discount
+		// (multiple ovens/fridges/freezers/dishwashers) get a better per-unit
+		// rate once their own quantity reaches the next tier.
+		//
+		// Also returns the raw {id, qty, unitsMultiplier} for every active row
+		// so update() can hand it off to the /book step — the server re-derives
+		// prices from these ids rather than trusting any dollar amount computed
+		// here in the browser.
+		function updateSteppers() {
+			let total = 0;
+			const entries = [];
+
+			stepperRows.forEach((row) => {
+				const input = row.querySelector(".pc-stepper-input");
+				const subtotalEl = row.querySelector(".pc-stepper-subtotal");
+				const unitsSelect = row.querySelector(".pc-laundry-units");
+				const rateEl = row.querySelector(".pc-unit-rate");
+				const basePrice = Number(input.dataset.pricePerUnit) || 0;
+				const maxQuantity = Number(input.max) || 10;
+				const hidden = !!row.closest("[hidden]");
+
+				const quantity = hidden ? 0 : clampQuantity(input.value, maxQuantity);
+				input.value = quantity;
+
+				let multiplier = 1;
+				if (unitsSelect) {
+					multiplier = Number(unitsSelect.value) || 1;
+				} else if (input.dataset.hasQuantityDiscount === "true") {
+					const tierIndex = Math.min(Math.max(quantity, 1), applianceQuantityTiers.length) - 1;
+					multiplier = applianceQuantityTiers[tierIndex] ?? 1;
+				}
+
+				const effectiveRate = basePrice * multiplier;
+				if (rateEl) {
+					rateEl.textContent = effectiveRate.toFixed(2);
+				}
+
+				const subtotal = quantity * effectiveRate;
+				subtotalEl.textContent = formatMoney(subtotal);
+				total += subtotal;
+
+				if (!hidden && quantity > 0 && input.dataset.id) {
+					entries.push({
+						id: input.dataset.id,
+						qty: quantity,
+						unitsMultiplier: unitsSelect ? Number(unitsSelect.value) : undefined,
+						isDeepLaundry: !!row.closest("#pc-deep-addons"),
+						label: row.querySelector(".pc__addon-name")?.textContent || "",
+						amount: subtotal,
+					});
+				}
+			});
+
+			return { total, entries };
+		}
+
+		const FREQUENCY_LABELS = {
+			oneTime: "One-Time Cleaning",
+			weekly: "Weekly Cleaning",
+			biweekly: "Bi-Weekly Cleaning",
+			monthly: "Monthly Cleaning",
+		};
+		const TYPE_LABELS = {
+			deep: "Deep Cleaning (One-Time)",
+			moveInOut: "Move-In / Move-Out Cleaning (One-Time)",
+		};
+
+		// Builds the payload carried over to /book — the customer's raw
+		// selections (for the server to re-price authoritatively) plus a
+		// display-only breakdown (for the order summary on the next page).
+		// This is never trusted for the actual charge; see src/lib/pricing.js.
+		function buildBookingPayload({ type, frequency, sqft, basePrice, checkedAddonIds, stepperEntries, total }) {
+			const lines = [{ label: TYPE_LABELS[type] || FREQUENCY_LABELS[frequency], amount: basePrice }];
+
+			const addons = [];
+			if (type === "standard") {
+				checkedAddonIds.forEach(({ id, label, price }) => {
+					addons.push(id);
+					lines.push({ label, amount: price });
+				});
+			}
+
+			const steppers = [];
+			let deepLaundry = null;
+			stepperEntries.forEach((entry) => {
+				lines.push({ label: `${entry.label} × ${entry.qty}`, amount: entry.amount });
+				if (entry.isDeepLaundry) {
+					deepLaundry = { qty: entry.qty, unitsMultiplier: entry.unitsMultiplier };
+				} else {
+					steppers.push({ id: entry.id, qty: entry.qty, unitsMultiplier: entry.unitsMultiplier });
+				}
+			});
+
+			return { type, frequency, sqft, total, lines, addons, steppers, deepLaundry };
+		}
+
 		function update() {
 			syncTypeAvailability();
+			const addonsEligible = syncAddonsAvailability();
+			syncDeepAddonsAvailability();
 
 			const sqft = Number(sqftEl.value);
 			sqftValueEl.textContent = sqft.toLocaleString("en-US");
@@ -254,21 +797,84 @@ const { ctaHref = "#", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
 			const tier = pricingMatrix[tierIndexFor(sqft)];
 			const type = currentType();
 
-			let price;
+			let basePrice;
 			if (type === "deep") {
-				price = tier.deep;
+				basePrice = tier.deep;
 			} else if (type === "moveInOut") {
-				price = tier.moveInOut;
+				basePrice = tier.moveInOut;
 			} else {
-				price = tier[frequencyEl.value];
+				basePrice = tier[frequencyEl.value];
 			}
 
-			priceEl.textContent = formatMoney(price);
+			let addonsTotal = 0;
+			const checkedAddonIds = [];
+			if (addonsEligible) {
+				addonInputs.forEach((input) => {
+					if (input.checked) {
+						const price = Number(input.dataset.price);
+						addonsTotal += price;
+						checkedAddonIds.push({
+							id: input.value,
+							label: input.closest(".pc__addon")?.querySelector(".pc__addon-name")?.textContent || "",
+							price,
+						});
+					}
+				});
+			}
+
+			const { total: stepperTotal, entries: stepperEntries } = updateSteppers();
+
+			const extrasTotal = addonsTotal + stepperTotal;
+			const grandTotal = basePrice + extrasTotal;
+			priceEl.textContent = formatMoney(grandTotal);
+
+			if (extrasTotal > 0) {
+				addonsNoteEl.hidden = false;
+				addonsNoteEl.textContent = `Includes ${formatMoney(extrasTotal)} in add-ons`;
+			} else {
+				addonsNoteEl.hidden = true;
+			}
+
+			if (ctaEl) {
+				const payload = buildBookingPayload({
+					type,
+					frequency: frequencyEl.value,
+					sqft,
+					basePrice,
+					checkedAddonIds,
+					stepperEntries,
+					total: grandTotal,
+				});
+				const separator = ctaHref.includes("?") ? "&" : "?";
+				ctaEl.href = `${ctaHref}${separator}s=${encodeURIComponent(JSON.stringify(payload))}`;
+			}
 		}
 
 		frequencyEl.addEventListener("change", update);
 		sqftEl.addEventListener("input", update);
 		typeEls.forEach((el) => el.addEventListener("change", update));
+		addonInputs.forEach((el) => el.addEventListener("change", update));
+
+		stepperRows.forEach((row) => {
+			const input = row.querySelector(".pc-stepper-input");
+			const minusBtn = row.querySelector(".pc-stepper-minus");
+			const plusBtn = row.querySelector(".pc-stepper-plus");
+
+			minusBtn.addEventListener("click", () => {
+				const max = Number(input.max) || 10;
+				input.value = Math.max(0, clampQuantity(input.value, max) - 1);
+				update();
+			});
+			plusBtn.addEventListener("click", () => {
+				const max = Number(input.max) || 10;
+				input.value = Math.min(max, clampQuantity(input.value, max) + 1);
+				update();
+			});
+			input.addEventListener("input", update);
+
+			const unitsSelect = row.querySelector(".pc-laundry-units");
+			unitsSelect?.addEventListener("change", update);
+		});
 
 		update();
 	}

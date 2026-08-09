@@ -15,6 +15,8 @@ npm run build     # builds for production to ./dist
 npm run preview   # previews the production build locally
 ```
 
+For the booking/payment flow to work locally, copy `.env.example` to `.env` and fill in the Stripe and Google Calendar variables (see "Booking & payments architecture" in AGENTS.md for full setup steps).
+
 ## Project Structure
 - `src/pages/` — file-based routing (e.g. `index.astro` maps to `/`)
 - `public/` — static assets served as-is (favicon, images, etc.)
@@ -23,7 +25,7 @@ npm run preview   # previews the production build locally
 ## Current State
 Full site built out: Home, About, Services (overview + 6 detail pages), Pricing, Reviews, and Contact, with a shared design system (`src/styles/global.css`), Navbar/Footer, and reusable components (`ServiceCard`, `ChecklistCard`, `TestimonialCard`, `PageHero`, `CtaBand`). Content pulled from the reference files listed below. Service/pricing/testimonial data lives in `src/data/content.js`.
 
-There's no online booking tool wired up yet — "Call" and "Email" CTAs are used everywhere instead (see the `TODO` comments in `Footer.astro` and `contact.astro`). Once a booking tool is chosen, swap those in.
+The Pricing page's `PricingConfigurator` now flows into a full booking pipeline: `/book` (a real date/time picker backed by Google Calendar availability, plus an on-site contact form) → `src/pages/api/create-checkout-session.js` (Stripe Checkout) → `src/pages/api/stripe-webhook.js` (creates the actual Google Calendar event once payment succeeds). See "Booking & payments architecture" in [AGENTS.md](AGENTS.md) for how it fits together and the setup steps still needed to go live (installing new deps, Stripe keys + webhook, Google service account). The rest of the site's "Call"/"Email" CTAs are unchanged for now.
 
 ## Content & Branding
 When building out pages and copy, pull from the business reference files one level up:

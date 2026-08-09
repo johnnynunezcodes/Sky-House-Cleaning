@@ -12,7 +12,7 @@ We'll leave your kitchen sparkling, inside and out:
 - Cleaning the exterior of appliances
 - Polishing the sink and wiping counters and backsplash
 - Cleaning the interior of cabinets and drawers
-- Cleaning the interior of appliances (oven, refrigerator)
+- Cleaning the interior of appliances (oven, refrigerator, dishwasher)
 
 ### Bathrooms
 Your bathrooms will look and feel truly clean:
@@ -26,6 +26,7 @@ We'll help these spaces feel warm and cared for:
 - Tidying pillows, blankets, and common areas
 - Making beds (if fresh linens are left out)
 - Dusting shelves and blinds
+- Wiping down ceiling fans
 - Wiping window sills
 
 ### All Interior Areas of the Home
@@ -35,5 +36,6 @@ We'll take care of the extra details throughout your home:
 - Wiping down handrails
 - Wiping down walls and baseboards
 - Cleaning interior windows
+- Cleaning the glass sliding door
 
 We recommend this one before starting a Recurring Cleaning membership, or any time your home needs more than a standard refresh.

@@ -24,6 +24,7 @@ We'll keep these spaces feeling warm and cared for:
 - Making beds (if fresh linens are left out)
 - Dusting shelves and blinds
 - Wiping window sills
+- Cleaning the glass sliding door (if your home has one)
 
 ### All Interior Areas of the Home
 We'll take care of the details throughout your home:

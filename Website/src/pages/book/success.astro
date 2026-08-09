@@ -1,0 +1,68 @@
+---
+// Server-rendered so we can verify the Stripe session and show real details
+// instead of just trusting the redirect happened.
+export const prerender = false;
+
+import Stripe from "stripe";
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+
+const sessionId = Astro.url.searchParams.get("session_id");
+const secretKey = import.meta.env.STRIPE_SECRET_KEY;
+
+let session = null;
+let errorMessage = null;
+
+if (!sessionId) {
+	errorMessage = "We couldn't find your booking details.";
+} else if (!secretKey) {
+	errorMessage = "Payments aren't fully configured yet.";
+} else {
+	try {
+		const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
+		session = await stripe.checkout.sessions.retrieve(sessionId);
+	} catch {
+		errorMessage = "We couldn't verify your payment. If you were charged, don't worry — we'll be in touch.";
+	}
+}
+
+const amountPaid = session?.amount_total != null ? (session.amount_total / 100).toFixed(2) : null;
+const email = session?.customer_details?.email || session?.customer_email;
+---
+
+<Layout title="Booking Confirmed | Sky House Cleaning" description="Your Sky House Cleaning booking is confirmed.">
+	<PageHero
+		eyebrow="You're All Set"
+		title={errorMessage ? "Thanks for booking!" : "Booking Confirmed"}
+		lede={
+			errorMessage ||
+			`We've received your payment${amountPaid ? ` of $${amountPaid}` : ""}${
+				email ? ` and a receipt is on its way to ${email}` : ""
+			}. Your cleaning is on the calendar for the date and time you picked.`
+		}
+	/>
+
+	<section class="section">
+		<div class="container">
+			<div class="card success-card">
+				<p>
+					If anything about your appointment needs to change, just give us a call at{" "}
+					<a href="tel:+18017592044">(801) 759-2044</a> and we'll take care of it.
+				</p>
+				<a href="/" class="btn btn--primary">Back to Home</a>
+			</div>
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.success-card {
+		max-width: 640px;
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.success-card .btn {
+		margin-top: 1rem;
+	}
+</style>

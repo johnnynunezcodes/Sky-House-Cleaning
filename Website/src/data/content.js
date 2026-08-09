@@ -68,6 +68,105 @@ export const addOns = [
 	"Dishwashing",
 ];
 
+// Detailed add-on catalog for the one-time Standard Cleaning pricing configurator.
+export const addOnCatalog = [
+	{
+		category: "General Touch-Ups",
+		note: "Extra detail for commonly missed spots",
+		items: [
+			{ id: "inside-blinds", label: "Inside Blinds", pricePerUnit: 20, unit: "set" },
+			{ id: "ceiling-fans", label: "Ceiling Fans (Up to 5)", price: 50, duration: "20 min" },
+			{ id: "high-dusting", label: "High Dusting", price: 40, duration: "40 min" },
+		],
+	},
+	{
+		category: "Specialty & Laundry Services",
+		note: "Optional specialty add-ons",
+		items: [
+			{ id: "wash-dry-laundry", label: "Wash & Dry Laundry", pricePerUnit: 25, unit: "load", hasUnitDiscount: true },
+			{ id: "fold-laundry", label: "Fold Laundry", pricePerUnit: 10, unit: "load" },
+			{ id: "inside-washer-dryer", label: "Inside Washer/Dryer", price: 20, duration: "15 min" },
+			{
+				id: "baseboard-deep-clean",
+				label: "Baseboard Deep Clean (Whole Home)",
+				price: 150,
+				duration: "1 hr 30 min",
+			},
+			{ id: "jetted-tub", label: "Jetted Tub", price: 40, duration: "20 min" },
+		],
+	},
+	{
+		category: "Windows & Interior Detailing",
+		note: "Glass, dusting & detailed touch-ups",
+		items: [
+			{ id: "interior-windows-10", label: "Interior Windows (Up to 10)", price: 75, duration: "40 min" },
+			{ id: "interior-windows-20", label: "Interior Windows (11–20)", price: 140, duration: "1 hr 10 min" },
+			{ id: "window-tracks", label: "Window Tracks (Up to 10)", price: 40, duration: "30 min" },
+		],
+	},
+	{
+		category: "Kitchen & Bathroom Upgrades",
+		note: "Add deeper cleaning to high-use areas",
+		items: [
+			{
+				id: "inside-oven",
+				label: "Inside Oven",
+				pricePerUnit: 50,
+				unit: "oven",
+				maxQuantity: 3,
+				hasQuantityDiscount: true,
+			},
+			{
+				id: "inside-fridge",
+				label: "Inside Fridge",
+				pricePerUnit: 45,
+				unit: "fridge",
+				maxQuantity: 3,
+				hasQuantityDiscount: true,
+			},
+			{
+				id: "inside-freezer",
+				label: "Inside Freezer",
+				pricePerUnit: 35,
+				unit: "freezer",
+				maxQuantity: 3,
+				hasQuantityDiscount: true,
+			},
+			{
+				id: "dishwasher-inside",
+				label: "Dishwasher (Inside)",
+				pricePerUnit: 25,
+				unit: "dishwasher",
+				maxQuantity: 3,
+				hasQuantityDiscount: true,
+			},
+			{ id: "cabinet-interior", label: "Cabinet Interior Cleaning", price: 75, duration: "45 min" },
+		],
+	},
+];
+
+// Laundry add-on for Deep Cleaning — priced per load.
+export const deepCleanLaundryAddOn = {
+	id: "deep-clean-laundry",
+	label: "Laundry (Wash & Dry)",
+	pricePerUnit: 25,
+	unit: "load",
+	hasUnitDiscount: true,
+};
+
+// Discount tiers for homes with multiple washer/dryer units — more units means
+// loads can run in parallel, so less hands-on time per load.
+export const laundryUnitTiers = [
+	{ multiplier: 1, label: "1 washer/dryer (standard)" },
+	{ multiplier: 0.8, label: "2 washer/dryers (20% off)" },
+	{ multiplier: 0.75, label: "3+ washer/dryers (25% off)" },
+];
+
+// Per-unit discount for add-ons where a home might have more than one of the
+// same appliance (oven, fridge, freezer, dishwasher) — indexed by quantity - 1.
+// The discount applies to every unit in the order once that quantity is reached.
+export const applianceQuantityTiers = [1, 0.9, 0.85];
+
 export const pricingMatrix = [
 	{ sqft: "1–999", oneTime: 150, weekly: 105, biweekly: 120, monthly: 128, deep: 225, moveInOut: 263 },
 	{ sqft: "1,000–1,499", oneTime: 225, weekly: 158, biweekly: 180, monthly: 191, deep: 338, moveInOut: 394 },

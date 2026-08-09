@@ -1,0 +1,29 @@
+// Booking/scheduling configuration — used by the availability API
+// (src/pages/api/availability.js) to figure out which time slots to offer,
+// and by the Google Calendar helper to size the actual calendar event.
+// Adjust freely as the business's real hours/crew capacity become clearer.
+
+// Days open, 0 = Sunday ... 6 = Saturday. Closed Sundays by default.
+export const WORKING_DAYS = [1, 2, 3, 4, 5, 6];
+
+// Business hours in 24h local time. Last possible start time is derived from
+// this minus the job duration, so a job never gets scheduled to run past close.
+export const WORKING_HOURS = { start: 8, end: 17 };
+
+// How far out customers can book, and the granularity of offered start times.
+export const BOOKING_WINDOW_DAYS = 21;
+export const SLOT_INTERVAL_MINUTES = 30;
+
+// Rough job duration by cleaning type, in minutes — used to block out enough
+// time on the calendar and to avoid offering a start time that wouldn't leave
+// enough room before closing. These are deliberately conservative estimates;
+// tune them once you have a feel for how long jobs actually run.
+export const JOB_DURATION_MINUTES = {
+	standard: 150, // one-time / weekly / bi-weekly / monthly
+	deep: 240,
+	moveInOut: 270,
+};
+
+export function durationForType(type) {
+	return JOB_DURATION_MINUTES[type] || JOB_DURATION_MINUTES.standard;
+}
