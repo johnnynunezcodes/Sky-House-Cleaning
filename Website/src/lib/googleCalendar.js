@@ -44,6 +44,34 @@ export function isConfigured() {
 	);
 }
 
+// How far the given time zone's clock is from UTC, in minutes, at a specific
+// instant (varies with daylight saving). Used below instead of the server's
+// own local time zone, since `Date#setHours` etc. always operate in whatever
+// time zone the server process happens to be running in — locally that's
+// Pacific time, but on Vercel it's UTC, which silently shifted "8am" business
+// hours to 8am UTC (1am Pacific) once deployed.
+function getUtcOffsetMinutes(date, timeZone) {
+	const parts = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "shortOffset" }).formatToParts(
+		date,
+	);
+	const offsetPart = parts.find((p) => p.type === "timeZoneName")?.value || "GMT+0";
+	const match = offsetPart.match(/GMT([+-]\d+)(?::(\d+))?/);
+	if (!match) return 0;
+	const hours = Number(match[1]);
+	const minutes = match[2] ? Number(match[2]) : 0;
+	return hours * 60 + (hours < 0 ? -minutes : minutes);
+}
+
+// Converts a wall-clock time (e.g. "8:00 AM") on `dateStr` in `timeZone` into
+// the correct absolute UTC instant, regardless of what time zone the server
+// process itself is running in.
+function zonedTimeToUtc(dateStr, hour, minute, timeZone) {
+	const [year, month, day] = dateStr.split("-").map(Number);
+	const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+	const offsetMinutes = getUtcOffsetMinutes(new Date(naiveUtc), timeZone);
+	return new Date(naiveUtc - offsetMinutes * 60 * 1000);
+}
+
 /**
  * Returns open time slots on `dateStr` (YYYY-MM-DD) long enough for the given
  * cleaning `type`'s job duration, within business hours, with anything
@@ -54,14 +82,16 @@ export async function getAvailableSlots({ dateStr, type, timeZone = DEFAULT_TIME
 	const auth = getAuth();
 	if (!auth) throw new Error("Google Calendar isn't configured yet.");
 
-	const dayStart = new Date(`${dateStr}T00:00:00`);
-	if (Number.isNaN(dayStart.getTime())) throw new Error("Invalid date.");
-	if (!WORKING_DAYS.includes(dayStart.getDay())) return [];
+	const [year, month, day] = dateStr.split("-").map(Number);
+	if (!year || !month || !day) throw new Error("Invalid date.");
 
-	const windowStart = new Date(dayStart);
-	windowStart.setHours(WORKING_HOURS.start, 0, 0, 0);
-	const windowEnd = new Date(dayStart);
-	windowEnd.setHours(WORKING_HOURS.end, 0, 0, 0);
+	// Noon UTC avoids any date-rollover ambiguity when just figuring out
+	// which day of the week `dateStr` falls on.
+	const dayOfWeek = new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
+	if (!WORKING_DAYS.includes(dayOfWeek)) return [];
+
+	const windowStart = zonedTimeToUtc(dateStr, WORKING_HOURS.start, 0, timeZone);
+	const windowEnd = zonedTimeToUtc(dateStr, WORKING_HOURS.end, 0, timeZone);
 
 	const now = new Date();
 	if (windowEnd <= now) return [];
