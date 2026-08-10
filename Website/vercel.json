@@ -14,6 +14,26 @@
 			"source": "/blank-4",
 			"destination": "/contact",
 			"permanent": true
+		},
+		{
+			"source": "/pricing",
+			"destination": "/booking",
+			"permanent": true
+		},
+		{
+			"source": "/book",
+			"destination": "/schedule",
+			"permanent": true
+		},
+		{
+			"source": "/book/success",
+			"destination": "/schedule/success",
+			"permanent": true
+		},
+		{
+			"source": "/book/canceled",
+			"destination": "/schedule/canceled",
+			"permanent": true
 		}
 	]
 }

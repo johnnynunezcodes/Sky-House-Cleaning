@@ -2,12 +2,12 @@
 // Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Step two
 // of the phone-booking flow (step one is /admin/quote.astro, which builds
 // the `?s=` quote payload this page expects). This is a close adaptation of
-// the public /book.astro: same date/time picker and contact form, reusing
+// the public /schedule.astro: same date/time picker and contact form, reusing
 // the same /api/availability and /api/create-checkout-session endpoints
 // unchanged — staff and online customers go through identical slot
 // validation and server-side pricing.
 //
-// The one real difference: /book.astro redirects the customer's own browser
+// The one real difference: /schedule.astro redirects the customer's own browser
 // straight to Stripe to pay. Here, staff are booking on someone else's
 // behalf over the phone, so there's no card to collect on this screen —
 // instead, once the Checkout Session is created, its payment link is shown

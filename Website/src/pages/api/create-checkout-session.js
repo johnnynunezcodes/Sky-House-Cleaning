@@ -159,8 +159,8 @@ export async function POST({ request }) {
 				},
 				quantity: 1,
 			})),
-			success_url: `${origin}/book/success?session_id={CHECKOUT_SESSION_ID}`,
-			cancel_url: `${origin}/book/canceled`,
+			success_url: `${origin}/schedule/success?session_id={CHECKOUT_SESSION_ID}`,
+			cancel_url: `${origin}/schedule/canceled`,
 			metadata: bookingMetadata,
 			// Subscriptions don't automatically inherit the Checkout Session's
 			// metadata, so it's duplicated onto the subscription itself —

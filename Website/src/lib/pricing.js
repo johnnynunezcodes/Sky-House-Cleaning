@@ -2,7 +2,7 @@
 //
 // The browser (PricingConfigurator.astro) computes and *displays* a price so
 // the customer sees a live quote, and encodes their raw selections into the
-// `/book?s=...` URL. That encoded payload is a convenience for display only —
+// `/schedule?s=...` URL. That encoded payload is a convenience for display only —
 // it is NEVER trusted for the actual charge. `calculatePrice()` re-derives
 // the price from scratch, purely from `pricingMatrix` / `addOnCatalog` (the
 // same source of truth the site itself is built from), so nobody can tamper

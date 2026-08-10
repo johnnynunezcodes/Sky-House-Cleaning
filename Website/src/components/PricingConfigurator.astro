@@ -12,7 +12,7 @@ interface Props {
 	ctaLabel?: string;
 }
 
-const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.props;
+const { ctaHref = "/schedule", ctaLabel = "Pick Your Date & Time" } = Astro.props;
 ---
 
 <div class="pc" id="pricing-configurator">
@@ -214,6 +214,21 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 			<span class="pc__addon-price pc-stepper-subtotal">$0</span>
 		</div>
 	</div>
+
+	<!-- Mirrors .pc__result above — kept in sync by the same update() calls in
+	     the script below. Lets someone who's scrolled through every add-on
+	     see the price and book without scrolling back up to the top. Hidden
+	     for Move-In/Move-Out, since that type has no add-ons section for this
+	     to sit below (it'd just duplicate the top card with nothing between
+	     them). -->
+	<div class="pc__result pc__result--bottom" id="pc-result-bottom">
+		<a href={ctaHref} class="btn btn--primary pc__cta" id="pc-cta-bottom">{ctaLabel}</a>
+		<div class="pc__result-bottom-price">
+			<p class="pc__result-label">Estimated Price</p>
+			<p class="pc__price" id="pc-price-bottom">$150</p>
+			<p class="pc__addons-note" id="pc-addons-note-bottom" hidden></p>
+		</div>
+	</div>
 </div>
 
 <style>
@@ -344,6 +359,54 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 
 	.pc__cta {
 		width: 100%;
+	}
+
+	.pc__result--bottom {
+		grid-column: 1 / -1;
+		margin-top: 2rem;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1.5rem;
+		padding: 1.5rem 2rem;
+		text-align: left;
+	}
+
+	.pc__result--bottom .pc__cta {
+		width: auto;
+		flex-shrink: 0;
+	}
+
+	.pc__result-bottom-price {
+		text-align: right;
+	}
+
+	.pc__result-bottom-price .pc__result-label {
+		margin-bottom: 0.25rem;
+	}
+
+	.pc__result-bottom-price .pc__price {
+		margin: 0;
+		font-size: 2rem;
+	}
+
+	.pc__result-bottom-price .pc__addons-note {
+		margin-top: 0.35rem;
+	}
+
+	@media (max-width: 640px) {
+		.pc__result--bottom {
+			flex-direction: column;
+			text-align: center;
+		}
+
+		.pc__result--bottom .pc__cta {
+			width: 100%;
+		}
+
+		.pc__result-bottom-price {
+			text-align: center;
+		}
 	}
 
 	.pc__addons-note {
@@ -622,14 +685,18 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 		const standardEl = root.querySelector('input[name="pc-type"][value="standard"]');
 		const conditionalLabels = root.querySelectorAll(".pc__radio--conditional");
 		const priceEl = root.querySelector("#pc-price");
+		const priceElBottom = root.querySelector("#pc-price-bottom");
 		const addonsEl = root.querySelector("#pc-addons");
 		const addonsNoteEl = root.querySelector("#pc-addons-note");
+		const addonsNoteElBottom = root.querySelector("#pc-addons-note-bottom");
 		const addonsRecurringNoteEl = root.querySelector("#pc-addons-recurring-note");
 		const addonInputs = root.querySelectorAll(".pc-addon-input");
 		const deepAddonsEl = root.querySelector("#pc-deep-addons");
 		const stepperRows = root.querySelectorAll(".pc__stepper-row");
 		const addonGroups = root.querySelectorAll(".pc__addon-group");
 		const ctaEl = root.querySelector("#pc-cta");
+		const ctaElBottom = root.querySelector("#pc-cta-bottom");
+		const resultBottomEl = root.querySelector("#pc-result-bottom");
 
 		// Accordion behavior: opening one add-on category collapses the rest,
 		// so only one section is expanded at a time.
@@ -710,7 +777,7 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 		// rate once their own quantity reaches the next tier.
 		//
 		// Also returns the raw {id, qty, unitsMultiplier} for every active row
-		// so update() can hand it off to the /book step — the server re-derives
+		// so update() can hand it off to the /schedule step — the server re-derives
 		// prices from these ids rather than trusting any dollar amount computed
 		// here in the browser.
 		function updateSteppers() {
@@ -772,7 +839,7 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 			moveInOut: "Move-In / Move-Out Cleaning (One-Time)",
 		};
 
-		// Builds the payload carried over to /book — the customer's raw
+		// Builds the payload carried over to /schedule — the customer's raw
 		// selections (for the server to re-price authoritatively) plus a
 		// display-only breakdown (for the order summary on the next page).
 		// This is never trusted for the actual charge; see src/lib/pricing.js.
@@ -804,7 +871,11 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 		function update() {
 			syncTypeAvailability();
 			const addonsEligible = syncAddonsAvailability();
-			syncDeepAddonsAvailability();
+			const deepAddonsEligible = syncDeepAddonsAvailability();
+
+			if (resultBottomEl) {
+				resultBottomEl.hidden = !(addonsEligible || deepAddonsEligible);
+			}
 
 			const isRecurringPlan = frequencyEl.value !== "oneTime";
 			addonsRecurringNoteEl.hidden = !(addonsEligible && isRecurringPlan);
@@ -845,15 +916,22 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 			const extrasTotal = addonsTotal + stepperTotal;
 			const grandTotal = basePrice + extrasTotal;
 			priceEl.textContent = formatMoney(grandTotal);
+			if (priceElBottom) priceElBottom.textContent = formatMoney(grandTotal);
 
 			if (extrasTotal > 0) {
-				addonsNoteEl.hidden = false;
 				const isRecurringPlan = frequencyEl.value !== "oneTime";
-				addonsNoteEl.textContent = isRecurringPlan
+				const noteText = isRecurringPlan
 					? `Includes ${formatMoney(extrasTotal)} in add-ons, taken care of at every visit.`
 					: `Includes ${formatMoney(extrasTotal)} in add-ons`;
+				addonsNoteEl.hidden = false;
+				addonsNoteEl.textContent = noteText;
+				if (addonsNoteElBottom) {
+					addonsNoteElBottom.hidden = false;
+					addonsNoteElBottom.textContent = noteText;
+				}
 			} else {
 				addonsNoteEl.hidden = true;
+				if (addonsNoteElBottom) addonsNoteElBottom.hidden = true;
 			}
 
 			if (ctaEl) {
@@ -867,7 +945,9 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 					total: grandTotal,
 				});
 				const separator = ctaHref.includes("?") ? "&" : "?";
-				ctaEl.href = `${ctaHref}${separator}s=${encodeURIComponent(JSON.stringify(payload))}`;
+				const href = `${ctaHref}${separator}s=${encodeURIComponent(JSON.stringify(payload))}`;
+				ctaEl.href = href;
+				if (ctaElBottom) ctaElBottom.href = href;
 			}
 		}
 

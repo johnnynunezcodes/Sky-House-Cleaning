@@ -1,5 +1,5 @@
 // Returns open booking slots for a given date + cleaning type. Called by the
-// date/time picker on /book as the customer browses days.
+// date/time picker on /schedule as the customer browses days.
 export const prerender = false;
 
 import { getAvailableSlots, isConfigured } from "../../lib/googleCalendar.js";
