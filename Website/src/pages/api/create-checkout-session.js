@@ -94,36 +94,15 @@ export async function POST({ request }) {
 	const isRecurring = selections?.type === "standard" && isRecurringFrequency(selections?.frequency);
 	const recurring = isRecurring ? RECURRING_INTERVALS[selections.frequency] : null;
 
-	// Every line item is included in the Checkout Session and marked
-	// recurring when this is a subscription — including add-ons — so the
-	// Checkout page shows the customer their real first-charge total (base +
-	// add-ons), not just the base price. (An earlier version tried making
-	// add-ons one-time Checkout line items instead, but Stripe rejects
-	// mixing one-time prices into a session that also sets
-	// `proration_behavior: "none"`, which is what defers the first charge to
-	// the actual cleaning date below — confirmed live. Pending invoice items
-	// avoided that error but meant the Checkout page couldn't show the true
-	// total, since it doesn't know about charges added after the session is
-	// created — also confirmed live, and worse for the customer.)
-	//
-	// Since add-ons still shouldn't recur forever, every add-on line item's
-	// inline product gets tagged `metadata: { role: "addon" }` here. Once the
-	// subscription exists, stripe-webhook.js reads that tag to find those
-	// subscription items, and removes them right after the first invoice is
-	// paid — so the customer sees and pays the full amount upfront, but only
-	// once.
-	const addonRoleMetadata = { role: "addon" };
-
-	// Two extra clarifications get added on top of that per-line caption
-	// Stripe can't remove (see the line_items mapping below): the add-on's
-	// own displayed name says it's one-time, and a plain-language note is
-	// added right above the Subscribe button via `custom_text.submit.message`
-	// (a documented, stable Checkout Session field) spelling out the actual
-	// first-visit total and the lower ongoing rate.
-	const addonLines = lineItems.slice(1);
-	const cadenceLabel = recurring
-		? { week: recurring.interval_count === 2 ? "every 2 weeks" : "per week", month: "per month" }[recurring.interval]
-		: "";
+	// Every line item is included in the Checkout Session and marked recurring
+	// when this is a subscription — including add-ons — so the Checkout page
+	// shows the customer their real per-visit total, and so add-ons genuinely
+	// keep billing (and getting done) every cleaning, not just the first one.
+	// That's a deliberate choice, not a default: an oven or blinds add-on
+	// picked on a recurring plan means "clean that every time," matching what
+	// customers actually expect from a standing add-on on a weekly/bi-weekly/
+	// monthly plan. `PricingConfigurator.astro` states this plainly in the
+	// add-ons section and next to the price before checkout.
 
 	// Everything here rides along as metadata so the webhook
 	// (src/pages/api/stripe-webhook.js) can create the real calendar event(s)
@@ -147,22 +126,10 @@ export async function POST({ request }) {
 		const session = await stripe.checkout.sessions.create({
 			mode: isRecurring ? "subscription" : "payment",
 			customer_email: customer.email,
-			line_items: lineItems.map((line, index) => ({
+			line_items: lineItems.map((line) => ({
 				price_data: {
 					currency: "usd",
-					// index 0 is always the base service line (see calculatePrice
-					// in pricing.js) — every line after it is an add-on, tagged so
-					// stripe-webhook.js can find and remove it after the first
-					// invoice. Stripe's Checkout page always prints a "Billed
-					// weekly — $X/week after" caption under every recurring line
-					// item, including add-ons, and that caption can't be turned
-					// off or reworded — so on a recurring plan, the add-on's own
-					// displayed name says plainly that it's a one-time thing,
-					// right where the customer is already looking.
-					product_data:
-						index === 0
-							? { name: line.label }
-							: { name: isRecurring ? `${line.label} (this first cleaning only)` : line.label, metadata: addonRoleMetadata },
+					product_data: { name: line.label },
 					unit_amount: Math.round(line.amount * 100),
 					...(recurring && {
 						recurring: { interval: recurring.interval, interval_count: recurring.interval_count },
@@ -194,14 +161,6 @@ export async function POST({ request }) {
 					proration_behavior: "none",
 				},
 			}),
-			...(isRecurring &&
-				addonLines.length > 0 && {
-					custom_text: {
-						submit: {
-							message: `Your first cleaning comes to $${total.toFixed(2)}, add-on${addonLines.length > 1 ? "s" : ""} included. After that, you'll be billed $${lineItems[0].amount.toFixed(2)} ${cadenceLabel} for the plan on its own.`,
-						},
-					},
-				}),
 		});
 
 		return new Response(JSON.stringify({ url: session.url }), {

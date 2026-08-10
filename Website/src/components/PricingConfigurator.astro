@@ -71,8 +71,8 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 		<p class="pc__label">Add-Ons</p>
 		<p class="pc__addons-intro">Add extra detail to your standard cleaning.</p>
 		<p class="pc__addons-recurring-note" id="pc-addons-recurring-note" hidden>
-			On a recurring plan, any add-ons you pick here are just for this first cleaning — your regular visits
-			after that stay at the standard rate.
+			On a recurring plan, any add-ons you pick here become part of every visit — we'll take care of them
+			each time we clean.
 		</p>
 
 		{addOnCatalog.map((group, i) => (
@@ -850,7 +850,7 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 				addonsNoteEl.hidden = false;
 				const isRecurringPlan = frequencyEl.value !== "oneTime";
 				addonsNoteEl.textContent = isRecurringPlan
-					? `Includes ${formatMoney(extrasTotal)} in add-ons for this first cleaning — after that, visits go back to the regular ${FREQUENCY_LABELS[frequencyEl.value].toLowerCase()} rate.`
+					? `Includes ${formatMoney(extrasTotal)} in add-ons, taken care of at every visit.`
 					: `Includes ${formatMoney(extrasTotal)} in add-ons`;
 			} else {
 				addonsNoteEl.hidden = true;
