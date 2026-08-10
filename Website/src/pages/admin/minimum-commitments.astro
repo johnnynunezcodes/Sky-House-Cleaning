@@ -1,0 +1,279 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Unlike
+// /admin/reschedule (which looks up one customer at a time by email), this
+// is a full roster: every active recurring plan, with progress toward its
+// minimum-commitment term, in one table. Purely informational — nothing
+// here blocks cancellation automatically; staff still decide by hand
+// whether an early-cancellation request is inside or outside the policy's
+// term (see "Minimum-commitment tracking" in AGENTS.md).
+//
+// Fetched directly from Stripe in frontmatter (this page is server-rendered
+// per request, not statically built — see `prerender = false`) rather than
+// via a client-side fetch to a separate API route: there's no search input
+// here, just "load everything," so there's nothing gained by round-tripping
+// through the browser first.
+export const prerender = false;
+
+import "../../styles/global.css";
+import Stripe from "stripe";
+import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
+
+const secretKey = import.meta.env.STRIPE_SECRET_KEY;
+
+let rows = [];
+let loadError = "";
+
+function fmt(iso) {
+	if (!iso) return "—";
+	return new Date(iso).toLocaleString("en-US", {
+		timeZone: "America/Los_Angeles",
+		weekday: "short",
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	});
+}
+
+const FREQUENCY_LABELS = { weekly: "Weekly", biweekly: "Bi-Weekly", monthly: "Monthly" };
+
+if (!secretKey) {
+	loadError = "Stripe isn't configured — STRIPE_SECRET_KEY is missing. See AGENTS.md for setup steps.";
+} else {
+	try {
+		const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
+
+		// Recurring plans only, and there are few enough of these for one
+		// business that a single page (Stripe's max `limit`) will hold every
+		// one for a long while — revisit with `autoPagingEach` if that ever
+		// stops being true.
+		const list = await stripe.subscriptions.list({
+			status: "all",
+			limit: 100,
+			expand: ["data.customer"],
+		});
+
+		for (const sub of list.data) {
+			// Same statuses `find-subscriptions.js` treats as "still a live
+			// plan" — "trialing" included, since billing-date re-anchoring
+			// (skip/reschedule) briefly puts every plan into that status.
+			if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
+
+			const metadata = sub.metadata || {};
+			if (!metadata.frequency) continue; // not a recurring standard plan
+
+			const completedVisitCount = parseInt(metadata.completedVisitCount || "0", 10) || 0;
+			const minimumCommitment = MINIMUM_COMMITMENT[metadata.frequency] ?? null;
+			const remaining = minimumCommitment != null ? Math.max(minimumCommitment - completedVisitCount, 0) : null;
+			const met = minimumCommitment != null && completedVisitCount >= minimumCommitment;
+
+			rows.push({
+				subscriptionId: sub.id,
+				email: sub.customer && !sub.customer.deleted ? sub.customer.email || "" : "",
+				name: metadata.name || "",
+				phone: metadata.phone || "",
+				frequency: metadata.frequency,
+				status: sub.status,
+				lastVisitStart: metadata.lastVisitStart || "",
+				completedVisitCount,
+				minimumCommitment,
+				remaining,
+				met,
+			});
+		}
+
+		// Customers still working toward their minimum first, soonest-to-finish
+		// at the top; customers who've already met it sink to the bottom.
+		rows.sort((a, b) => {
+			if (a.met !== b.met) return a.met ? 1 : -1;
+			if (!a.met && !b.met) return (a.remaining ?? 0) - (b.remaining ?? 0);
+			return (a.name || "").localeCompare(b.name || "");
+		});
+	} catch (err) {
+		loadError = "Couldn't load subscriptions from Stripe: " + err.message;
+	}
+}
+
+const totalCount = rows.length;
+const metCount = rows.filter((r) => r.met).length;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Minimum Commitments | Sky House Cleaning Staff Tools</title>
+	</head>
+	<body>
+		<main class="section">
+			<div class="container admin-container admin-container--wide">
+				<p class="admin-nav"><a href="/admin/reschedule">← Manage a specific customer's plan</a></p>
+				<h1>Minimum Commitments</h1>
+				<p class="admin-hint">
+					Every active recurring plan and its progress toward that frequency's minimum-commitment
+					term. Counts only visits that were actually billed — skipped visits and "still charge"
+					cancellations don't add to the total (see <code>completedVisitCount</code> in AGENTS.md).
+					Nothing here cancels or blocks anything automatically; use
+					<a href="/admin/reschedule">Manage a specific customer's plan</a> to act on one.
+				</p>
+
+				{
+					loadError ? (
+						<p class="admin-status admin-status--error">{loadError}</p>
+					) : rows.length === 0 ? (
+						<p class="admin-status">No active recurring plans found.</p>
+					) : (
+						<>
+							<p class="admin-hint admin-hint--tight">
+								{totalCount} active plan{totalCount === 1 ? "" : "s"} · {metCount} met their minimum
+								commitment · {totalCount - metCount} still in progress
+							</p>
+							<div class="admin-table-wrap">
+								<table class="admin-table">
+									<thead>
+										<tr>
+											<th>Customer</th>
+											<th>Contact</th>
+											<th>Plan</th>
+											<th>Completed</th>
+											<th>Remaining</th>
+											<th>Status</th>
+											<th>Last Visit</th>
+										</tr>
+									</thead>
+									<tbody>
+										{rows.map((row) => (
+											<tr>
+												<td>{row.name || "(no name on file)"}</td>
+												<td>
+													{row.email && <div>{row.email}</div>}
+													{row.phone && <div>{row.phone}</div>}
+												</td>
+												<td>{FREQUENCY_LABELS[row.frequency] || row.frequency}</td>
+												<td>
+													{row.minimumCommitment != null
+														? `${row.completedVisitCount} of ${row.minimumCommitment}`
+														: `${row.completedVisitCount} (minimum not written yet)`}
+												</td>
+												<td>{row.remaining != null ? row.remaining : "—"}</td>
+												<td>
+													{row.met ? (
+														<span class="admin-badge admin-badge--met">Minimum met</span>
+													) : (
+														<span class="admin-badge admin-badge--pending">In progress</span>
+													)}
+													{row.status !== "active" && row.status !== "trialing" && (
+														<div class="admin-table__note">Status: {row.status}</div>
+													)}
+												</td>
+												<td>{fmt(row.lastVisitStart)}</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						</>
+					)
+				}
+			</div>
+		</main>
+
+		<style>
+			.admin-container {
+				max-width: 680px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-container--wide {
+				max-width: 1080px;
+			}
+
+			.admin-nav {
+				margin-bottom: 1.5rem;
+				font-size: 0.9rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-hint--tight {
+				margin: 0 0 1rem;
+				font-size: 0.9rem;
+				font-weight: 600;
+				color: var(--color-ink);
+			}
+
+			.admin-hint code {
+				background: var(--color-sky-light);
+				padding: 0.1rem 0.35rem;
+				border-radius: 4px;
+				font-size: 0.85em;
+			}
+
+			.admin-status {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status--error {
+				color: #b3261e;
+			}
+
+			.admin-table-wrap {
+				overflow-x: auto;
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+			}
+
+			.admin-table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.9rem;
+			}
+
+			.admin-table th,
+			.admin-table td {
+				text-align: left;
+				padding: 0.75rem 1rem;
+				border-bottom: 1px solid var(--color-border);
+				white-space: nowrap;
+			}
+
+			.admin-table th {
+				background: var(--color-sky-light);
+				font-weight: 600;
+			}
+
+			.admin-table tbody tr:last-child td {
+				border-bottom: none;
+			}
+
+			.admin-badge {
+				display: inline-block;
+				padding: 0.2rem 0.6rem;
+				border-radius: 999px;
+				font-size: 0.8rem;
+				font-weight: 600;
+			}
+
+			.admin-badge--met {
+				background: #e3f3e6;
+				color: #1e7a34;
+			}
+
+			.admin-badge--pending {
+				background: var(--color-sky-light);
+				color: var(--color-ink);
+			}
+
+			.admin-table__note {
+				margin-top: 0.25rem;
+				font-size: 0.8rem;
+				color: var(--color-slate);
+			}
+		</style>
+	</body>
+</html>
