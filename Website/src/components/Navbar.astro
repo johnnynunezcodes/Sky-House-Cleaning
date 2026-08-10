@@ -3,7 +3,7 @@ const navItems = [
 	{ label: "Home", href: "/" },
 	{ label: "About", href: "/about" },
 	{ label: "Services", href: "/services" },
-	{ label: "Pricing", href: "/pricing" },
+	{ label: "Booking", href: "/pricing" },
 	{ label: "Reviews", href: "/reviews" },
 	{ label: "Contact", href: "/contact" },
 ];
@@ -39,7 +39,7 @@ const currentPath = Astro.url.pathname;
 					);
 				})}
 			</ul>
-			<a href="tel:+18017592044" class="btn btn--primary navbar__cta">Call (801) 759-2044</a>
+			<a href="/pricing" class="btn btn--primary navbar__cta">Schedule Your Cleaning</a>
 		</nav>
 	</div>
 </header>
