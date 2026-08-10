@@ -2,12 +2,26 @@
 interface Props {
 	quote: string;
 	name: string;
+	rating?: number | null;
 }
 
-const { quote, name } = Astro.props;
+const { quote, name, rating = null } = Astro.props;
+// Google returns fractional ratings per-review sometimes (rare, but
+// possible) — round to the nearest whole star for display purposes only,
+// the underlying number is never altered or shown elsewhere.
+const filledStars = rating != null ? Math.max(0, Math.min(5, Math.round(rating))) : null;
 ---
 
 <figure class="testimonial">
+	{
+		filledStars != null && (
+			<div class="testimonial__stars" aria-label={`${rating} out of 5 stars`}>
+				{Array.from({ length: 5 }).map((_, i) => (
+					<span class:list={["testimonial__star", i < filledStars && "testimonial__star--filled"]}>★</span>
+				))}
+			</div>
+		)
+	}
 	<blockquote>&ldquo;{quote}&rdquo;</blockquote>
 	<figcaption>— {name}</figcaption>
 </figure>
@@ -37,5 +51,16 @@ const { quote, name } = Astro.props;
 		font-weight: 600;
 		font-size: 0.9rem;
 		color: var(--color-sky-dark);
+	}
+
+	.testimonial__stars {
+		margin-bottom: 0.85rem;
+		font-size: 0.95rem;
+		letter-spacing: 0.15em;
+		color: var(--color-border);
+	}
+
+	.testimonial__star--filled {
+		color: var(--color-sky);
 	}
 </style>

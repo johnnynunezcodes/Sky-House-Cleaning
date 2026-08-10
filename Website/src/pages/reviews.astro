@@ -1,9 +1,50 @@
 ---
+// Server-rendered (not statically built) so the live Google reviews below
+// are fetched fresh per request rather than baked in at deploy time — see
+// AGENTS.md's "Live Google reviews" section for the full setup and
+// fallback behavior.
+export const prerender = false;
+
 import Layout from "../layouts/Layout.astro";
 import PageHero from "../components/PageHero.astro";
 import TestimonialCard from "../components/TestimonialCard.astro";
 import CtaBand from "../components/CtaBand.astro";
 import { testimonials } from "../data/content.js";
+import { isConfigured as isGoogleReviewsConfigured, getGoogleReviews, writeReviewUrl } from "../lib/googleReviews.js";
+
+let liveReviews = null; // non-null once real Google reviews load successfully
+let overallRating = null;
+let userRatingCount = null;
+let mapsUri = null;
+
+if (isGoogleReviewsConfigured()) {
+	try {
+		const data = await getGoogleReviews();
+		if (data.reviews.length > 0) {
+			liveReviews = data.reviews;
+			overallRating = data.rating;
+			userRatingCount = data.userRatingCount;
+			mapsUri = data.mapsUri;
+		}
+	} catch (err) {
+		// Never break the page over a Places API hiccup (bad key, quota,
+		// network blip) — just fall back to the curated testimonials below,
+		// exactly as if live reviews were never configured at all.
+		console.error("Failed to load Google reviews:", err?.message);
+	}
+}
+
+// Falls back to the hand-picked testimonials in data/content.js — real
+// quotes Johnny collected directly — until GOOGLE_PLACES_API_KEY and
+// GOOGLE_PLACE_ID are set up (see AGENTS.md), or any time the live fetch
+// fails.
+const displayReviews =
+	liveReviews ?? testimonials.map((t) => ({ authorName: t.name, text: t.quote, rating: null }));
+
+// The "leave us a review" link only needs the Place ID (not a successful
+// API fetch), so it can still show up even if the live-reviews fetch above
+// failed for some reason.
+const reviewUrl = writeReviewUrl();
 ---
 
 <Layout
@@ -18,11 +59,39 @@ import { testimonials } from "../data/content.js";
 
 	<section class="section">
 		<div class="container">
+			{
+				overallRating != null && (
+					<p class="reviews-summary">
+						<span class="reviews-summary__score">{overallRating.toFixed(1)}</span> out of 5
+						{userRatingCount != null && ` from ${userRatingCount} Google reviews`}
+					</p>
+				)
+			}
+
 			<div class="grid grid--3">
-				{testimonials.map((t) => (
-					<TestimonialCard quote={t.quote} name={t.name} />
+				{displayReviews.map((r) => (
+					<TestimonialCard quote={r.text} name={r.authorName} rating={r.rating} />
 				))}
 			</div>
+
+			{
+				(reviewUrl || mapsUri) && (
+					<div class="reviews-actions">
+						{reviewUrl && (
+							<a href={reviewUrl} target="_blank" rel="noopener" class="btn btn--primary">
+								Leave Us a Review
+							</a>
+						)}
+						{mapsUri && (
+							<a href={mapsUri} target="_blank" rel="noopener" class="btn btn--outline">
+								See All Reviews on Google
+							</a>
+						)}
+					</div>
+				)
+			}
+
+			{liveReviews && <p class="reviews-attribution">Reviews via Google</p>}
 		</div>
 	</section>
 
@@ -31,3 +100,34 @@ import { testimonials } from "../data/content.js";
 		subtext="Call or email us and let's get a cleaning on the calendar."
 	/>
 </Layout>
+
+<style>
+	.reviews-summary {
+		text-align: center;
+		margin: 0 0 2.5rem;
+		font-size: 1.15rem;
+		color: var(--color-slate);
+	}
+
+	.reviews-summary__score {
+		font-family: var(--font-heading);
+		font-weight: 700;
+		font-size: 1.4rem;
+		color: var(--color-ink);
+	}
+
+	.reviews-actions {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin-top: 2.5rem;
+	}
+
+	.reviews-attribution {
+		text-align: center;
+		margin: 1rem 0 0;
+		font-size: 0.85rem;
+		color: var(--color-slate-light);
+	}
+</style>
