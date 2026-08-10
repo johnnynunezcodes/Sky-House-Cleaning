@@ -85,38 +85,29 @@ export async function POST({ request }) {
 				// can find and move it later without guessing which event is theirs.
 				if (session.mode === "subscription" && session.subscription) {
 					try {
-						const subscription = await stripe.subscriptions.retrieve(session.subscription);
+						// Expand the price/product so add-on subscription items —
+						// tagged with product metadata `role: "addon"` in
+						// create-checkout-session.js — can be found and stored for
+						// removal after the first invoice below. Add-ons are
+						// included as real recurring line items at checkout (so
+						// Stripe's own payment page shows the true first-charge
+						// total), but they shouldn't keep billing every cycle.
+						const subscription = await stripe.subscriptions.retrieve(session.subscription, {
+							expand: ["items.data.price.product"],
+						});
+						const addonItemIds = subscription.items.data
+							.filter((item) => item.price?.product?.metadata?.role === "addon")
+							.map((item) => item.id);
+
 						await stripe.subscriptions.update(session.subscription, {
-							metadata: { ...subscription.metadata, lastEventId: createdEvent.id },
+							metadata: {
+								...subscription.metadata,
+								lastEventId: createdEvent.id,
+								...(addonItemIds.length > 0 && { addonItemIds: addonItemIds.join(",") }),
+							},
 						});
 					} catch (err) {
 						console.error("Failed to save calendar event id on subscription:", err?.message);
-					}
-
-					// Add-ons on a recurring plan bill once, with the first
-					// cleaning, then never again — see create-checkout-session.js
-					// for why this has to happen as pending invoice items rather
-					// than as Checkout line items. Each one attaches to this
-					// subscription with no `invoice` specified, so Stripe sweeps
-					// them into whatever the subscription's *next* invoice turns
-					// out to be — the deferred first-visit invoice, thanks to
-					// `billing_cycle_anchor`/`proration_behavior: "none"` — and
-					// they never appear again since they aren't a recurring price.
-					if (metadata.addonLines) {
-						try {
-							const addonLines = JSON.parse(metadata.addonLines);
-							for (const line of addonLines) {
-								await stripe.invoiceItems.create({
-									customer: session.customer,
-									subscription: session.subscription,
-									currency: "usd",
-									amount: Math.round(line.a * 100),
-									description: line.l,
-								});
-							}
-						} catch (err) {
-							console.error("Failed to add add-on charges to first invoice:", err?.message);
-						}
 					}
 				}
 			} catch (err) {
@@ -152,6 +143,26 @@ export async function POST({ request }) {
 					lastVisitSeconds != null &&
 					typeof invoice.period_start === "number" &&
 					Math.abs(invoice.period_start - lastVisitSeconds) < 3600;
+
+				// This invoice matching the visit already on file means it's the
+				// delayed first charge landing on the actual cleaning date (see
+				// "Billing date alignment" in AGENTS.md) — the one moment any
+				// add-ons get billed. Remove those subscription items now so
+				// they don't appear on any invoice after this one. Clearing
+				// `addonItemIds` from metadata afterward makes this safe to run
+				// again if Stripe ever retries this webhook delivery.
+				if (alreadyScheduled && metadata.addonItemIds) {
+					try {
+						const addonItemIds = metadata.addonItemIds.split(",").filter(Boolean);
+						await stripe.subscriptions.update(invoice.subscription, {
+							items: addonItemIds.map((id) => ({ id, deleted: true })),
+							proration_behavior: "none",
+							metadata: { ...metadata, addonItemIds: "" },
+						});
+					} catch (err) {
+						console.error("Failed to remove add-ons after first invoice:", err?.message);
+					}
+				}
 
 				if (
 					!alreadyScheduled &&
