@@ -70,6 +70,10 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 	<div class="pc__addons" id="pc-addons" hidden>
 		<p class="pc__label">Add-Ons</p>
 		<p class="pc__addons-intro">Add extra detail to your standard cleaning.</p>
+		<p class="pc__addons-recurring-note" id="pc-addons-recurring-note" hidden>
+			On a recurring plan, any add-ons you pick here are just for this first cleaning — your regular visits
+			after that stay at the standard rate.
+		</p>
 
 		{addOnCatalog.map((group, i) => (
 			<details class="pc__addon-group" open={i === 0}>
@@ -368,6 +372,16 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 		font-size: 0.9rem;
 	}
 
+	.pc__addons-recurring-note {
+		margin: -1.25rem 0 1.75rem;
+		font-size: 0.85rem;
+		color: var(--color-sky-dark);
+	}
+
+	.pc__addons-recurring-note[hidden] {
+		display: none;
+	}
+
 	.pc__addon-group {
 		border: 1px solid var(--color-border);
 		border-radius: 12px;
@@ -610,6 +624,7 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 		const priceEl = root.querySelector("#pc-price");
 		const addonsEl = root.querySelector("#pc-addons");
 		const addonsNoteEl = root.querySelector("#pc-addons-note");
+		const addonsRecurringNoteEl = root.querySelector("#pc-addons-recurring-note");
 		const addonInputs = root.querySelectorAll(".pc-addon-input");
 		const deepAddonsEl = root.querySelector("#pc-deep-addons");
 		const stepperRows = root.querySelectorAll(".pc__stepper-row");
@@ -790,6 +805,9 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 			syncTypeAvailability();
 			const addonsEligible = syncAddonsAvailability();
 			syncDeepAddonsAvailability();
+
+			const isRecurringPlan = frequencyEl.value !== "oneTime";
+			addonsRecurringNoteEl.hidden = !(addonsEligible && isRecurringPlan);
 
 			const sqft = Number(sqftEl.value);
 			sqftValueEl.textContent = sqft.toLocaleString("en-US");
