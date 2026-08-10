@@ -108,10 +108,12 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 							<div class="admin-link-row">
 								<input type="text" id="book-payment-link" class="admin-link-input" readonly />
 								<button type="button" class="btn btn--outline" id="book-copy-link">Copy Link</button>
+								<button type="button" class="btn btn--outline" id="book-copy-message">Copy Message</button>
 							</div>
 							<p class="admin-hint--tight">
 								Text or email this link to the customer to complete payment. Nothing is booked or
-								charged until they pay it — no calendar event exists yet.
+								charged until they pay it — no calendar event exists yet. "Copy Message" copies a
+								ready-to-send note with the link already in it, so you're not typing one out by hand.
 							</p>
 							<a href="#" target="_blank" rel="noopener" id="book-open-link" class="btn btn--outline">Open Payment Page</a>
 
@@ -467,10 +469,12 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 				const linkRecap = root.querySelector("#book-link-recap");
 				const linkInput = root.querySelector("#book-payment-link");
 				const copyBtn = root.querySelector("#book-copy-link");
+				const copyMessageBtn = root.querySelector("#book-copy-message");
 				const openLink = root.querySelector("#book-open-link");
 
 				let selectedDate = null; // "YYYY-MM-DD"
 				let selectedSlot = null; // { start, end }
+				let lastCustomerName = "";
 
 				function formatMoney(n) {
 					const value = Number(n) || 0;
@@ -638,6 +642,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 						linkRecap.textContent = `${customer.name || "This customer"} — ${when}, ${formatMoney(selections.total)}`;
 						linkInput.value = data.url;
 						openLink.href = data.url;
+						lastCustomerName = (customer.name || "").trim();
 						linkPanel.hidden = false;
 						linkPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -652,18 +657,39 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 					}
 				});
 
-				copyBtn?.addEventListener("click", async () => {
+				async function copyText(text) {
 					try {
-						await navigator.clipboard.writeText(linkInput.value);
+						await navigator.clipboard.writeText(text);
 					} catch {
-						linkInput.select();
+						const scratch = document.createElement("textarea");
+						scratch.value = text;
+						scratch.style.position = "fixed";
+						scratch.style.opacity = "0";
+						document.body.appendChild(scratch);
+						scratch.select();
 						document.execCommand("copy");
+						document.body.removeChild(scratch);
 					}
-					const original = copyBtn.textContent;
-					copyBtn.textContent = "Copied!";
+				}
+
+				function flashCopied(button) {
+					const original = button.textContent;
+					button.textContent = "Copied!";
 					setTimeout(() => {
-						copyBtn.textContent = original;
+						button.textContent = original;
 					}, 1500);
+				}
+
+				copyBtn?.addEventListener("click", async () => {
+					await copyText(linkInput.value);
+					flashCopied(copyBtn);
+				});
+
+				copyMessageBtn?.addEventListener("click", async () => {
+					const greetingName = lastCustomerName || "there";
+					const message = `Hi ${greetingName}, here's your secure link to complete your Sky House Cleaning booking: ${linkInput.value}\n\nNothing's charged until you finish this step.`;
+					await copyText(message);
+					flashCopied(copyMessageBtn);
 				});
 			}
 
