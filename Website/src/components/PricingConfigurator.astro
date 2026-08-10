@@ -830,7 +830,10 @@ const { ctaHref = "/book", ctaLabel = "Get Your Cleaning Started" } = Astro.prop
 
 			if (extrasTotal > 0) {
 				addonsNoteEl.hidden = false;
-				addonsNoteEl.textContent = `Includes ${formatMoney(extrasTotal)} in add-ons`;
+				const isRecurringPlan = frequencyEl.value !== "oneTime";
+				addonsNoteEl.textContent = isRecurringPlan
+					? `Includes ${formatMoney(extrasTotal)} in add-ons for this first cleaning — after that, visits go back to the regular ${FREQUENCY_LABELS[frequencyEl.value].toLowerCase()} rate.`
+					: `Includes ${formatMoney(extrasTotal)} in add-ons`;
 			} else {
 				addonsNoteEl.hidden = true;
 			}

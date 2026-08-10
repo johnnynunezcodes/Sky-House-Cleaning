@@ -116,14 +116,25 @@ export async function POST({ request }) {
 		const session = await stripe.checkout.sessions.create({
 			mode: isRecurring ? "subscription" : "payment",
 			customer_email: customer.email,
-			line_items: lineItems.map((line) => ({
+			line_items: lineItems.map((line, index) => ({
 				price_data: {
 					currency: "usd",
 					product_data: { name: line.label },
 					unit_amount: Math.round(line.amount * 100),
-					...(recurring && {
-						recurring: { interval: recurring.interval, interval_count: recurring.interval_count },
-					}),
+					// Only the base service line (always index 0 — see
+					// calculatePrice in pricing.js) recurs. Add-ons are
+					// naturally one-off "do this extra thing this time"
+					// requests, not something a customer expects to keep
+					// paying for every week forever — so every line item after
+					// the base one is left as a plain one-time price. Checkout
+					// Sessions in subscription mode natively support mixing
+					// recurring + one-time line items: Stripe bills the
+					// one-time ones once, on the first invoice only, then
+					// drops them automatically for every renewal after that.
+					...(recurring &&
+						index === 0 && {
+							recurring: { interval: recurring.interval, interval_count: recurring.interval_count },
+						}),
 				},
 				quantity: 1,
 			})),
