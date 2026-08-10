@@ -102,93 +102,122 @@ export async function POST({ request }) {
 	}
 
 	// Fires on every recurring subscription charge, including the very first
-	// one — `billing_reason` is how we tell them apart. The first cycle
-	// ("subscription_create") is already handled above by
-	// checkout.session.completed, so only act on renewals here to avoid
-	// double-booking the first visit.
+	// one — `billing_reason` is how we tell them apart. Both are handled
+	// below now: `subscription_create` (the delayed first charge) only needs
+	// the visit-count bookkeeping, since checkout.session.completed already
+	// created that first calendar event; `subscription_cycle` (every renewal)
+	// needs the bookkeeping *and* the next-visit scheduling.
 	if (event.type === "invoice.paid") {
 		const invoice = event.data.object;
+		const isSubscriptionInvoice =
+			(invoice.billing_reason === "subscription_cycle" || invoice.billing_reason === "subscription_create") &&
+			invoice.subscription;
 
-		if (invoice.billing_reason === "subscription_cycle" && invoice.subscription) {
+		if (isSubscriptionInvoice) {
 			try {
 				const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
 				const metadata = subscription.metadata || {};
+				const metadataPatch = {};
 
-				// Defense-in-depth: if this invoice's billing period is actually
-				// for the visit already on file (e.g. the delayed first charge
-				// aligned to the first cleaning date, or the charge right after a
-				// staff reschedule re-anchored billing to a new date), skip
-				// creating a second calendar event for the same visit. Only
-				// proceed when this is genuinely a new period.
-				const lastVisitSeconds = metadata.lastVisitStart ? Date.parse(metadata.lastVisitStart) / 1000 : null;
-				const alreadyScheduled =
-					lastVisitSeconds != null &&
-					typeof invoice.period_start === "number" &&
-					Math.abs(invoice.period_start - lastVisitSeconds) < 3600;
+				// Every successful invoice on this subscription represents one
+				// visit's worth of billing — count it toward the membership's
+				// minimum-commitment term, *unless* it was flagged by a staff
+				// "still charge" cancellation (cancel-visit.js) or an
+				// auto-removed visit under a scheduled cancellation
+				// (cancel-subscription.js) as billed-but-not-performed. Guarded
+				// against Stripe's webhook retries (which can redeliver the same
+				// event) by never counting the same invoice id twice.
+				if (metadata.lastCountedInvoiceId !== invoice.id) {
+					if (metadata.nextVisitCanceled === "true") {
+						metadataPatch.nextVisitCanceled = "";
+					} else {
+						const currentCount = parseInt(metadata.completedVisitCount || "0", 10) || 0;
+						metadataPatch.completedVisitCount = String(currentCount + 1);
+					}
+					metadataPatch.lastCountedInvoiceId = invoice.id;
+				}
 
-				if (
-					!alreadyScheduled &&
-					isCalendarConfigured() &&
-					metadata.lastVisitStart &&
-					metadata.lastVisitEnd &&
-					metadata.frequency
-				) {
-					const nextWindow = nextVisitWindow(metadata.lastVisitStart, metadata.lastVisitEnd, metadata.frequency);
+				// Only look for a *new* visit to schedule on genuine renewals —
+				// the very first invoice ("subscription_create") already has its
+				// calendar event from checkout.session.completed above.
+				if (invoice.billing_reason === "subscription_cycle") {
+					// Defense-in-depth: if this invoice's billing period is actually
+					// for the visit already on file (e.g. the delayed first charge
+					// aligned to the first cleaning date, or the charge right after a
+					// staff reschedule/skip re-anchored billing to a new date), skip
+					// creating a second calendar event for the same visit. Only
+					// proceed when this is genuinely a new period.
+					const lastVisitSeconds = metadata.lastVisitStart ? Date.parse(metadata.lastVisitStart) / 1000 : null;
+					const alreadyScheduled =
+						lastVisitSeconds != null &&
+						typeof invoice.period_start === "number" &&
+						Math.abs(invoice.period_start - lastVisitSeconds) < 3600;
 
-					if (nextWindow) {
-						const service = describeService(metadata.type, metadata.frequency);
-						const email = invoice.customer_email || undefined;
+					if (
+						!alreadyScheduled &&
+						isCalendarConfigured() &&
+						metadata.lastVisitStart &&
+						metadata.lastVisitEnd &&
+						metadata.frequency
+					) {
+						const nextWindow = nextVisitWindow(metadata.lastVisitStart, metadata.lastVisitEnd, metadata.frequency);
 
-						const descriptionLines = [
-							`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
-							"Recurring cleaning — billed automatically",
-							metadata.phone ? `Phone: ${metadata.phone}` : null,
-							email ? `Email: ${email}` : null,
-							metadata.address ? `Address: ${metadata.address}` : null,
-							metadata.access ? `Access: ${metadata.access}` : null,
-							metadata.pets ? `Pets: ${metadata.pets}` : null,
-							metadata.notes ? `Notes: ${metadata.notes}` : null,
-						].filter(Boolean);
+						if (nextWindow) {
+							const service = describeService(metadata.type, metadata.frequency);
+							const email = invoice.customer_email || undefined;
 
-						// Best-effort only — a busy slot doesn't stop the visit from
-						// being scheduled (the customer already paid), it just flags
-						// it for a human to double check.
-						try {
-							const stillFree = await isSlotStillFree(nextWindow);
-							if (!stillFree) {
-								descriptionLines.unshift(
-									"⚠️ This time showed as busy on the calendar — please confirm there's no conflict.",
-								);
+							const descriptionLines = [
+								`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
+								"Recurring cleaning — billed automatically",
+								metadata.phone ? `Phone: ${metadata.phone}` : null,
+								email ? `Email: ${email}` : null,
+								metadata.address ? `Address: ${metadata.address}` : null,
+								metadata.access ? `Access: ${metadata.access}` : null,
+								metadata.pets ? `Pets: ${metadata.pets}` : null,
+								metadata.notes ? `Notes: ${metadata.notes}` : null,
+							].filter(Boolean);
+
+							// Best-effort only — a busy slot doesn't stop the visit from
+							// being scheduled (the customer already paid), it just flags
+							// it for a human to double check.
+							try {
+								const stillFree = await isSlotStillFree(nextWindow);
+								if (!stillFree) {
+									descriptionLines.unshift(
+										"⚠️ This time showed as busy on the calendar — please confirm there's no conflict.",
+									);
+								}
+							} catch {
+								// ignore — proceed without the freshness check
 							}
-						} catch {
-							// ignore — proceed without the freshness check
+
+							const createdEvent = await createBookingEvent({
+								start: nextWindow.start,
+								end: nextWindow.end,
+								summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
+								description: descriptionLines.join("\n"),
+								location: metadata.address || undefined,
+								attendeeEmail: email,
+							});
+
+							// Advance the stored "last visit" (and which calendar event is
+							// the current one) so the next renewal computes the correct
+							// following date, and the staff reschedule tool always finds
+							// the right event.
+							metadataPatch.lastVisitStart = nextWindow.start;
+							metadataPatch.lastVisitEnd = nextWindow.end;
+							metadataPatch.lastEventId = createdEvent.id;
 						}
-
-						const createdEvent = await createBookingEvent({
-							start: nextWindow.start,
-							end: nextWindow.end,
-							summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
-							description: descriptionLines.join("\n"),
-							location: metadata.address || undefined,
-							attendeeEmail: email,
-						});
-
-						// Advance the stored "last visit" (and which calendar event is
-						// the current one) so the next renewal computes the correct
-						// following date, and the staff reschedule tool always finds
-						// the right event.
-						await stripe.subscriptions.update(invoice.subscription, {
-							metadata: {
-								...metadata,
-								lastVisitStart: nextWindow.start,
-								lastVisitEnd: nextWindow.end,
-								lastEventId: createdEvent.id,
-							},
-						});
 					}
 				}
+
+				if (Object.keys(metadataPatch).length > 0) {
+					await stripe.subscriptions.update(invoice.subscription, {
+						metadata: { ...metadata, ...metadataPatch },
+					});
+				}
 			} catch (err) {
-				console.error("Failed to create recurring calendar event:", err?.message);
+				console.error("Failed to process recurring invoice:", err?.message);
 			}
 		}
 	}

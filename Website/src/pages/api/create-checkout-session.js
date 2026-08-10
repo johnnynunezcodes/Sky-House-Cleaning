@@ -11,6 +11,7 @@ export const prerender = false;
 import Stripe from "stripe";
 import { calculatePrice, RECURRING_INTERVALS, isRecurringFrequency } from "../../lib/pricing.js";
 import { isConfigured as isCalendarConfigured, isSlotStillFree } from "../../lib/googleCalendar.js";
+import { policyFor } from "../../lib/policies.js";
 
 const REQUIRED_CUSTOMER_FIELDS = ["name", "email", "phone", "address", "access"];
 
@@ -36,7 +37,7 @@ export async function POST({ request }) {
 		});
 	}
 
-	const { selections, customer, slot } = body || {};
+	const { selections, customer, slot, policyAgreed } = body || {};
 
 	const missingField = REQUIRED_CUSTOMER_FIELDS.find((field) => !customer?.[field]);
 	if (missingField) {
@@ -68,6 +69,20 @@ export async function POST({ request }) {
 			// If the availability check itself fails, don't block checkout on
 			// it — worst case a rare double-booking gets sorted out by hand.
 		}
+	}
+
+	// Which policy governs this booking is re-derived server-side from
+	// `selections`, the same way price is — never trust the `policyPath`/
+	// `policyLabel` strings the client sent, only whether they actually
+	// checked the box (`policyAgreed`). If a booking type has no matching
+	// policy (shouldn't happen for anything sold through this form), we don't
+	// block checkout on it.
+	const policy = policyFor({ type: selections?.type, frequency: selections?.frequency });
+	if (policy && policyAgreed !== true) {
+		return new Response(
+			JSON.stringify({ error: "Please confirm you've read and agree to the booking policy before continuing." }),
+			{ status: 400, headers: { "Content-Type": "application/json" } },
+		);
 	}
 
 	// The price is always re-derived here from the site's own pricing data —
@@ -120,6 +135,13 @@ export async function POST({ request }) {
 		frequency: selections?.frequency || "",
 		type: selections?.type || "",
 		sqft: String(selections?.sqft || ""),
+		// Durable, auditable record that the customer actually agreed to the
+		// specific policy version in force at checkout time — the checkbox
+		// state itself lives only in the browser, so this is what proves
+		// consent happened if it's ever disputed.
+		policyPath: policy?.path || "",
+		policyLabel: policy?.label || "",
+		policyAgreedAt: policy ? new Date().toISOString() : "",
 	};
 
 	try {
@@ -146,7 +168,16 @@ export async function POST({ request }) {
 			// know where/when to schedule each recurring visit.
 			...(isRecurring && {
 				subscription_data: {
-					metadata: { ...bookingMetadata, lastVisitStart: slot.start, lastVisitEnd: slot.end },
+					// `completedVisitCount` tracks progress toward the membership's
+					// minimum-commitment term (see the Policies vault and
+					// stripe-webhook.js) — starts at 0 and is incremented there each
+					// time a visit is actually billed, not just scheduled.
+					metadata: {
+						...bookingMetadata,
+						lastVisitStart: slot.start,
+						lastVisitEnd: slot.end,
+						completedVisitCount: "0",
+					},
 					// Bill on the day of the actual first cleaning, not the day
 					// they signed up — `proration_behavior: "none"` means no
 					// invoice is generated at all until that date (not even a

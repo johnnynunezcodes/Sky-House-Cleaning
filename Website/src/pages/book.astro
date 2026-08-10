@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import PageHero from "../components/PageHero.astro";
 import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
+import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../lib/policies.js";
 ---
 
 <Layout
@@ -75,6 +76,17 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 							<div class="book-form__row book-form__row--full">
 								<label for="book-notes">Anything else? <span class="book-form__optional">(optional)</span></label>
 								<textarea id="book-notes" name="notes" rows="3" placeholder="Parking, allergies, areas to focus on or skip, anything else"></textarea>
+							</div>
+
+							<div class="book-policy book-form__row--full" id="book-policy-block" hidden>
+								<p class="book-policy__commitment" id="book-policy-commitment" hidden></p>
+								<label class="book-policy__checkbox">
+									<input type="checkbox" id="book-policy-agree" />
+									<span>
+										I have read and agree to the
+										<a href="#" id="book-policy-link" target="_blank" rel="noopener"></a>.
+									</span>
+								</label>
 							</div>
 
 							<p class="book-form__error" id="book-form-error" hidden></p>
@@ -294,6 +306,42 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 		display: none;
 	}
 
+	.book-policy {
+		background: var(--color-sky-light);
+		border-radius: 10px;
+		padding: 1rem 1.1rem;
+	}
+
+	.book-policy[hidden] {
+		display: none;
+	}
+
+	.book-policy__commitment {
+		margin: 0 0 0.75rem;
+		font-size: 0.9rem;
+		font-weight: 600;
+		color: var(--color-ink);
+	}
+
+	.book-policy__commitment[hidden] {
+		display: none;
+	}
+
+	.book-policy__checkbox {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		font-size: 0.9rem;
+		color: var(--color-slate);
+		cursor: pointer;
+	}
+
+	.book-policy__checkbox input {
+		width: auto;
+		margin-top: 0.2rem;
+		flex-shrink: 0;
+	}
+
 	.book-form__submit {
 		grid-column: 1 / -1;
 		width: 100%;
@@ -376,7 +424,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 	}
 </style>
 
-<script>
+<script define:vars={{ recurringPolicies: RECURRING_POLICIES, oneTimePolicies: ONE_TIME_POLICIES, minimumCommitment: MINIMUM_COMMITMENT }}>
 	function initBookPage() {
 		const root = document.getElementById("book-page");
 		if (!root || root.dataset.bookInit === "true") return;
@@ -384,6 +432,25 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 
 		const workingDays = JSON.parse(root.dataset.workingDays || "[1,2,3,4,5,6]");
 		const windowDays = Number(root.dataset.windowDays) || 21;
+
+		// Which booking policy applies, and (for recurring plans) the
+		// minimum-commitment number to show plainly before checkout — not just
+		// buried in the linked policy text. `recurringPolicies`/`oneTimePolicies`/
+		// `minimumCommitment` come from src/lib/policies.js via `define:vars`
+		// above, so this stays in sync with the same data the checkout API and
+		// the admin tool use.
+		function policyFor(type, frequency) {
+			if (type === "standard" && frequency !== "oneTime" && recurringPolicies[frequency]) {
+				return {
+					...recurringPolicies[frequency],
+					minimumCommitment: minimumCommitment[frequency] ?? null,
+				};
+			}
+			if (oneTimePolicies[type]) {
+				return { ...oneTimePolicies[type], minimumCommitment: null };
+			}
+			return null;
+		}
 
 		const noQuoteEl = root.querySelector("#book-no-quote");
 		const stepsEl = root.querySelector("#book-steps");
@@ -394,6 +461,10 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 		const formEl = root.querySelector("#book-form");
 		const submitBtn = root.querySelector("#book-submit");
 		const errorEl = root.querySelector("#book-form-error");
+		const policyBlockEl = root.querySelector("#book-policy-block");
+		const policyCommitmentEl = root.querySelector("#book-policy-commitment");
+		const policyLinkEl = root.querySelector("#book-policy-link");
+		const policyAgreeEl = root.querySelector("#book-policy-agree");
 
 		let selectedDate = null; // "YYYY-MM-DD"
 		let selectedSlot = null; // { start, end }
@@ -451,6 +522,23 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 			summaryLinesEl.append(li);
 		});
 		summaryTotalEl.textContent = formatMoney(selections.total);
+
+		// Wire up the booking policy: which one applies depends on the service
+		// type/frequency picked on the pricing page. Shown as a required
+		// checkbox + link (not just a footer mention) so agreement is an actual
+		// affirmative action taken right before payment, not something assumed.
+		const policy = policyFor(selections.type || "standard", selections.frequency || "oneTime");
+		if (policy) {
+			policyLinkEl.href = policy.path;
+			policyLinkEl.textContent = policy.label;
+			if (policy.minimumCommitment) {
+				policyCommitmentEl.hidden = false;
+				policyCommitmentEl.textContent = `This plan requires a minimum commitment of ${policy.minimumCommitment} completed cleanings before you can cancel. Full details in the policy below.`;
+			} else {
+				policyCommitmentEl.hidden = true;
+			}
+			policyBlockEl.hidden = false;
+		}
 
 		// Build the date strip: the next `windowDays` calendar days, filtered
 		// down to days the business is open.
@@ -537,6 +625,13 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 				return;
 			}
 
+			if (policy && !policyAgreeEl.checked) {
+				errorEl.textContent = `Please check the box confirming you've read the ${policy.label} before continuing.`;
+				errorEl.hidden = false;
+				policyBlockEl.scrollIntoView({ behavior: "smooth", block: "center" });
+				return;
+			}
+
 			submitBtn.disabled = true;
 			submitBtn.textContent = "Redirecting to payment…";
 
@@ -547,7 +642,14 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../data/booking.js";
 				const response = await fetch("/api/create-checkout-session", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ selections, customer, slot: selectedSlot }),
+					body: JSON.stringify({
+						selections,
+						customer,
+						slot: selectedSlot,
+						policyAgreed: policy ? policyAgreeEl.checked : false,
+						policyPath: policy?.path || "",
+						policyLabel: policy?.label || "",
+					}),
 				});
 
 				const data = await response.json();

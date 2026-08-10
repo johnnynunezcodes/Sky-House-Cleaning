@@ -12,6 +12,7 @@ To keep this file small, detailed reference material lives in separate files wit
 - [Services Overview](Services/Overview.md) — index of all services offered, linking out to individual service detail files.
 - [Verbal Branding](Branding/Verbal%20Branding.md) — voice, tone, and messaging guidelines. Always reference this file whenever writing any copy for me (services, marketing, pricing pages, anything customer-facing).
 - [Images Overview](Images/Images.md) — index of where logos and job photos live in this project.
+- [Policies Overview](Policies/Overview.md) — index of per-service booking policies, shown to customers at checkout via a required agreement checkbox.
 - [Website](Website/README.md) — the Astro project for the marketing website (source code, dev setup, project notes). This is a separate codebase with its own `CLAUDE.md` for coding-specific instructions.
 
 When you add a new file to this project, add a link for it here (with a one-line description) so I know to reference it.

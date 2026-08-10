@@ -134,9 +134,13 @@ export async function POST({ request }) {
 			// Clear the stale reference now that the event is gone, so no
 			// other tool later mistakes it for a live event and tries to
 			// "update" a deleted one instead of creating a fresh one.
+			// `nextVisitCanceled` is belt-and-suspenders here — this visit's
+			// invoice should never actually fire once cancel_at is at or
+			// before it, but if timing ever allows it through, this stops it
+			// from counting toward the minimum commitment.
 			try {
 				await stripe.subscriptions.update(subscriptionId, {
-					metadata: { ...metadata, lastEventId: "" },
+					metadata: { ...metadata, lastEventId: "", nextVisitCanceled: "true" },
 				});
 			} catch {
 				// Non-critical — the calendar's already in the right state;

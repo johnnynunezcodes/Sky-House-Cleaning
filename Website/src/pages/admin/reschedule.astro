@@ -93,6 +93,21 @@ import "../../styles/global.css";
 				return labels[status] || status;
 			}
 
+			function commitmentLabel(sub) {
+				// completedVisitCount only counts visits actually billed and
+				// performed — skips and "still charge" cancellations don't add to
+				// it (see stripe-webhook.js). Staff use this to decide whether a
+				// cancellation request is inside or outside the plan's minimum
+				// commitment before approving it — nothing here blocks cancellation
+				// automatically, it's just the number to check by hand.
+				if (sub.minimumCommitment == null) {
+					return `Completed visits: <strong>${sub.completedVisitCount}</strong> (minimum commitment not written yet for ${sub.frequency || "this frequency"})`;
+				}
+				const remaining = sub.minimumCommitment - sub.completedVisitCount;
+				const status = remaining <= 0 ? "minimum commitment met" : `${remaining} more to go`;
+				return `Completed visits: <strong>${sub.completedVisitCount} of ${sub.minimumCommitment}</strong> — ${status}`;
+			}
+
 			function setStatus(message, isError = false) {
 				searchStatus.hidden = !message;
 				searchStatus.textContent = message;
@@ -117,6 +132,7 @@ import "../../styles/global.css";
 							Plan: ${sub.frequency || "—"} · Current schedule: <strong>${fmt(sub.lastVisitStart)}</strong>
 							${sub.status && sub.status !== "active" ? ` · Status: <strong>${statusLabel(sub.status)}</strong>` : ""}
 						</p>
+						<p class="admin-card__meta">${commitmentLabel(sub)}</p>
 						<form class="book-form admin-reschedule-form">
 							<div class="book-form__row">
 								<label>New date</label>

@@ -1,0 +1,23 @@
+# Sky House Cleaning – Move-In / Move-Out Cleaning Booking Policy
+
+By booking a Move-In/Move-Out Cleaning service with Sky House Cleaning, you agree to the following:
+
+**Payment:** Payment is processed using your selected payment method. Any remaining balance is due upon completion of service unless otherwise agreed.
+
+**Rescheduling:** Appointments may be rescheduled with at least 24 hours' notice, subject to availability.
+
+**Cancellations:** Cancellations made 24–48 hours before the appointment will incur a 50% cancellation fee. Cancellations made less than 24 hours before the appointment will incur a 100% cancellation fee.
+
+**No-Shows:** If our team cannot access the property upon arrival, the appointment will be considered a no-show and charged 100% of the scheduled service price.
+
+**Property Access:** Move-In/Move-Out Cleanings typically take place at an empty or near-empty property, often with no one on site. Please arrange access in advance (lockbox, key, or gate code) and confirm it with us before your appointment — access issues on arrival will be handled under our No-Show policy above.
+
+**Utilities:** Our team needs working water and electricity to complete the service. If utilities are not active at the time of your appointment, we may be unable to complete the cleaning as scheduled.
+
+**Home Condition:** Quoted prices assume the home is empty or near-empty at the time of service. If the property still contains a significant amount of furniture or belongings, this may fall outside the scope of a Move-In/Move-Out Cleaning and could result in a revised estimate or a recommendation for a different service.
+
+**Satisfaction Guarantee:** If you're not satisfied with your cleaning, please notify us within 24 hours, and we'll return to address any missed areas included in the original scope of work.
+
+**Liability:** Sky House Cleaning is not responsible for pre-existing damage, normal wear and tear, or improperly secured or fragile items. Please notify us of any delicate or high-value items before your appointment.
+
+**Right to Refuse Service:** We reserve the right to refuse or discontinue service if conditions are unsafe or fall outside the agreed scope of work.

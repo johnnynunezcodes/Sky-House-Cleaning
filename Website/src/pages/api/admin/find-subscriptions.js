@@ -6,6 +6,7 @@ export const prerender = false;
 
 import Stripe from "stripe";
 import { nextVisitWindow } from "../../../lib/pricing.js";
+import { MINIMUM_COMMITMENT } from "../../../lib/policies.js";
 
 export async function GET({ url }) {
 	const secretKey = import.meta.env.STRIPE_SECRET_KEY;
@@ -60,6 +61,8 @@ export async function GET({ url }) {
 					lastVisitStart: metadata.lastVisitStart || "",
 					lastVisitEnd: metadata.lastVisitEnd || "",
 					afterNextVisitStart: nextStop?.start || "",
+					completedVisitCount: parseInt(metadata.completedVisitCount || "0", 10) || 0,
+					minimumCommitment: MINIMUM_COMMITMENT[metadata.frequency] ?? null,
 				});
 			}
 		}

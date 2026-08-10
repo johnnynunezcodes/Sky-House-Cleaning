@@ -1,9 +1,16 @@
-// Staff-only tool to skip a single upcoming visit — e.g. the customer is on
-// vacation that week. The recurring plan keeps billing and scheduling
-// normally afterward: this only removes the one calendar event and clears
-// the subscription's `lastEventId`, without touching `lastVisitStart`/
-// `lastVisitEnd`, so the next renewal still computes the correct following
-// date exactly as if this visit had happened.
+// Staff-only tool to cancel a single upcoming visit while still charging for
+// it — e.g. a late cancellation that the plan's policy says still bills. The
+// recurring plan keeps billing and scheduling normally afterward: this only
+// removes the one calendar event and clears the subscription's
+// `lastEventId`, without touching `lastVisitStart`/`lastVisitEnd`, so the
+// next renewal still computes the correct following date exactly as if this
+// visit had happened.
+//
+// Because the customer is still charged for this visit but it's not actually
+// performed, it also shouldn't count toward the membership's minimum
+// commitment — `nextVisitCanceled` flags that for stripe-webhook.js, which
+// reads it the moment that visit's charge comes through and skips
+// incrementing `completedVisitCount` for it.
 export const prerender = false;
 
 import Stripe from "stripe";
@@ -48,7 +55,7 @@ export async function POST({ request }) {
 
 	try {
 		await stripe.subscriptions.update(subscriptionId, {
-			metadata: { ...metadata, lastEventId: "" },
+			metadata: { ...metadata, lastEventId: "", nextVisitCanceled: "true" },
 		});
 	} catch (err) {
 		return json(

@@ -1,0 +1,57 @@
+---
+import Layout from "./Layout.astro";
+import PageHero from "../components/PageHero.astro";
+
+interface Props {
+	title: string;
+	updated?: string;
+}
+
+const { title, updated } = Astro.props;
+---
+
+<Layout title={`${title} | Sky House Cleaning`} description={`${title} — Sky House Cleaning's booking policy for this service.`}>
+	<PageHero eyebrow="Booking Policy" title={title} />
+
+	<section class="section">
+		<div class="container policy-copy">
+			{updated && <p class="policy-copy__updated">Last updated {updated}</p>}
+			<slot />
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.policy-copy {
+		max-width: 720px;
+		margin: 0 auto;
+	}
+
+	.policy-copy__updated {
+		font-size: 0.85rem;
+		color: var(--color-slate-light);
+		margin-bottom: 2rem;
+	}
+
+	.policy-copy :global(h2) {
+		font-size: 1.15rem;
+		margin: 2rem 0 0.5rem;
+	}
+
+	.policy-copy :global(h2:first-child) {
+		margin-top: 0;
+	}
+
+	.policy-copy :global(p) {
+		margin: 0 0 1rem;
+	}
+
+	.policy-copy :global(ul) {
+		margin: 0 0 1rem;
+		padding-left: 1.25rem;
+	}
+
+	.policy-copy :global(li) {
+		margin-bottom: 0.4rem;
+	}
+</style>
