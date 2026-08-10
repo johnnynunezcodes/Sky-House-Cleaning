@@ -12,6 +12,55 @@ const {
 	title = "Sky House Cleaning | Bay Area Home Cleaning",
 	description = "Trusted, detail-oriented home cleaning for the San Francisco Bay Area. One-time, weekly, bi-weekly, and monthly cleaning memberships, plus car detailing and garage organization.",
 } = Astro.props;
+
+// LocalBusiness structured data (JSON-LD), included on every page via this
+// shared layout. Uses schema.org's "CleaningService" type (a LocalBusiness
+// subtype) rather than a generic LocalBusiness, since that's the more
+// specific/correct type for this business per schema.org's guidance.
+//
+// Deliberately no street "address" property: Sky House Cleaning is a
+// service-area business without a public storefront (a deliberate privacy
+// choice — see the Google Calendar reminder-event work in this codebase for
+// the same reasoning), so `areaServed` is used instead, which is the
+// documented approach for SABs without a public address.
+//
+// Deliberately no `aggregateRating`: Google's structured data guidelines
+// require rating markup to match what's actually visible on the page, and
+// /reviews doesn't reliably show a live Google rating yet (see
+// "Live Google reviews" in AGENTS.md — still blocked on finding the correct
+// Place ID). Add it once that's resolved and a real rating is rendered.
+const businessSchema = {
+	"@context": "https://schema.org",
+	"@type": "CleaningService",
+	"@id": "https://www.skyhousecleaning.com/#business",
+	name: "Sky House Cleaning",
+	description:
+		"Premium residential home cleaning for the San Francisco Bay Area — one-time, weekly, bi-weekly, and monthly cleaning memberships, plus move-in/out cleaning, interior car detailing, and garage organization.",
+	url: "https://www.skyhousecleaning.com",
+	logo: "https://www.skyhousecleaning.com/images/logo-full.png",
+	image: "https://www.skyhousecleaning.com/images/logo-full.png",
+	telephone: "+18017592044",
+	email: "info@skyhousecleaning.com",
+	priceRange: "$$",
+	areaServed: {
+		"@type": "Place",
+		name: "San Francisco Bay Area, CA",
+	},
+	openingHoursSpecification: [
+		{
+			"@type": "OpeningHoursSpecification",
+			dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+			opens: "08:00",
+			closes: "18:00",
+		},
+	],
+	// Confirmed-correct canonical Google Maps listing (verified directly via
+	// Business Profile Manager — see AGENTS.md "Live Google reviews" for why
+	// that verification mattered here). Update if the listing URL ever changes.
+	sameAs: [
+		"https://www.google.com/maps/place/Sky+House+Cleaning/@37.7967174,-122.5122048,10z/data=!3m1!4b1!4m6!3m5!1s0xafc03b23bc3eb11:0x3cee9619b4bc6b03!8m2!3d37.7967174!4d-122.5122048!16s%2Fg%2F11lyz3w6g5",
+	],
+};
 ---
 
 <!doctype html>
@@ -27,6 +76,7 @@ const {
 		<meta property="og:description" content={description} />
 		<meta property="og:type" content="website" />
 		<title>{title}</title>
+		<script type="application/ld+json" set:html={JSON.stringify(businessSchema)} />
 	</head>
 	<body>
 		<Navbar />
