@@ -114,14 +114,12 @@ export async function POST({ request }) {
 	// once.
 	const addonRoleMetadata = { role: "addon" };
 
-	// Stripe's own Checkout page shows a per-line "Billed weekly... after"
-	// caption on every recurring line item, including add-ons — which reads
-	// as if the add-on will keep charging every cycle forever. It won't (see
-	// the removal logic in stripe-webhook.js above), so when there's at least
-	// one add-on on a recurring plan, a plain-language note is added right
-	// above the Subscribe button via `custom_text.submit.message` (a
-	// documented, stable Checkout Session field) clarifying that only the
-	// first cleaning includes the add-on cost.
+	// Two extra clarifications get added on top of that per-line caption
+	// Stripe can't remove (see the line_items mapping below): the add-on's
+	// own displayed name says it's one-time, and a plain-language note is
+	// added right above the Subscribe button via `custom_text.submit.message`
+	// (a documented, stable Checkout Session field) spelling out the actual
+	// first-visit total and the lower ongoing rate.
 	const addonLines = lineItems.slice(1);
 	const cadenceLabel = recurring
 		? { week: recurring.interval_count === 2 ? "every 2 weeks" : "per week", month: "per month" }[recurring.interval]
@@ -155,8 +153,16 @@ export async function POST({ request }) {
 					// index 0 is always the base service line (see calculatePrice
 					// in pricing.js) — every line after it is an add-on, tagged so
 					// stripe-webhook.js can find and remove it after the first
-					// invoice.
-					product_data: index === 0 ? { name: line.label } : { name: line.label, metadata: addonRoleMetadata },
+					// invoice. Stripe's Checkout page always prints a "Billed
+					// weekly — $X/week after" caption under every recurring line
+					// item, including add-ons, and that caption can't be turned
+					// off or reworded — so on a recurring plan, the add-on's own
+					// displayed name says plainly that it's a one-time thing,
+					// right where the customer is already looking.
+					product_data:
+						index === 0
+							? { name: line.label }
+							: { name: isRecurring ? `${line.label} (this first cleaning only)` : line.label, metadata: addonRoleMetadata },
 					unit_amount: Math.round(line.amount * 100),
 					...(recurring && {
 						recurring: { interval: recurring.interval, interval_count: recurring.interval_count },
@@ -192,7 +198,7 @@ export async function POST({ request }) {
 				addonLines.length > 0 && {
 					custom_text: {
 						submit: {
-							message: `The add-on${addonLines.length > 1 ? "s" : ""} above ${addonLines.length > 1 ? "are" : "is"} just for this first cleaning. Starting your next visit, you'll be billed $${lineItems[0].amount.toFixed(2)} ${cadenceLabel} for the plan on its own.`,
+							message: `Your first cleaning comes to $${total.toFixed(2)}, add-on${addonLines.length > 1 ? "s" : ""} included. After that, you'll be billed $${lineItems[0].amount.toFixed(2)} ${cadenceLabel} for the plan on its own.`,
 						},
 					},
 				}),
