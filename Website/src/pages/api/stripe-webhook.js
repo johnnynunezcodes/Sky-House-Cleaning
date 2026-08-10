@@ -92,6 +92,32 @@ export async function POST({ request }) {
 					} catch (err) {
 						console.error("Failed to save calendar event id on subscription:", err?.message);
 					}
+
+					// Add-ons on a recurring plan bill once, with the first
+					// cleaning, then never again — see create-checkout-session.js
+					// for why this has to happen as pending invoice items rather
+					// than as Checkout line items. Each one attaches to this
+					// subscription with no `invoice` specified, so Stripe sweeps
+					// them into whatever the subscription's *next* invoice turns
+					// out to be — the deferred first-visit invoice, thanks to
+					// `billing_cycle_anchor`/`proration_behavior: "none"` — and
+					// they never appear again since they aren't a recurring price.
+					if (metadata.addonLines) {
+						try {
+							const addonLines = JSON.parse(metadata.addonLines);
+							for (const line of addonLines) {
+								await stripe.invoiceItems.create({
+									customer: session.customer,
+									subscription: session.subscription,
+									currency: "usd",
+									amount: Math.round(line.a * 100),
+									description: line.l,
+								});
+							}
+						} catch (err) {
+							console.error("Failed to add add-on charges to first invoice:", err?.message);
+						}
+					}
 				}
 			} catch (err) {
 				// Log for now (visible in Vercel's function logs) rather than
