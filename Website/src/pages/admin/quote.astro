@@ -1,0 +1,56 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. First step
+// of the phone-booking flow: build the customer's quote using the exact same
+// pricing configurator the public Pricing page uses, so staff and customers
+// always see identical numbers. "Continue" hands off to /admin/book (step
+// two: pick a date/time and enter the customer's details), instead of the
+// public /book page.
+export const prerender = false;
+
+import "../../styles/global.css";
+import PricingConfigurator from "../../components/PricingConfigurator.astro";
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Build a Quote | Sky House Cleaning Staff Tools</title>
+	</head>
+	<body>
+		<main class="section">
+			<div class="container admin-container">
+				<p class="admin-nav"><a href="/admin/reschedule">← Manage existing plans</a></p>
+				<h1>Book a Customer Who Called In</h1>
+				<p class="admin-hint">
+					Build their quote below the same way the website does, then continue to pick a date/time
+					and enter their details. At the end you'll get a secure payment link to text or email them
+					— nothing is booked or charged until they pay it.
+				</p>
+
+				<PricingConfigurator ctaHref="/admin/book" ctaLabel="Continue to date & customer details" />
+			</div>
+		</main>
+
+		<style>
+			.admin-container {
+				max-width: 900px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-nav {
+				margin-bottom: 1.5rem;
+				font-size: 0.9rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 2rem;
+				max-width: 640px;
+			}
+		</style>
+	</body>
+</html>

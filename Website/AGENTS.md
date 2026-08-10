@@ -46,6 +46,15 @@ Weekly / bi-weekly / monthly **standard** cleanings are real Stripe subscription
 
 Known limitation: monthly plans advance by calendar month, so a visit booked for the 31st can land on the 1st–3rd of the following month depending on how many days that month has. Rare in practice, but worth knowing about.
 
+### Booking a phone customer (staff tool)
+
+`/admin/quote` → `/admin/book` is the staff-side path for someone who calls in instead of booking online — password-protected the same way as `/admin/reschedule`.
+
+- **`src/pages/admin/quote.astro`** just renders the same `<PricingConfigurator />` component the public Pricing page uses (same catalog, same prices, so staff and customers always see identical numbers), with its `ctaHref` pointed at `/admin/book` instead of the public `/book`.
+- **`src/pages/admin/book.astro`** is a close copy of the public `/book.astro` — same date/time slot picker, same contact form, same two endpoints (`/api/availability`, `/api/create-checkout-session`), completely unchanged. Staff go through the exact same slot-conflict checking and server-side price recomputation a customer would.
+- **The one real difference, and the reason this needed its own page instead of just reusing `/book.astro`:** there's no code anywhere in this app (and deliberately no plan to add any) that collects a card number without the cardholder completing Stripe's own hosted Checkout page themselves — no `PaymentIntent`, no manually-keyed card, no Stripe Payment Links. That's a deliberate choice: keying in someone's card over the phone would pull Sky House into a meaningfully bigger PCI compliance burden (a stricter self-assessment questionnaire with Stripe) for a solo/small-team operation, when the actual need is just "get this customer a way to pay." So instead of `window.location.href = data.url` (the public page's behavior), `/admin/book.astro` displays the returned Stripe Checkout URL on screen — a copy-link button and an "Open Payment Page" link — for staff to text or email to the customer. **Nothing is booked or charged until the customer completes that payment themselves** — same invariant as every other path through this app (a calendar event is never created before `stripe-webhook.js` sees a successful payment), just reached by a human sending a link instead of a browser redirect.
+- No new API routes or webhook changes were needed for this — it's purely a different front-end entry point into the same, already-hardened checkout pipeline.
+
 ### Rescheduling recurring plans
 
 Two different situations, handled two different ways:
