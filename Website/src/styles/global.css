@@ -7,12 +7,13 @@
 	--color-ink: #1c2b45; /* deep navy-charcoal, from logo */
 	--color-slate: #58595b; /* logo gray */
 	--color-slate-light: #7c8695;
-	--color-sky: #3e7cb1; /* primary accent blue */
+	--color-sky: #3e7cb1; /* primary accent blue — buttons, links, active states */
 	--color-sky-dark: #2f5f8a;
-	--color-sky-light: #eaf3fa; /* tinted section backgrounds */
+	--color-sky-light: #eeeeec; /* tinted section backgrounds (formerly light blue, now light gray) */
 	--color-cream: #faf9f6; /* page background */
 	--color-white: #ffffff;
 	--color-border: #e4e1da;
+	--color-charcoal: #2e2e2e; /* solid dark section backgrounds (CTA band, footer) */
 
 	/* Type */
 	--font-heading: "Poppins", "Segoe UI", system-ui, sans-serif;

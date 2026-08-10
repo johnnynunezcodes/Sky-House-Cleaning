@@ -22,7 +22,7 @@ import { pricingMatrix } from "../data/content.js";
 		</div>
 	</section>
 
-	<section class="section section--tint">
+	<section class="section section--tint" id="pricing-table">
 		<div class="container">
 			<div class="section-heading">
 				<p class="eyebrow">Full Pricing Reference</p>
@@ -59,7 +59,7 @@ import { pricingMatrix } from "../data/content.js";
 			<p class="table-note">
 				Weekly is 30% off One-Time, Bi-Weekly is 20% off, and Monthly is 15% off. Deep Cleaning is
 				1.5&times; One-Time, and Move-In/Move-Out is 1.75&times; One-Time. Rates are rounded to the
-				nearest dollar. Have a home larger than 5,999 sq ft? <a href="/contact">Contact us</a> for a
+				nearest dollar. Have a home larger than 9,999 sq ft? <a href="/contact">Contact us</a> for a
 				custom quote.
 			</p>
 		</div>
@@ -96,6 +96,12 @@ import { pricingMatrix } from "../data/content.js";
 </Layout>
 
 <style>
+	#pricing-table {
+		/* Offsets the jump so the sticky navbar doesn't cover the section
+		   heading when a "See Pricing" link scrolls straight here. */
+		scroll-margin-top: 5rem;
+	}
+
 	.table-wrap {
 		overflow-x: auto;
 		background: var(--color-white);

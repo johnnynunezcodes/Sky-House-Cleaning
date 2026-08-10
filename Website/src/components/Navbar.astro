@@ -11,7 +11,7 @@ const navItems = [
 const currentPath = Astro.url.pathname;
 ---
 
-<header class="navbar">
+<header class="navbar" id="site-navbar">
 	<div class="navbar__inner container">
 		<a href="/" class="navbar__brand">
 			<img src="/images/logo-icon.svg" alt="Sky House Cleaning" class="navbar__logo" />
@@ -49,14 +49,19 @@ const currentPath = Astro.url.pathname;
 		position: sticky;
 		top: 0;
 		z-index: 50;
-		background: var(--color-cream);
-		border-bottom: 1px solid var(--color-border);
+		background: var(--color-white);
+		border-bottom: 1px solid transparent;
+		transition: border-color 0.2s ease;
+	}
+
+	.navbar.is-scrolled {
+		border-bottom-color: var(--color-border);
 	}
 
 	.navbar__inner {
 		position: relative;
 		display: flex;
-		align-items: center;
+		align-items: stretch;
 		justify-content: space-between;
 		padding: 0.85rem 1.5rem;
 	}
@@ -80,12 +85,13 @@ const currentPath = Astro.url.pathname;
 
 	.navbar__nav {
 		display: flex;
-		align-items: center;
+		align-items: stretch;
 		gap: 2rem;
 	}
 
 	.navbar__nav ul {
 		display: flex;
+		align-items: stretch;
 		gap: 1.6rem;
 		list-style: none;
 		margin: 0;
@@ -93,6 +99,10 @@ const currentPath = Astro.url.pathname;
 	}
 
 	.navbar__link {
+		position: relative;
+		display: flex;
+		align-items: center;
+		height: 100%;
 		text-decoration: none;
 		color: var(--color-slate);
 		font-weight: 500;
@@ -104,7 +114,23 @@ const currentPath = Astro.url.pathname;
 		color: var(--color-sky-dark);
 	}
 
+	/* The active-page indicator bar. -0.85rem matches .navbar__inner's
+	   padding-bottom exactly, so the bar sits flush with the header's own
+	   bottom edge (the same place the scroll-triggered border-bottom sits),
+	   rather than floating under the link text with a gap. */
+	.navbar__link.is-active::after {
+		content: "";
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: -0.85rem;
+		height: 3px;
+		background: var(--color-sky);
+		border-radius: 2px 2px 0 0;
+	}
+
 	.navbar__cta {
+		align-self: center;
 		padding: 0.6rem 1.25rem;
 		font-size: 0.85rem;
 		white-space: nowrap;
@@ -141,7 +167,7 @@ const currentPath = Astro.url.pathname;
 			top: 100%;
 			left: 0;
 			right: 0;
-			background: var(--color-cream);
+			background: var(--color-white);
 			border-bottom: 1px solid var(--color-border);
 			flex-direction: column;
 			align-items: flex-start;
@@ -168,5 +194,36 @@ const currentPath = Astro.url.pathname;
 		.navbar__cta {
 			width: 100%;
 		}
+
+		/* The desktop active-page bar is positioned assuming a horizontal,
+		   full-height nav row — it doesn't translate to the stacked mobile
+		   dropdown, so swap it for a simple left-edge accent instead. */
+		.navbar__link.is-active::after {
+			top: 0;
+			bottom: 0;
+			left: -0.75rem;
+			right: auto;
+			width: 3px;
+			height: auto;
+			border-radius: 2px;
+		}
 	}
 </style>
+
+<script>
+	function initNavbarScroll() {
+		const header = document.getElementById("site-navbar");
+		if (!header || header.dataset.scrollInit === "true") return;
+		header.dataset.scrollInit = "true";
+
+		function update() {
+			header.classList.toggle("is-scrolled", window.scrollY > 0);
+		}
+
+		update();
+		window.addEventListener("scroll", update, { passive: true });
+	}
+
+	initNavbarScroll();
+	document.addEventListener("astro:page-load", initNavbarScroll);
+</script>

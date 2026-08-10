@@ -109,7 +109,7 @@ export function calculatePrice(selections) {
 	} = selections || {};
 
 	const safeFrequency = FREQUENCY_LABELS[frequency] ? frequency : "oneTime";
-	const clampedSqft = Math.min(Math.max(Number(sqft) || 500, 500), 5999);
+	const clampedSqft = Math.min(Math.max(Number(sqft) || 500, 500), 9999);
 	const tier = pricingMatrix[tierIndexFor(clampedSqft)];
 
 	let basePrice;
