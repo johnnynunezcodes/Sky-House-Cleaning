@@ -23,10 +23,17 @@ export function isConfigured() {
 	return Boolean(import.meta.env.GOOGLE_PLACES_API_KEY && import.meta.env.GOOGLE_PLACE_ID);
 }
 
-// The standard Google-hosted "write a review" link for a place — works from
-// just the Place ID, no API call needed, so it can be shown even if the
-// live reviews fetch below ever fails.
+// The "Leave Us a Review" link on /reviews. Prefers GOOGLE_REVIEW_URL — the
+// "Get more reviews" share link from Business Profile Manager (business.google.com),
+// which is generated directly from the verified account and needs no Place ID
+// at all. Falls back to building the standard write-review URL from
+// GOOGLE_PLACE_ID if that's ever set instead. Deliberately independent of the
+// live-reviews fetch below (and of whether a Place ID has been found), so
+// this button works even while that's unresolved — see AGENTS.md.
 export function writeReviewUrl() {
+	const reviewUrl = import.meta.env.GOOGLE_REVIEW_URL;
+	if (reviewUrl) return reviewUrl;
+
 	const placeId = import.meta.env.GOOGLE_PLACE_ID;
 	if (!placeId) return null;
 	return `https://search.google.com/local/writereview?placeid=${encodeURIComponent(placeId)}`;
