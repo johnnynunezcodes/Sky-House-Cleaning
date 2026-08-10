@@ -169,6 +169,11 @@ export async function POST({ request }) {
 			headers: { "Content-Type": "application/json" },
 		});
 	} catch (err) {
+		// Always log the real reason server-side (visible in Vercel's function
+		// logs) even though the customer only ever sees the generic message
+		// below — a raw Stripe error isn't something to show a customer, but
+		// we still need to be able to see it ourselves to debug.
+		console.error("Checkout session creation failed:", err?.message, err?.raw?.message);
 		return new Response(
 			JSON.stringify({ error: "We couldn't start payment. Please try again or give us a call." }),
 			{ status: 500, headers: { "Content-Type": "application/json" } },
