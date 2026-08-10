@@ -75,6 +75,17 @@ export async function POST({ request }) {
 
 	let eventId = metadata.lastEventId || null;
 
+	// TEMP DIAGNOSTIC — tracking down a mismatch between the stored schedule
+	// and what actually shows up on the calendar. Safe to remove once that's
+	// resolved.
+	console.log("[skip-visit] input", {
+		lastVisitStart: metadata.lastVisitStart,
+		lastVisitEnd: metadata.lastVisitEnd,
+		frequency: metadata.frequency,
+		eventId,
+	});
+	console.log("[skip-visit] computed nextWindow", nextWindow);
+
 	try {
 		let moved = false;
 		if (eventId) {
@@ -83,13 +94,15 @@ export async function POST({ request }) {
 				// forward to the following visit's date, rather than deleting
 				// and recreating — the net effect is the same (nothing left on
 				// the skipped date, something on the next one).
-				await updateBookingEvent({ eventId, start: nextWindow.start, end: nextWindow.end });
+				const updated = await updateBookingEvent({ eventId, start: nextWindow.start, end: nextWindow.end });
+				console.log("[skip-visit] update result", { status: updated.status, start: updated.start, end: updated.end });
 				moved = true;
-			} catch {
+			} catch (err) {
 				// The stored event id points at something that's already gone
 				// (e.g. deleted by an earlier cancellation, or by hand in
 				// Calendar) — fall back to creating a fresh event below rather
 				// than failing the whole request over a stale reference.
+				console.log("[skip-visit] update threw, falling back to create:", err.message);
 				moved = false;
 			}
 		}
