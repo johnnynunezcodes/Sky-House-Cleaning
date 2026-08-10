@@ -6,11 +6,12 @@
 // next renewal still computes the correct following date exactly as if this
 // visit had happened.
 //
-// Because the customer is still charged for this visit but it's not actually
-// performed, it also shouldn't count toward the membership's minimum
-// commitment — `nextVisitCanceled` flags that for stripe-webhook.js, which
-// reads it the moment that visit's charge comes through and skips
-// incrementing `completedVisitCount` for it.
+// The customer is still charged for this visit, so it counts toward the
+// membership's minimum commitment the same as any other billed visit — no
+// flag needed here; stripe-webhook.js increments `completedVisitCount` for
+// every paid invoice by default. (Contrast with skip-visit.js, which cancels
+// *and* skips the charge — that invoice never happens in the first place, so
+// it's naturally excluded with no bookkeeping needed either.)
 export const prerender = false;
 
 import Stripe from "stripe";
@@ -55,7 +56,7 @@ export async function POST({ request }) {
 
 	try {
 		await stripe.subscriptions.update(subscriptionId, {
-			metadata: { ...metadata, lastEventId: "", nextVisitCanceled: "true" },
+			metadata: { ...metadata, lastEventId: "" },
 		});
 	} catch (err) {
 		return json(

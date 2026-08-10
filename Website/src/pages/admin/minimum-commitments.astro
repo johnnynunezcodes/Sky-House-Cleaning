@@ -112,10 +112,11 @@ const metCount = rows.filter((r) => r.met).length;
 				<h1>Minimum Commitments</h1>
 				<p class="admin-hint">
 					Every active recurring plan and its progress toward that frequency's minimum-commitment
-					term. Counts only visits that were actually billed — skipped visits and "still charge"
-					cancellations don't add to the total (see <code>completedVisitCount</code> in AGENTS.md).
-					Nothing here cancels or blocks anything automatically; use
-					<a href="/admin/reschedule">Manage a specific customer's plan</a> to act on one.
+					term. Counts every visit the customer was actually billed for, including "still charge"
+					cancellations — only skipped (never-billed) visits don't add to the total (see
+					<code>completedVisitCount</code> in AGENTS.md). Nothing here cancels or blocks anything
+					automatically; use <a href="/admin/reschedule">Manage a specific customer's plan</a> to
+					act on one.
 				</p>
 
 				{

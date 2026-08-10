@@ -252,6 +252,65 @@ export async function updateBookingEvent({ eventId, start, end, timeZone = DEFAU
 }
 
 /**
+ * Drops a short reminder event on the business calendar starting almost
+ * immediately — a lightweight way to surface a time-sensitive staff-facing
+ * notice (e.g. a customer just crossing their plan's minimum-commitment
+ * threshold — see stripe-webhook.js) through a channel that already has
+ * notifications wired up, instead of adding a whole new email/SMS service
+ * just for this one alert. Goes on the same calendar as real bookings
+ * (`GOOGLE_CALENDAR_ID`) — the summary is written to read unambiguously as
+ * a staff note, not a cleaning appointment, so it isn't mistaken for one at
+ * a glance. No custom `reminders` are set here, so whatever popup/email
+ * lead time is already configured as that calendar's default applies.
+ *
+ * `visibility: "private"` matters here specifically because this calendar
+ * is shared with cleaning staff so they can see their job schedule (see
+ * AGENTS.md setup steps) — unlike a real booking event, this one carries a
+ * customer's name/phone/address in a note that's for Johnny only. Marking
+ * it private means anyone else with access to the calendar (i.e. staff, not
+ * the organizer) sees it only as a plain "Busy" block with no title or
+ * description, while it still shows in full for Johnny.
+ *
+ * `transparency: "transparent"` matters separately: it's not a real
+ * appointment, so it must never count as "busy" time and block a real
+ * customer from booking that slot — see the inline comment below.
+ */
+export async function createReminderEvent({ summary, description }) {
+	const auth = getAuth();
+	if (!auth) throw new Error("Google Calendar isn't configured yet.");
+
+	const calendar = google.calendar({ version: "v3", auth });
+	const calendarId = getCalendarId();
+
+	// Starts a minute out (rather than exactly "now") so it never lands in
+	// the past by the time the API call round-trips, which some calendar
+	// clients quietly hide or badge differently than an upcoming event.
+	const start = new Date(Date.now() + 60 * 1000);
+	const end = new Date(start.getTime() + 15 * 60 * 1000);
+
+	const event = await calendar.events.insert({
+		calendarId,
+		requestBody: {
+			summary,
+			description,
+			visibility: "private",
+			// A normal event counts as "busy" for `getAvailableSlots`'s freebusy
+			// query, which is exactly what powers real booking availability.
+			// This event always starts almost immediately ("now"), so the only
+			// way that could ever matter is a same-day customer booking request
+			// landing in this exact ~15-minute window — narrow, but real.
+			// `transparent` marks it as not-busy, so freebusy queries (and
+			// therefore every availability check) ignore it entirely, exactly
+			// like it isn't a real appointment — which it isn't.
+			transparency: "transparent",
+			start: { dateTime: start.toISOString(), timeZone: DEFAULT_TIME_ZONE },
+			end: { dateTime: end.toISOString(), timeZone: DEFAULT_TIME_ZONE },
+		},
+	});
+	return event.data;
+}
+
+/**
  * Removes a single calendar event outright — used by the staff tool to
  * cancel one upcoming visit (the recurring plan continues normally; the
  * cycle after this one is still computed from the subscription's stored

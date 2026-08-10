@@ -13,8 +13,14 @@
 export const prerender = false;
 
 import Stripe from "stripe";
-import { isConfigured as isCalendarConfigured, createBookingEvent, isSlotStillFree } from "../../lib/googleCalendar.js";
+import {
+	isConfigured as isCalendarConfigured,
+	createBookingEvent,
+	createReminderEvent,
+	isSlotStillFree,
+} from "../../lib/googleCalendar.js";
 import { nextVisitWindow } from "../../lib/pricing.js";
+import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
 
 function describeService(type, frequency) {
 	if (type === "deep") return "Deep Cleaning";
@@ -120,19 +126,64 @@ export async function POST({ request }) {
 				const metadataPatch = {};
 
 				// Every successful invoice on this subscription represents one
-				// visit's worth of billing — count it toward the membership's
-				// minimum-commitment term, *unless* it was flagged by a staff
-				// "still charge" cancellation (cancel-visit.js) or an
-				// auto-removed visit under a scheduled cancellation
-				// (cancel-subscription.js) as billed-but-not-performed. Guarded
-				// against Stripe's webhook retries (which can redeliver the same
-				// event) by never counting the same invoice id twice.
+				// visit's worth of billing — the customer paid for it, so it counts
+				// toward the membership's minimum-commitment term even if staff
+				// later canceled that visit and it was never actually performed
+				// (cancel-visit.js's "still charge" cancellation deliberately sets
+				// no flag here, for exactly this reason — they paid, it counts).
+				// The one exception is `nextVisitCanceled`, set only by
+				// cancel-subscription.js's defensive cleanup when a visit's
+				// calendar event is removed because it falls on or after a
+				// scheduled cancellation date — that invoice isn't expected to
+				// ever fire at all, so if timing somehow lets it through anyway,
+				// it's excluded rather than counted. Guarded against Stripe's
+				// webhook retries (which can redeliver the same event) by never
+				// counting the same invoice id twice.
 				if (metadata.lastCountedInvoiceId !== invoice.id) {
 					if (metadata.nextVisitCanceled === "true") {
 						metadataPatch.nextVisitCanceled = "";
 					} else {
 						const currentCount = parseInt(metadata.completedVisitCount || "0", 10) || 0;
-						metadataPatch.completedVisitCount = String(currentCount + 1);
+						const newCount = currentCount + 1;
+						metadataPatch.completedVisitCount = String(newCount);
+
+						// The moment a customer crosses their plan's minimum-commitment
+						// threshold, drop a reminder on the business calendar so Johnny
+						// knows it's now fine to approve a cancellation if they ask for
+						// one — nothing changes for the customer automatically, they
+						// still have to call/email and staff still process it by hand
+						// via /admin/reschedule (see "Minimum-commitment tracking" in
+						// AGENTS.md — self-cancel was deliberately kept staff-only).
+						// `commitmentNotified` guards this to fire exactly once per
+						// subscription, even across webhook retries or later cycles.
+						const minimumCommitment = MINIMUM_COMMITMENT[metadata.frequency] ?? null;
+						if (
+							isCalendarConfigured() &&
+							minimumCommitment != null &&
+							newCount >= minimumCommitment &&
+							metadata.commitmentNotified !== "true"
+						) {
+							try {
+								await createReminderEvent({
+									summary: `✅ Minimum commitment met — ${metadata.name || "customer"} (${metadata.frequency})`,
+									description: [
+										`${metadata.name || "This customer"} has completed ${newCount} of ${minimumCommitment} required ${metadata.frequency} cleanings — their minimum commitment is met.`,
+										"They're free to cancel now if they ask. Approve/process it from /admin/reschedule, or see everyone's status at /admin/minimum-commitments.",
+										metadata.phone ? `Phone: ${metadata.phone}` : null,
+										metadata.address ? `Address: ${metadata.address}` : null,
+									]
+										.filter(Boolean)
+										.join("\n"),
+								});
+								metadataPatch.commitmentNotified = "true";
+							} catch (err) {
+								// Don't fail the whole webhook over a reminder — the visit
+								// count itself is what actually matters and still gets
+								// saved below; this just means the notice needs to be
+								// checked for by hand via /admin/minimum-commitments.
+								console.error("Failed to create minimum-commitment reminder event:", err?.message);
+							}
+						}
 					}
 					metadataPatch.lastCountedInvoiceId = invoice.id;
 				}

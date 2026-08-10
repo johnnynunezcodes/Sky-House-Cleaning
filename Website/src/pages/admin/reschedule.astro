@@ -97,9 +97,11 @@ import "../../styles/global.css";
 			}
 
 			function commitmentLabel(sub) {
-				// completedVisitCount only counts visits actually billed and
-				// performed — skips and "still charge" cancellations don't add to
-				// it (see stripe-webhook.js). Staff use this to decide whether a
+				// completedVisitCount counts every visit the customer was actually
+				// billed for — including "still charge" cancellations, since they
+				// paid for that visit even though it wasn't performed. Only skipped
+				// visits (never billed at all) don't add to it (see
+				// stripe-webhook.js). Staff use this to decide whether a
 				// cancellation request is inside or outside the plan's minimum
 				// commitment before approving it — nothing here blocks cancellation
 				// automatically, it's just the number to check by hand.
