@@ -18,7 +18,26 @@ const values = [
 	},
 	{
 		title: "Eco-Conscious",
-		text: "We use eco-conscious products whenever we can, so your home feels fresh and healthy for everyone in it.",
+		text: "We use eco-conscious products whenever we can, so your home feels fresh and healthy for everyone in it. See our product standards below.",
+	},
+];
+
+const productStandards = [
+	{
+		title: "EWG-Rated for Safety",
+		text: "We reach for products that score well with the Environmental Working Group (EWG), so you can breathe easy about what's being used in your home.",
+	},
+	{
+		title: "Eco-Friendly Formulas",
+		text: "Biodegradable and made from plant-based or naturally occurring ingredients — kind to your home and the planet.",
+	},
+	{
+		title: "Vegan & Cruelty-Free",
+		text: "Nothing we use is tested on animals or made with animal-derived ingredients.",
+	},
+	{
+		title: "Gentle, Yet Effective",
+		text: "Our products cut through dirt and everyday buildup without harsh chemicals — safe to have around kids, pets, and anyone with sensitivities.",
 	},
 ];
 ---
@@ -66,6 +85,32 @@ const values = [
 		</div>
 	</section>
 
+	<section class="section" id="product-standards">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">Product Standards</p>
+				<h2>What actually goes into your home</h2>
+				<p>
+					A clean home shouldn't come with a side of harsh chemicals. That's why we're picky about
+					what goes into our cleaning bags — every product we use has to clear a few standards
+					first.
+				</p>
+			</div>
+			<div class="grid grid--4">
+				{productStandards.map((p) => (
+					<div class="value-card">
+						<h3>{p.title}</h3>
+						<p>{p.text}</p>
+					</div>
+				))}
+			</div>
+			<p class="product-standards__closer">
+				We don't think you should have to choose between a clean home and a healthy one — so
+				we've already made that choice for you.
+			</p>
+		</div>
+	</section>
+
 	<CtaBand
 		heading="Let's take one thing off your plate"
 		subtext="Call or email us and let's talk about what your home needs."
@@ -95,5 +140,13 @@ const values = [
 	.value-card p {
 		margin: 0;
 		font-size: 0.92rem;
+	}
+
+	.product-standards__closer {
+		max-width: 620px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+		font-size: 1.05rem;
+		color: var(--color-slate);
 	}
 </style>
