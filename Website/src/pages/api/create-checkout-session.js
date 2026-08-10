@@ -114,6 +114,19 @@ export async function POST({ request }) {
 	// once.
 	const addonRoleMetadata = { role: "addon" };
 
+	// Stripe's own Checkout page shows a per-line "Billed weekly... after"
+	// caption on every recurring line item, including add-ons — which reads
+	// as if the add-on will keep charging every cycle forever. It won't (see
+	// the removal logic in stripe-webhook.js above), so when there's at least
+	// one add-on on a recurring plan, a plain-language note is added right
+	// above the Subscribe button via `custom_text.submit.message` (a
+	// documented, stable Checkout Session field) clarifying that only the
+	// first cleaning includes the add-on cost.
+	const addonLines = lineItems.slice(1);
+	const cadenceLabel = recurring
+		? { week: recurring.interval_count === 2 ? "every 2 weeks" : "per week", month: "per month" }[recurring.interval]
+		: "";
+
 	// Everything here rides along as metadata so the webhook
 	// (src/pages/api/stripe-webhook.js) can create the real calendar event(s)
 	// once payment actually succeeds — the first calendar event is never
@@ -175,6 +188,14 @@ export async function POST({ request }) {
 					proration_behavior: "none",
 				},
 			}),
+			...(isRecurring &&
+				addonLines.length > 0 && {
+					custom_text: {
+						submit: {
+							message: `The add-on${addonLines.length > 1 ? "s" : ""} above ${addonLines.length > 1 ? "are" : "is"} just for this first cleaning. Starting your next visit, you'll be billed $${lineItems[0].amount.toFixed(2)} ${cadenceLabel} for the plan on its own.`,
+						},
+					},
+				}),
 		});
 
 		return new Response(JSON.stringify({ url: session.url }), {
