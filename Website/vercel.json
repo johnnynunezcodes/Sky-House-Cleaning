@@ -1,0 +1,19 @@
+{
+	"redirects": [
+		{
+			"source": "/blank",
+			"destination": "/about",
+			"permanent": true
+		},
+		{
+			"source": "/blank-2",
+			"destination": "/reviews",
+			"permanent": true
+		},
+		{
+			"source": "/blank-4",
+			"destination": "/contact",
+			"permanent": true
+		}
+	]
+}
