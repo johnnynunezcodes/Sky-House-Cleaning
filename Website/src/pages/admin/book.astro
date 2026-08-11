@@ -400,7 +400,11 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 				gap: 0.6rem;
 			}
 
-			.book-summary__lines li {
+			/* :global() because these <li> elements are created client-side via
+			   document.createElement — Astro's scoped-style attribute only
+			   attaches to elements present in the markup at build time, so
+			   without :global() this rule silently never matches them. */
+			.book-summary__lines :global(li) {
 				display: flex;
 				justify-content: space-between;
 				gap: 1rem;

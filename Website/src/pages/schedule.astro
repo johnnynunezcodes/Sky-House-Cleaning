@@ -642,7 +642,14 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 		gap: 0.6rem;
 	}
 
-	.book-summary__lines li {
+	/* :global() because these <li> elements are created client-side via
+	   document.createElement, not written in this template — Astro only
+	   attaches its scoping attribute to elements present in the markup at
+	   build time, so a scoped ".book-summary__lines li" rule silently
+	   never matches them (the label and price just render inline with no
+	   space between). :global() drops the scoping requirement on "li" so
+	   this rule actually applies to the dynamically-created rows. */
+	.book-summary__lines :global(li) {
 		display: flex;
 		justify-content: space-between;
 		gap: 1rem;
@@ -798,6 +805,15 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 		// Car detailing books a vehicle, not a home — swap in copy that matches
 		// what we're actually asking for on this step.
 		if (selections.type === "carDetailing") {
+			const heroTitleEl = document.querySelector(".page-hero h1");
+			const heroLedeEl = document.querySelector(".page-hero__lede");
+			if (heroTitleEl) heroTitleEl.textContent = "Book Your Car Detailing";
+			if (heroLedeEl) {
+				heroLedeEl.textContent =
+					"Pick a date and time that works for you, tell us a bit about your vehicle, and we'll lock in your appointment.";
+			}
+			document.title = "Book Your Car Detailing | Sky House Cleaning";
+
 			const detailsHintEl = root.querySelector("#book-details-hint");
 			const accessLabelEl = root.querySelector("#book-access-label");
 			const accessInputEl = root.querySelector("#book-access");
