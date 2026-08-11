@@ -22,11 +22,13 @@ import {
 import { nextVisitWindow } from "../../lib/pricing.js";
 import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
 
-function describeService(type, frequency) {
+function describeService(type, frequency, vehicles) {
 	if (type === "deep") return "Deep Cleaning";
 	if (type === "moveInOut") return "Move-In / Move-Out Cleaning";
 	if (type === "carDetailing") {
-		return frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+		const base = frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+		const qty = Number(vehicles) || 1;
+		return qty > 1 ? `${base} × ${qty} vehicles` : base;
 	}
 	const names = {
 		oneTime: "One-Time Cleaning",
@@ -65,7 +67,7 @@ export async function POST({ request }) {
 		const email = session.customer_details?.email || session.customer_email;
 
 		if (isCalendarConfigured() && metadata.slotStart && metadata.slotEnd) {
-			const service = describeService(metadata.type, metadata.frequency);
+			const service = describeService(metadata.type, metadata.frequency, metadata.vehicles);
 			const amountPaid = session.amount_total != null ? (session.amount_total / 100).toFixed(2) : null;
 
 			const descriptionLines = [
@@ -219,7 +221,7 @@ export async function POST({ request }) {
 						const nextWindow = nextVisitWindow(metadata.lastVisitStart, metadata.lastVisitEnd, metadata.frequency);
 
 						if (nextWindow) {
-							const service = describeService(metadata.type, metadata.frequency);
+							const service = describeService(metadata.type, metadata.frequency, metadata.vehicles);
 							const email = invoice.customer_email || undefined;
 
 							const descriptionLines = [

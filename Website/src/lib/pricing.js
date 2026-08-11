@@ -15,6 +15,8 @@ import {
 	applianceQuantityTiers,
 	carDetailingPricing,
 	carDetailingAddOns,
+	carDetailingVehicleQuantityTiers,
+	carDetailingMaxVehicles,
 } from "../data/content.js";
 
 const FREQUENCY_LABELS = {
@@ -100,6 +102,7 @@ function round2(n) {
  * @param {"oneTime"|"weekly"|"biweekly"|"monthly"} [selections.frequency]
  * @param {"standard"|"deep"|"moveInOut"|"carDetailing"} [selections.type]
  * @param {number} [selections.sqft] - ignored for carDetailing, which is flat-rate
+ * @param {number} [selections.vehicles] - number of vehicles (carDetailing only, default 1)
  * @param {string[]} [selections.addons] - ids of checked flat-price add-ons (standard/carDetailing only)
  * @param {{id: string, qty: number, unitsMultiplier?: number}[]} [selections.steppers] - per-unit add-ons (standard only)
  * @param {{qty: number, unitsMultiplier?: number}} [selections.deepLaundry] - deep-clean laundry add-on
@@ -110,6 +113,7 @@ export function calculatePrice(selections) {
 		frequency = "oneTime",
 		type = "standard",
 		sqft = 500,
+		vehicles = 1,
 		addons = [],
 		steppers = [],
 		deepLaundry = null,
@@ -119,10 +123,19 @@ export function calculatePrice(selections) {
 	const clampedSqft = Math.min(Math.max(Number(sqft) || 500, 500), 9999);
 
 	let basePrice;
+	let vehicleQty = 1;
+	let serviceLabel = describeService(type, safeFrequency);
 	if (type === "carDetailing") {
 		// Flat-rate, not tied to square footage — just One-Time vs the Monthly
-		// membership's per-visit rate.
-		basePrice = frequency === "monthly" ? carDetailingPricing.monthly : carDetailingPricing.oneTime;
+		// membership's per-visit rate. Multiple vehicles in one visit get the
+		// same "per unit, at that tier" discount as the appliance add-ons (see
+		// carDetailingVehicleQuantityTiers in content.js).
+		const perVehiclePrice = frequency === "monthly" ? carDetailingPricing.monthly : carDetailingPricing.oneTime;
+		vehicleQty = Math.min(Math.max(Math.floor(Number(vehicles) || 1), 1), carDetailingMaxVehicles);
+		const tierIndex = Math.min(Math.max(vehicleQty, 1), carDetailingVehicleQuantityTiers.length) - 1;
+		const vehicleMultiplier = carDetailingVehicleQuantityTiers[tierIndex] ?? 1;
+		basePrice = perVehiclePrice * vehicleQty * vehicleMultiplier;
+		if (vehicleQty > 1) serviceLabel += ` × ${vehicleQty} vehicles`;
 	} else {
 		const tier = pricingMatrix[tierIndexFor(clampedSqft)];
 		if (type === "deep") {
@@ -134,7 +147,7 @@ export function calculatePrice(selections) {
 		}
 	}
 
-	const lineItems = [{ label: describeService(type, safeFrequency), amount: basePrice }];
+	const lineItems = [{ label: serviceLabel, amount: basePrice }];
 	let total = basePrice;
 
 	// Flat-price and per-unit add-ons only apply to the Standard cleaning

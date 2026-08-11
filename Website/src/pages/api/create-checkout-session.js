@@ -141,6 +141,7 @@ export async function POST({ request }) {
 		frequency: selections?.frequency || "",
 		type: selections?.type || "",
 		sqft: String(selections?.sqft || ""),
+		vehicles: selections?.type === "carDetailing" ? String(selections?.vehicles || 1) : "",
 		// Durable, auditable record that the customer actually agreed to the
 		// specific policy version in force at checkout time — the checkbox
 		// state itself lives only in the browser, so this is what proves

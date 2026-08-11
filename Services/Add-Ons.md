@@ -66,13 +66,25 @@ None currently offered. Move-In/Move-Out already includes the deep-detail items 
 
 Available on: **One-Time Interior Detail and Monthly Detailing Membership.**
 
-- Extensive Pet Hair Removal — $35
+- Extensive Pet Hair Removal — $35 flat, regardless of how many vehicles are booked in the same visit.
 
 Standard vacuuming already picks up everyday pet hair as part of every detail — this add-on is for heavier shedding that needs extra time.
 
 On the Monthly Detailing Membership, selecting an add-on isn't a one-time charge — the $35 is billed every visit for as long as the membership runs (same recurring-add-on behavior as Standard Cleaning memberships, see above). The website's configurator calls this out to the customer before checkout.
 
 The Monthly Detailing Membership itself requires a 2-month minimum commitment, shown on the plan at checkout.
+
+### Multiple Vehicles
+
+Both plans let a customer book more than one vehicle in the same visit (e.g. two cars). Per-vehicle price drops the same way the oven/fridge/freezer/dishwasher quantity discounts do:
+
+| Vehicles | Per-Vehicle Rate (One-Time) | Per-Vehicle Rate (Monthly) |
+| --- | --- | --- |
+| 1 (standard) | $275.00 | $250.00 |
+| 2 (10% off) | $247.50 | $225.00 |
+| 3+ (15% off) | $233.75 | $212.50 |
+
+Rates shown are per vehicle, at that tier — e.g. 2 vehicles at the 2-vehicle One-Time rate is $247.50 × 2 = $495.00 total. Capped at 6 vehicles per booking.
 
 ## Garage Cleaning & Organization
 

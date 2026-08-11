@@ -178,10 +178,25 @@ export const carDetailingPricing = {
 
 // Add-ons available on Interior Car Detailing bookings (both One-Time and
 // Monthly Membership). Standard vacuuming already picks up everyday pet
-// hair — this is for heavier shedding that needs extra time.
+// hair — this is for heavier shedding that needs extra time. Flat price
+// regardless of how many vehicles are booked (see carDetailingVehicleQuantityTiers
+// below) — a customer detailing 2 cars with pet hair only pays the add-on once.
 export const carDetailingAddOns = [
 	{ id: "pet-hair-removal", label: "Extensive Pet Hair Removal", price: 35 },
 ];
+
+// Per-vehicle discount when a customer books more than one vehicle in the
+// same visit (One-Time Interior Detail or Monthly Detailing Membership) —
+// indexed by quantity - 1. Intentionally mirrors applianceQuantityTiers'
+// curve (10% off at 2, 15% off at 3+), kept as its own constant so the two
+// can diverge later without affecting each other. The discount applies to
+// every vehicle in the order once that quantity is reached (same "per unit,
+// at that tier" behavior as the appliance add-ons — see Add-Ons.md).
+export const carDetailingVehicleQuantityTiers = [1, 0.9, 0.85];
+
+// Upper bound on how many vehicles can be booked in one visit — a generous
+// ceiling, not an expected common case.
+export const carDetailingMaxVehicles = 6;
 
 export const pricingMatrix = [
 	{ sqft: "1–999", oneTime: 150, weekly: 105, biweekly: 120, monthly: 128, deep: 225, moveInOut: 263 },

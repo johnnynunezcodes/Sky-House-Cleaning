@@ -1,5 +1,10 @@
 ---
-import { carDetailingPricing, carDetailingAddOns } from "../data/content.js";
+import {
+	carDetailingPricing,
+	carDetailingAddOns,
+	carDetailingVehicleQuantityTiers,
+	carDetailingMaxVehicles,
+} from "../data/content.js";
 
 interface Props {
 	ctaHref?: string;
@@ -32,6 +37,33 @@ const { ctaHref = "/schedule" } = Astro.props;
 		</div>
 
 		<div class="cd__field">
+			<label class="cd__label">Vehicles</label>
+			<div class="cd__vehicles">
+				<span class="cd__vehicles-text">
+					<span class="cd__vehicles-name">Number of vehicles</span>
+					<span class="cd__vehicles-hint">Price drops with each additional vehicle (up to {carDetailingMaxVehicles})</span>
+				</span>
+				<div class="cd__stepper">
+					<button type="button" class="cd__stepper-btn" id="cd-vehicles-minus" aria-label="Decrease number of vehicles">
+						−
+					</button>
+					<input
+						type="number"
+						id="cd-vehicles-input"
+						min="1"
+						max={carDetailingMaxVehicles}
+						step="1"
+						value="1"
+						aria-label="Number of vehicles"
+					/>
+					<button type="button" class="cd__stepper-btn" id="cd-vehicles-plus" aria-label="Increase number of vehicles">
+						+
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<div class="cd__field">
 			<label class="cd__label">Add-Ons</label>
 			<p class="cd__addons-recurring-note" id="cd-addons-recurring-note" hidden>
 				On the Monthly Detailing Membership, any add-ons you pick here are charged every visit — not just
@@ -55,6 +87,7 @@ const { ctaHref = "/schedule" } = Astro.props;
 	<div class="cd__result">
 		<p class="cd__result-label">Estimated Price</p>
 		<p class="cd__price" id="cd-price">${carDetailingPricing.oneTime}</p>
+		<p class="cd__vehicles-note" id="cd-vehicles-note" hidden></p>
 		<p class="cd__addons-note" id="cd-addons-note" hidden></p>
 		<a href={ctaHref} class="btn btn--primary cd__cta" id="cd-cta">Schedule Your Detail</a>
 	</div>
@@ -166,6 +199,89 @@ const { ctaHref = "/schedule" } = Astro.props;
 		color: var(--color-ink);
 	}
 
+	.cd__vehicles {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.9rem 1.1rem;
+		border-radius: 10px;
+		border: 1px solid var(--color-border);
+		background: var(--color-cream);
+	}
+
+	.cd__vehicles-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.cd__vehicles-name {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.95rem;
+		color: var(--color-ink);
+	}
+
+	.cd__vehicles-hint {
+		font-size: 0.8rem;
+		color: var(--color-slate-light);
+	}
+
+	.cd__stepper {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
+	}
+
+	.cd__stepper-btn {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		border: 1px solid var(--color-border);
+		background: var(--color-white);
+		color: var(--color-ink);
+		font-size: 1.1rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.cd__stepper-btn:hover {
+		border-color: var(--color-sky);
+	}
+
+	.cd__stepper-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.cd__stepper-btn:disabled:hover {
+		border-color: var(--color-border);
+	}
+
+	#cd-vehicles-input {
+		width: 48px;
+		text-align: center;
+		padding: 0.4rem 0.3rem;
+	}
+
+	#cd-vehicles-input::-webkit-outer-spin-button,
+	#cd-vehicles-input::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+
+	.cd__vehicles-note {
+		font-size: 0.85rem;
+		color: var(--color-sky-dark);
+		margin: -0.5rem 0 1rem;
+	}
+
+	.cd__vehicles-note[hidden] {
+		display: none;
+	}
+
 	.cd__addon input {
 		width: auto;
 		flex-shrink: 0;
@@ -213,7 +329,7 @@ const { ctaHref = "/schedule" } = Astro.props;
 	}
 </style>
 
-<script define:vars={{ carDetailingPricing, carDetailingAddOns }}>
+<script define:vars={{ carDetailingPricing, carDetailingAddOns, carDetailingVehicleQuantityTiers, carDetailingMaxVehicles }}>
 	function initCarDetailingConfigurator() {
 		const root = document.getElementById("car-detailing-configurator");
 		if (!root || root.dataset.cdInit === "true") return;
@@ -222,6 +338,10 @@ const { ctaHref = "/schedule" } = Astro.props;
 		const frequencyEls = root.querySelectorAll('input[name="cd-frequency"]');
 		const addonInputs = root.querySelectorAll(".cd-addon-input");
 		const priceEl = root.querySelector("#cd-price");
+		const vehiclesInput = root.querySelector("#cd-vehicles-input");
+		const vehiclesMinusBtn = root.querySelector("#cd-vehicles-minus");
+		const vehiclesPlusBtn = root.querySelector("#cd-vehicles-plus");
+		const vehiclesNoteEl = root.querySelector("#cd-vehicles-note");
 		const addonsNoteEl = root.querySelector("#cd-addons-note");
 		const addonsRecurringNoteEl = root.querySelector("#cd-addons-recurring-note");
 		const ctaEl = root.querySelector("#cd-cta");
@@ -244,9 +364,30 @@ const { ctaHref = "/schedule" } = Astro.props;
 			return checked ? checked.value : "oneTime";
 		}
 
+		// Clamps and reflects the vehicle count back into the input (so typing
+		// "0" or something above the max snaps back to a valid value), then
+		// returns the clean number for pricing.
+		function currentVehicles() {
+			const raw = Math.floor(Number(vehiclesInput.value) || 1);
+			const qty = Math.min(Math.max(raw, 1), carDetailingMaxVehicles);
+			vehiclesInput.value = String(qty);
+			return qty;
+		}
+
 		function update() {
 			const frequency = currentFrequency();
-			const basePrice = carDetailingPricing[frequency] ?? carDetailingPricing.oneTime;
+			const perVehiclePrice = carDetailingPricing[frequency] ?? carDetailingPricing.oneTime;
+			const vehicles = currentVehicles();
+
+			// Same "per unit, at that tier" discount curve as the appliance
+			// add-ons elsewhere on the site — every vehicle in the order is
+			// priced at the rate for the total quantity, not just extra ones.
+			const tierIndex = Math.min(Math.max(vehicles, 1), carDetailingVehicleQuantityTiers.length) - 1;
+			const vehicleMultiplier = carDetailingVehicleQuantityTiers[tierIndex] ?? 1;
+			const basePrice = perVehiclePrice * vehicles * vehicleMultiplier;
+
+			vehiclesMinusBtn.disabled = vehicles <= 1;
+			vehiclesPlusBtn.disabled = vehicles >= carDetailingMaxVehicles;
 
 			let addonsTotal = 0;
 			const checkedAddons = [];
@@ -261,6 +402,17 @@ const { ctaHref = "/schedule" } = Astro.props;
 			const total = basePrice + addonsTotal;
 			priceEl.textContent = formatMoney(total);
 
+			if (vehicles > 1) {
+				const discountPct = Math.round((1 - vehicleMultiplier) * 100);
+				vehiclesNoteEl.hidden = false;
+				vehiclesNoteEl.textContent =
+					discountPct > 0
+						? `${vehicles} vehicles — ${discountPct}% off each (${formatMoney(perVehiclePrice)} → ${formatMoney(perVehiclePrice * vehicleMultiplier)} per vehicle)`
+						: `${vehicles} vehicles`;
+			} else {
+				vehiclesNoteEl.hidden = true;
+			}
+
 			addonsRecurringNoteEl.hidden = frequency !== "monthly";
 
 			if (addonsTotal > 0) {
@@ -273,7 +425,8 @@ const { ctaHref = "/schedule" } = Astro.props;
 				addonsNoteEl.hidden = true;
 			}
 
-			const label = frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+			const planLabel = frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+			const label = vehicles > 1 ? `${planLabel} × ${vehicles} vehicles` : planLabel;
 			const lines = [
 				{ label, amount: basePrice },
 				...checkedAddons.map((a) => ({ label: a.label, amount: a.price })),
@@ -282,6 +435,7 @@ const { ctaHref = "/schedule" } = Astro.props;
 			const payload = {
 				type: "carDetailing",
 				frequency,
+				vehicles,
 				total,
 				lines,
 				addons: checkedAddons.map((a) => a.id),
@@ -295,6 +449,16 @@ const { ctaHref = "/schedule" } = Astro.props;
 
 		frequencyEls.forEach((el) => el.addEventListener("change", update));
 		addonInputs.forEach((el) => el.addEventListener("change", update));
+		vehiclesInput.addEventListener("input", update);
+		vehiclesInput.addEventListener("change", update);
+		vehiclesMinusBtn.addEventListener("click", () => {
+			vehiclesInput.value = String(Math.max(1, (Number(vehiclesInput.value) || 1) - 1));
+			update();
+		});
+		vehiclesPlusBtn.addEventListener("click", () => {
+			vehiclesInput.value = String(Math.min(carDetailingMaxVehicles, (Number(vehiclesInput.value) || 1) + 1));
+			update();
+		});
 
 		update();
 	}
