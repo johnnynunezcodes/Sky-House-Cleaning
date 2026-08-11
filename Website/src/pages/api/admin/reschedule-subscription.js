@@ -27,6 +27,27 @@ const SERVICE_NAMES = {
 	monthly: "Monthly Cleaning",
 };
 
+// Monthly Detailing Membership shares the "monthly" frequency string with
+// Standard Cleaning's Monthly plan, so SERVICE_NAMES alone can't tell them
+// apart — check metadata.type first.
+function serviceLabelFor(metadata) {
+	if (metadata.type === "carDetailing") {
+		const base = metadata.frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+		const qty = Number(metadata.vehicles) || 1;
+		return qty > 1 ? `${base} × ${qty} vehicles` : base;
+	}
+	return SERVICE_NAMES[metadata.frequency] || "Recurring Cleaning";
+}
+
+// "2020 Honda Civic (Blue)" from whichever of year/make/model/color were
+// filled in — null if none were (e.g. every non-carDetailing booking).
+function describeVehicle(metadata) {
+	const parts = [metadata.vehicleYear, metadata.vehicleMake, metadata.vehicleModel].filter(Boolean).join(" ");
+	if (!parts && !metadata.vehicleColor) return null;
+	const color = metadata.vehicleColor ? ` (${metadata.vehicleColor})` : "";
+	return `${parts}${color}`.trim();
+}
+
 export async function POST({ request }) {
 	const secretKey = import.meta.env.STRIPE_SECRET_KEY;
 	if (!secretKey) {
@@ -77,12 +98,14 @@ export async function POST({ request }) {
 		}
 	}
 
-	const service = SERVICE_NAMES[metadata.frequency] || "Recurring Cleaning";
+	const service = serviceLabelFor(metadata);
+	const vehicle = describeVehicle(metadata);
 	const descriptionLines = [
 		`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
 		"Recurring cleaning — rescheduled by staff",
 		metadata.phone ? `Phone: ${metadata.phone}` : null,
 		metadata.address ? `Address: ${metadata.address}` : null,
+		vehicle ? `Vehicle: ${vehicle}` : null,
 		metadata.access ? `Access: ${metadata.access}` : null,
 		metadata.pets ? `Pets: ${metadata.pets}` : null,
 		metadata.electricalAccess ? `Electrical Access: ${metadata.electricalAccess}` : null,

@@ -59,6 +59,22 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 								<label for="book-address">Home Address</label>
 								<input type="text" id="book-address" name="address" required autocomplete="street-address" />
 							</div>
+							<div class="book-form__row book-vehicle-row" id="book-vehicle-year-row" hidden>
+								<label for="book-vehicle-year">Vehicle Year</label>
+								<input type="text" id="book-vehicle-year" name="vehicleYear" placeholder="e.g. 2020" disabled />
+							</div>
+							<div class="book-form__row book-vehicle-row" id="book-vehicle-make-row" hidden>
+								<label for="book-vehicle-make">Vehicle Make</label>
+								<input type="text" id="book-vehicle-make" name="vehicleMake" placeholder="e.g. Honda" disabled />
+							</div>
+							<div class="book-form__row book-vehicle-row" id="book-vehicle-model-row" hidden>
+								<label for="book-vehicle-model">Vehicle Model</label>
+								<input type="text" id="book-vehicle-model" name="vehicleModel" placeholder="e.g. Civic" disabled />
+							</div>
+							<div class="book-form__row book-vehicle-row" id="book-vehicle-color-row" hidden>
+								<label for="book-vehicle-color">Vehicle Color</label>
+								<input type="text" id="book-vehicle-color" name="vehicleColor" placeholder="e.g. Blue" disabled />
+							</div>
 							<div class="book-form__row book-form__row--full">
 								<label for="book-access" id="book-access-label">How do we get in?</label>
 								<input
@@ -284,7 +300,8 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 	   explicit override. Same pattern as .book-form__error[hidden] and
 	   .book-policy[hidden] above. */
 	#book-pets-row[hidden],
-	#book-electrical-row[hidden] {
+	#book-electrical-row[hidden],
+	.book-vehicle-row[hidden] {
 		display: none;
 	}
 
@@ -578,6 +595,19 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 				electricalInputEl.disabled = false;
 				electricalInputEl.required = true;
 			}
+
+			// So we know which vehicle we're detailing — shown between the phone
+			// number/address fields and the vehicle-access question.
+			const vehicleFieldIds = ["book-vehicle-year", "book-vehicle-make", "book-vehicle-model", "book-vehicle-color"];
+			vehicleFieldIds.forEach((id) => {
+				const rowEl = root.querySelector(`#${id}-row`);
+				const inputEl = root.querySelector(`#${id}`);
+				if (rowEl) rowEl.hidden = false;
+				if (inputEl) {
+					inputEl.disabled = false;
+					inputEl.required = true;
+				}
+			});
 		}
 
 		// Wire up the booking policy: which one applies depends on the service

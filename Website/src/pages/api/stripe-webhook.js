@@ -39,6 +39,15 @@ function describeService(type, frequency, vehicles) {
 	return names[frequency] || "Cleaning";
 }
 
+// "2020 Honda Civic (Blue)" from whichever of year/make/model/color were
+// filled in — null if none were (e.g. every non-carDetailing booking).
+function describeVehicle(metadata) {
+	const parts = [metadata.vehicleYear, metadata.vehicleMake, metadata.vehicleModel].filter(Boolean).join(" ");
+	if (!parts && !metadata.vehicleColor) return null;
+	const color = metadata.vehicleColor ? ` (${metadata.vehicleColor})` : "";
+	return `${parts}${color}`.trim();
+}
+
 export async function POST({ request }) {
 	const secretKey = import.meta.env.STRIPE_SECRET_KEY;
 	const webhookSecret = import.meta.env.STRIPE_WEBHOOK_SECRET;
@@ -69,6 +78,7 @@ export async function POST({ request }) {
 		if (isCalendarConfigured() && metadata.slotStart && metadata.slotEnd) {
 			const service = describeService(metadata.type, metadata.frequency, metadata.vehicles);
 			const amountPaid = session.amount_total != null ? (session.amount_total / 100).toFixed(2) : null;
+			const vehicle = describeVehicle(metadata);
 
 			const descriptionLines = [
 				`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
@@ -76,6 +86,7 @@ export async function POST({ request }) {
 				metadata.phone ? `Phone: ${metadata.phone}` : null,
 				email ? `Email: ${email}` : null,
 				metadata.address ? `Address: ${metadata.address}` : null,
+				vehicle ? `Vehicle: ${vehicle}` : null,
 				metadata.access ? `Access: ${metadata.access}` : null,
 				metadata.pets ? `Pets: ${metadata.pets}` : null,
 				metadata.electricalAccess ? `Electrical Access: ${metadata.electricalAccess}` : null,
@@ -223,6 +234,7 @@ export async function POST({ request }) {
 						if (nextWindow) {
 							const service = describeService(metadata.type, metadata.frequency, metadata.vehicles);
 							const email = invoice.customer_email || undefined;
+							const vehicle = describeVehicle(metadata);
 
 							const descriptionLines = [
 								`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
@@ -230,6 +242,7 @@ export async function POST({ request }) {
 								metadata.phone ? `Phone: ${metadata.phone}` : null,
 								email ? `Email: ${email}` : null,
 								metadata.address ? `Address: ${metadata.address}` : null,
+								vehicle ? `Vehicle: ${vehicle}` : null,
 								metadata.access ? `Access: ${metadata.access}` : null,
 								metadata.pets ? `Pets: ${metadata.pets}` : null,
 				metadata.electricalAccess ? `Electrical Access: ${metadata.electricalAccess}` : null,
