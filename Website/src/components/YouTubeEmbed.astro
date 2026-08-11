@@ -25,7 +25,7 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 	<button type="button" class="yt__play" aria-label={`Play video: ${title}`}>
 		<img src={thumbnail} alt="" class="yt__thumb" loading="lazy" />
 		<span class="yt__icon" aria-hidden="true">
-			<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+			<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
 				<path d="M8 5v14l11-7z"></path>
 			</svg>
 		</span>
@@ -77,26 +77,28 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		background: rgba(12, 16, 24, 0.4);
 	}
 
+	/* Sized and positioned to match .yt__toggle-icon below, so the play
+	   button in this "before you've clicked" state sits in the exact same
+	   spot the pause/play icon lands in once the video's actually playing
+	   — nothing large sitting over the thumbnail itself. */
 	.yt__icon {
 		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		width: 68px;
-		height: 68px;
+		bottom: 0.85rem;
+		right: 0.85rem;
+		width: 34px;
+		height: 34px;
 		border-radius: 50%;
-		background: #fff;
-		color: var(--color-sky-dark);
+		background: rgba(0, 0, 0, 0.45);
+		color: #fff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding-left: 4px;
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-		transition: transform 0.15s ease;
+		padding-left: 1px;
+		transition: background 0.15s ease;
 	}
 
 	.yt__play:hover .yt__icon {
-		transform: translate(-50%, -50%) scale(1.08);
+		background: rgba(0, 0, 0, 0.65);
 	}
 
 	.yt :global(.yt__player-wrap) {
@@ -129,22 +131,38 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		cursor: pointer;
 	}
 
-	.yt :global(.yt__toggle-icon) {
+	/* Small icon-button cluster (mute, then play/pause), stacked above the
+	   full-cover .yt__toggle so their clicks land on the specific button
+	   underneath the cursor rather than the anywhere-click catcher. */
+	.yt :global(.yt__controls) {
 		position: absolute;
 		bottom: 0.85rem;
 		right: 0.85rem;
+		z-index: 3;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.yt :global(.yt__mute),
+	.yt :global(.yt__toggle-icon) {
+		position: relative;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		width: 34px;
 		height: 34px;
+		padding: 0;
+		border: none;
 		border-radius: 50%;
 		background: rgba(0, 0, 0, 0.45);
 		color: #fff;
+		cursor: pointer;
 		transition: background 0.15s ease;
 	}
 
-	.yt :global(.yt__toggle:hover .yt__toggle-icon) {
+	.yt :global(.yt__mute:hover),
+	.yt :global(.yt__toggle-icon:hover) {
 		background: rgba(0, 0, 0, 0.65);
 	}
 
@@ -154,6 +172,12 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		fill: currentColor;
 	}
 
+	.yt :global(.yt__mute svg) {
+		width: 16px;
+		height: 16px;
+	}
+
+	.yt :global(.yt__mute svg.is-hidden),
 	.yt :global(.yt__toggle-icon svg.is-hidden) {
 		display: none;
 	}
@@ -192,20 +216,48 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 				const playerId = `yt-player-${Math.random().toString(36).slice(2, 9)}`;
 				el.innerHTML = `
 					<div class="yt__player-wrap"><div id="${playerId}"></div></div>
-					<button type="button" class="yt__toggle" aria-label="Pause video">
-						<span class="yt__toggle-icon" aria-hidden="true">
-							<svg class="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>
-							<svg class="icon-play is-hidden" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></svg>
-						</span>
-					</button>
+					<button type="button" class="yt__toggle" aria-label="Pause video"></button>
+					<div class="yt__controls">
+						<button type="button" class="yt__mute" aria-label="Mute video">
+							<svg class="icon-unmuted" viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M4 9v6h3l4 3.5v-12.5l-4 3.5h-3z" fill="currentColor"></path>
+								<path d="M14.5 8.5a4.5 4.5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+								<path d="M17 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+							</svg>
+							<svg class="icon-muted is-hidden" viewBox="0 0 24 24" aria-hidden="true">
+								<path d="M4 9v6h3l4 3.5v-12.5l-4 3.5h-3z" fill="currentColor"></path>
+								<path d="M15 9l5 5M20 9l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+							</svg>
+						</button>
+						<button type="button" class="yt__toggle-icon" aria-label="Pause video">
+							<svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>
+							<svg class="icon-play is-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>
+						</button>
+					</div>
 				`;
 
 				const toggleBtn = el.querySelector(".yt__toggle");
+				const toggleIconBtn = el.querySelector(".yt__toggle-icon");
 				const pauseIcon = el.querySelector(".icon-pause");
 				const playIcon = el.querySelector(".icon-play");
-				if (!toggleBtn || !pauseIcon || !playIcon) return;
+				const muteBtn = el.querySelector(".yt__mute");
+				const unmutedIcon = el.querySelector(".icon-unmuted");
+				const mutedIcon = el.querySelector(".icon-muted");
+				if (!toggleBtn || !toggleIconBtn || !pauseIcon || !playIcon || !muteBtn || !unmutedIcon || !mutedIcon) return;
 
 				const YT = await loadYouTubeApi();
+
+				// mute()/unMute() are fire-and-forget postMessage calls to the
+				// cross-origin iframe — isMuted() can briefly report the old
+				// state right after calling them. Tracking it ourselves avoids
+				// that race instead of re-querying the player immediately after.
+				let isMuted = false;
+
+				function updateMuteIcon() {
+					unmutedIcon.classList.toggle("is-hidden", isMuted);
+					mutedIcon.classList.toggle("is-hidden", !isMuted);
+					muteBtn.setAttribute("aria-label", isMuted ? "Unmute video" : "Mute video");
+				}
 
 				const player = new YT.Player(playerId, {
 					videoId,
@@ -219,21 +271,40 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 						playsinline: 1,
 					},
 					events: {
+						onReady() {
+							isMuted = player.isMuted();
+							updateMuteIcon();
+						},
 						onStateChange(event) {
 							const playing = event.data === YT.PlayerState.PLAYING;
 							pauseIcon.classList.toggle("is-hidden", !playing);
 							playIcon.classList.toggle("is-hidden", playing);
-							toggleBtn.setAttribute("aria-label", playing ? "Pause video" : "Play video");
+							const label = playing ? "Pause video" : "Play video";
+							toggleBtn.setAttribute("aria-label", label);
+							toggleIconBtn.setAttribute("aria-label", label);
 						},
 					},
 				});
 
-				toggleBtn.addEventListener("click", () => {
+				function togglePlayback() {
 					if (player.getPlayerState() === YT.PlayerState.PLAYING) {
 						player.pauseVideo();
 					} else {
 						player.playVideo();
 					}
+				}
+
+				toggleBtn.addEventListener("click", togglePlayback);
+				toggleIconBtn.addEventListener("click", togglePlayback);
+
+				muteBtn.addEventListener("click", () => {
+					isMuted = !isMuted;
+					if (isMuted) {
+						player.mute();
+					} else {
+						player.unMute();
+					}
+					updateMuteIcon();
 				});
 			});
 		});
