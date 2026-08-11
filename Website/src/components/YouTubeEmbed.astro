@@ -9,12 +9,38 @@ const { id, title, aspectRatio = "16 / 9" } = Astro.props;
 const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 ---
 
+<!--
+	YouTube's embedded player always shows its own branded overlay (channel
+	avatar, video title, a big play button, and a "Watch on YouTube" link)
+	whenever it isn't actively playing — on initial load, when paused, or
+	when a video ends. That overlay is not part of the controls bar and
+	YouTube doesn't offer a parameter to turn it off; it's how they keep
+	attribution visible even with controls=0.
+
+	So instead of fighting that, this covers the player with our own
+	opaque thumbnail + play button any time it's not playing (.yt__cover),
+	and only lets the raw iframe show through while it's actually playing
+	— which is the one state where YouTube's own overlay is already gone.
+	While playing, a small transparent button (.yt__catch) sits on top so
+	a click anywhere pauses it, with a small corner icon as the affordance.
+-->
 <div class="yt" style={`--ratio: ${aspectRatio};`} data-yt-id={id} data-yt-title={title}>
-	<button type="button" class="yt__play" aria-label={`Play video: ${title}`}>
+	<div class="yt__player-wrap"></div>
+
+	<button type="button" class="yt__cover" aria-label={`Play video: ${title}`}>
 		<img src={thumbnail} alt="" class="yt__thumb" loading="lazy" />
 		<span class="yt__icon" aria-hidden="true">
 			<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
 				<path d="M8 5v14l11-7z"></path>
+			</svg>
+		</span>
+	</button>
+
+	<button type="button" class="yt__catch is-hidden" aria-label="Pause video">
+		<span class="yt__catch-icon" aria-hidden="true">
+			<svg viewBox="0 0 24 24">
+				<rect x="6" y="4" width="4" height="16" rx="1"></rect>
+				<rect x="14" y="4" width="4" height="16" rx="1"></rect>
 			</svg>
 		</span>
 	</button>
@@ -31,16 +57,42 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		background: #0c0c0c;
 	}
 
-	.yt__play {
+	.yt :global(.yt__player-wrap) {
+		position: absolute;
+		inset: 0;
+	}
+
+	.yt :global(.yt__player-wrap iframe) {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
+		border: 0;
+		display: block;
+		/* Cross-origin YouTube document — a click inside it can never be
+		   observed by our page's JS, so this sends clicks straight through
+		   to .yt__catch (a same-origin button stacked on top, see below). */
+		pointer-events: none;
+	}
+
+	.yt__cover,
+	.yt__catch {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		width: 100%;
+		height: 100%;
 		padding: 0;
 		border: none;
-		margin: 0;
 		cursor: pointer;
-		display: block;
+	}
+
+	.yt__cover.is-hidden,
+	.yt__catch.is-hidden {
+		display: none;
+	}
+
+	.yt__cover {
 		background: none;
 	}
 
@@ -53,7 +105,7 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		display: block;
 	}
 
-	.yt__play::after {
+	.yt__cover::after {
 		content: "";
 		position: absolute;
 		inset: 0;
@@ -61,7 +113,7 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		transition: background 0.15s ease;
 	}
 
-	.yt__play:hover::after {
+	.yt__cover:hover::after {
 		background: rgba(12, 16, 24, 0.4);
 	}
 
@@ -83,47 +135,15 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		transition: transform 0.15s ease;
 	}
 
-	.yt__play:hover .yt__icon {
+	.yt__cover:hover .yt__icon {
 		transform: translate(-50%, -50%) scale(1.08);
 	}
 
-	.yt :global(.yt__player-wrap) {
-		position: absolute;
-		inset: 0;
-	}
-
-	.yt :global(.yt__player-wrap iframe) {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		border: 0;
-		display: block;
-		/* The iframe is a cross-origin YouTube document, so a click inside
-		   it can never be observed by our page's JS — pointer-events: none
-		   sends clicks straight through to .yt__toggle (a same-origin
-		   button stacked on top of it, see below), which is what actually
-		   handles play/pause. */
-		pointer-events: none;
-	}
-
-	/* Covers the whole player so clicking anywhere pauses/resumes it, with
-	   a small Instagram-style icon pinned to the corner as the visible
-	   affordance — no native YouTube controls bar or settings gear at
-	   all, playerVars below removes those entirely. */
-	.yt :global(.yt__toggle) {
-		position: absolute;
-		inset: 0;
-		z-index: 2;
-		width: 100%;
-		height: 100%;
-		padding: 0;
-		border: none;
+	.yt__catch {
 		background: none;
-		cursor: pointer;
 	}
 
-	.yt :global(.yt__toggle-icon) {
+	.yt__catch-icon {
 		position: absolute;
 		bottom: 0.85rem;
 		right: 0.85rem;
@@ -138,21 +158,14 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		transition: background 0.15s ease;
 	}
 
-	.yt :global(.yt__toggle:hover .yt__toggle-icon) {
+	.yt__catch:hover .yt__catch-icon {
 		background: rgba(0, 0, 0, 0.65);
 	}
 
-	.yt :global(.yt__toggle-icon svg) {
+	.yt__catch-icon svg {
 		width: 15px;
 		height: 15px;
 		fill: currentColor;
-	}
-
-	/* Explicit class rather than the "hidden" attribute — this codebase
-	   has run into "hidden" silently losing to an equal-specificity
-	   author display rule before, so this sidesteps that entirely. */
-	.yt :global(.yt__toggle-icon svg.is-hidden) {
-		display: none;
 	}
 </style>
 
@@ -181,30 +194,39 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 			if (!(el instanceof HTMLElement) || el.dataset.ytInit === "true") return;
 			el.dataset.ytInit = "true";
 
-			const button = el.querySelector(".yt__play");
-			button?.addEventListener("click", async () => {
-				const videoId = el.dataset.ytId;
-				if (!videoId) return;
+			const videoId = el.dataset.ytId;
+			const playerWrap = el.querySelector(".yt__player-wrap");
+			const cover = el.querySelector(".yt__cover");
+			const catchBtn = el.querySelector(".yt__catch");
+			if (!videoId || !playerWrap || !cover || !catchBtn) return;
 
+			let YT;
+			let player;
+
+			function showCoveredState(showCover) {
+				cover.classList.toggle("is-hidden", !showCover);
+				catchBtn.classList.toggle("is-hidden", showCover);
+			}
+
+			function onStateChange(event) {
+				// Playing or actively buffering into playback are the only
+				// states where YouTube's own idle/paused overlay is gone —
+				// everything else (unstarted, paused, ended, cued) shows
+				// it, so our opaque cover takes over for those instead.
+				const isPlayingOrBuffering =
+					event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING;
+				showCoveredState(!isPlayingOrBuffering);
+			}
+
+			async function createPlayer() {
 				const playerId = `yt-player-${Math.random().toString(36).slice(2, 9)}`;
-				el.innerHTML = `
-					<div class="yt__player-wrap"><div id="${playerId}"></div></div>
-					<button type="button" class="yt__toggle" aria-label="Pause video">
-						<span class="yt__toggle-icon" aria-hidden="true">
-							<svg class="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>
-							<svg class="icon-play is-hidden" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></svg>
-						</span>
-					</button>
-				`;
+				const target = document.createElement("div");
+				target.id = playerId;
+				playerWrap.appendChild(target);
 
-				const toggleBtn = el.querySelector(".yt__toggle");
-				const pauseIcon = el.querySelector(".icon-pause");
-				const playIcon = el.querySelector(".icon-play");
-				if (!toggleBtn || !pauseIcon || !playIcon) return;
+				YT = await loadYouTubeApi();
 
-				const YT = await loadYouTubeApi();
-
-				const player = new YT.Player(playerId, {
+				player = new YT.Player(playerId, {
 					videoId,
 					host: "https://www.youtube-nocookie.com",
 					playerVars: {
@@ -215,23 +237,20 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 						iv_load_policy: 3,
 						playsinline: 1,
 					},
-					events: {
-						onStateChange(event) {
-							const playing = event.data === YT.PlayerState.PLAYING;
-							pauseIcon.classList.toggle("is-hidden", !playing);
-							playIcon.classList.toggle("is-hidden", playing);
-							toggleBtn.setAttribute("aria-label", playing ? "Pause video" : "Play video");
-						},
-					},
+					events: { onStateChange },
 				});
+			}
 
-				toggleBtn.addEventListener("click", () => {
-					if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-						player.pauseVideo();
-					} else {
-						player.playVideo();
-					}
-				});
+			cover.addEventListener("click", async () => {
+				if (!player) {
+					await createPlayer();
+				} else {
+					player.playVideo();
+				}
+			});
+
+			catchBtn.addEventListener("click", () => {
+				player?.pauseVideo();
 			});
 		});
 	}
