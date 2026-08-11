@@ -277,6 +277,17 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 		grid-column: 1 / -1;
 	}
 
+	/* .book-form__row sets display: flex, which (same specificity, but an
+	   author rule) beats the browser's built-in `[hidden] { display: none }`
+	   UA style — so toggling the `hidden` attribute on #book-pets-row /
+	   #book-electrical-row via JS would silently do nothing without this
+	   explicit override. Same pattern as .book-form__error[hidden] and
+	   .book-policy[hidden] above. */
+	#book-pets-row[hidden],
+	#book-electrical-row[hidden] {
+		display: none;
+	}
+
 	.book-form label {
 		font-family: var(--font-heading);
 		font-weight: 600;
