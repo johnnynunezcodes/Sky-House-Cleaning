@@ -59,10 +59,10 @@ if (!secretKey) {
 			if (sub.status === "canceled" || sub.status === "incomplete_expired") continue;
 
 			const metadata = sub.metadata || {};
-			if (!metadata.frequency) continue; // not a recurring standard plan
+			if (!metadata.frequency) continue; // not a recurring plan of any kind
 
 			const completedVisitCount = parseInt(metadata.completedVisitCount || "0", 10) || 0;
-			const minimumCommitment = MINIMUM_COMMITMENT[metadata.frequency] ?? null;
+			const minimumCommitment = MINIMUM_COMMITMENT[metadata.type || "standard"]?.[metadata.frequency] ?? null;
 			const remaining = minimumCommitment != null ? Math.max(minimumCommitment - completedVisitCount, 0) : null;
 			const met = minimumCommitment != null && completedVisitCount >= minimumCommitment;
 

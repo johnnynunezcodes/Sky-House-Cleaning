@@ -1,0 +1,304 @@
+---
+import { carDetailingPricing, carDetailingAddOns } from "../data/content.js";
+
+interface Props {
+	ctaHref?: string;
+}
+
+const { ctaHref = "/schedule" } = Astro.props;
+---
+
+<div class="cd" id="car-detailing-configurator">
+	<div class="cd__fields">
+		<div class="cd__field">
+			<label class="cd__label">Plan</label>
+			<div class="cd__frequency">
+				<label class="cd__radio">
+					<input type="radio" name="cd-frequency" value="oneTime" checked />
+					<span>
+						<strong>One-Time Interior Detail</strong>
+						<em>${carDetailingPricing.oneTime}</em>
+					</span>
+				</label>
+				<label class="cd__radio">
+					<input type="radio" name="cd-frequency" value="monthly" />
+					<span>
+						<strong>Monthly Detailing Membership</strong>
+						<em>${carDetailingPricing.monthly} / visit</em>
+						<small class="cd__radio-note">2-month minimum commitment</small>
+					</span>
+				</label>
+			</div>
+		</div>
+
+		<div class="cd__field">
+			<label class="cd__label">Add-Ons</label>
+			<p class="cd__addons-recurring-note" id="cd-addons-recurring-note" hidden>
+				On the Monthly Detailing Membership, any add-ons you pick here are charged every visit — not just
+				the first.
+			</p>
+			{carDetailingAddOns.map((addon) => (
+				<label class="cd__addon">
+					<input
+						type="checkbox"
+						class="cd-addon-input"
+						value={addon.id}
+						data-price={addon.price}
+						data-label={addon.label}
+					/>
+					<span>{addon.label} — ${addon.price}</span>
+				</label>
+			))}
+		</div>
+	</div>
+
+	<div class="cd__result">
+		<p class="cd__result-label">Estimated Price</p>
+		<p class="cd__price" id="cd-price">${carDetailingPricing.oneTime}</p>
+		<p class="cd__addons-note" id="cd-addons-note" hidden></p>
+		<a href={ctaHref} class="btn btn--primary cd__cta" id="cd-cta">Schedule Your Detail</a>
+	</div>
+</div>
+
+<style>
+	.cd {
+		background: var(--color-white);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		padding: 2rem;
+		display: grid;
+		gap: 2rem;
+		grid-template-columns: 1.4fr 1fr;
+		align-items: start;
+		/* Offsets the jump so the sticky navbar doesn't cover this when a
+		   "Schedule Your Detail" link scrolls straight here. */
+		scroll-margin-top: 5rem;
+	}
+
+	.cd__fields {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+	.cd__label {
+		display: block;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.85rem;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
+		color: var(--color-sky-dark);
+		margin-bottom: 0.75rem;
+	}
+
+	.cd__frequency {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.cd__radio {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.9rem 1.1rem;
+		border-radius: 10px;
+		border: 1px solid var(--color-border);
+		background: var(--color-cream);
+		cursor: pointer;
+	}
+
+	.cd__radio:has(input:checked) {
+		border-color: var(--color-sky);
+		background: var(--color-sky-light);
+	}
+
+	.cd__radio input {
+		width: auto;
+		flex-shrink: 0;
+	}
+
+	.cd__radio span {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.cd__radio strong {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.95rem;
+		color: var(--color-ink);
+	}
+
+	.cd__radio em {
+		font-style: normal;
+		font-size: 0.85rem;
+		color: var(--color-slate-light);
+	}
+
+	.cd__radio-note {
+		font-size: 0.78rem;
+		color: var(--color-sky-dark);
+	}
+
+	.cd__addons-recurring-note {
+		margin: -0.5rem 0 1rem;
+		font-size: 0.85rem;
+		color: var(--color-sky-dark);
+	}
+
+	.cd__addons-recurring-note[hidden] {
+		display: none;
+	}
+
+	.cd__addon {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		padding: 0.75rem 1rem;
+		border-radius: 10px;
+		border: 1px solid var(--color-border);
+		background: var(--color-cream);
+		cursor: pointer;
+		font-size: 0.9rem;
+		color: var(--color-ink);
+	}
+
+	.cd__addon input {
+		width: auto;
+		flex-shrink: 0;
+	}
+
+	.cd__result {
+		background: var(--color-sky-light);
+		border-radius: var(--radius);
+		padding: 1.75rem;
+		text-align: center;
+	}
+
+	.cd__result-label {
+		margin: 0 0 0.5rem;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.8rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--color-sky-dark);
+	}
+
+	.cd__price {
+		font-family: var(--font-heading);
+		font-weight: 700;
+		font-size: 2.5rem;
+		color: var(--color-ink);
+		margin: 0 0 0.75rem;
+	}
+
+	.cd__addons-note {
+		font-size: 0.85rem;
+		color: var(--color-slate-light);
+		margin: -0.5rem 0 1rem;
+	}
+
+	.cd__cta {
+		width: 100%;
+	}
+
+	@media (max-width: 720px) {
+		.cd {
+			grid-template-columns: 1fr;
+		}
+	}
+</style>
+
+<script define:vars={{ carDetailingPricing, carDetailingAddOns }}>
+	function initCarDetailingConfigurator() {
+		const root = document.getElementById("car-detailing-configurator");
+		if (!root || root.dataset.cdInit === "true") return;
+		root.dataset.cdInit = "true";
+
+		const frequencyEls = root.querySelectorAll('input[name="cd-frequency"]');
+		const addonInputs = root.querySelectorAll(".cd-addon-input");
+		const priceEl = root.querySelector("#cd-price");
+		const addonsNoteEl = root.querySelector("#cd-addons-note");
+		const addonsRecurringNoteEl = root.querySelector("#cd-addons-recurring-note");
+		const ctaEl = root.querySelector("#cd-cta");
+		const ctaHref = ctaEl.getAttribute("href");
+
+		function formatMoney(n) {
+			const value = Number(n) || 0;
+			const hasCents = Math.round(value * 100) % 100 !== 0;
+			return (
+				"$" +
+				value.toLocaleString("en-US", {
+					minimumFractionDigits: hasCents ? 2 : 0,
+					maximumFractionDigits: 2,
+				})
+			);
+		}
+
+		function currentFrequency() {
+			const checked = Array.from(frequencyEls).find((el) => el.checked);
+			return checked ? checked.value : "oneTime";
+		}
+
+		function update() {
+			const frequency = currentFrequency();
+			const basePrice = carDetailingPricing[frequency] ?? carDetailingPricing.oneTime;
+
+			let addonsTotal = 0;
+			const checkedAddons = [];
+			addonInputs.forEach((input) => {
+				if (input.checked) {
+					const price = Number(input.dataset.price);
+					addonsTotal += price;
+					checkedAddons.push({ id: input.value, label: input.dataset.label, price });
+				}
+			});
+
+			const total = basePrice + addonsTotal;
+			priceEl.textContent = formatMoney(total);
+
+			addonsRecurringNoteEl.hidden = frequency !== "monthly";
+
+			if (addonsTotal > 0) {
+				addonsNoteEl.hidden = false;
+				addonsNoteEl.textContent =
+					frequency === "monthly"
+						? `Includes ${formatMoney(addonsTotal)} in add-ons, taken care of at every visit.`
+						: `Includes ${formatMoney(addonsTotal)} in add-ons`;
+			} else {
+				addonsNoteEl.hidden = true;
+			}
+
+			const label = frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+			const lines = [
+				{ label, amount: basePrice },
+				...checkedAddons.map((a) => ({ label: a.label, amount: a.price })),
+			];
+
+			const payload = {
+				type: "carDetailing",
+				frequency,
+				total,
+				lines,
+				addons: checkedAddons.map((a) => a.id),
+				steppers: [],
+				deepLaundry: null,
+			};
+
+			const separator = ctaHref.includes("?") ? "&" : "?";
+			ctaEl.href = `${ctaHref}${separator}s=${encodeURIComponent(JSON.stringify(payload))}`;
+		}
+
+		frequencyEls.forEach((el) => el.addEventListener("change", update));
+		addonInputs.forEach((el) => el.addEventListener("change", update));
+
+		update();
+	}
+
+	initCarDetailingConfigurator();
+	document.addEventListener("astro:page-load", initCarDetailingConfigurator);
+</script>

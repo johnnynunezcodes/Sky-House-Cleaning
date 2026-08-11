@@ -25,6 +25,9 @@ import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
 function describeService(type, frequency) {
 	if (type === "deep") return "Deep Cleaning";
 	if (type === "moveInOut") return "Move-In / Move-Out Cleaning";
+	if (type === "carDetailing") {
+		return frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+	}
 	const names = {
 		oneTime: "One-Time Cleaning",
 		weekly: "Weekly Cleaning",
@@ -73,6 +76,7 @@ export async function POST({ request }) {
 				metadata.address ? `Address: ${metadata.address}` : null,
 				metadata.access ? `Access: ${metadata.access}` : null,
 				metadata.pets ? `Pets: ${metadata.pets}` : null,
+				metadata.electricalAccess ? `Electrical Access: ${metadata.electricalAccess}` : null,
 				metadata.notes ? `Notes: ${metadata.notes}` : null,
 			].filter(Boolean);
 
@@ -156,7 +160,8 @@ export async function POST({ request }) {
 						// AGENTS.md — self-cancel was deliberately kept staff-only).
 						// `commitmentNotified` guards this to fire exactly once per
 						// subscription, even across webhook retries or later cycles.
-						const minimumCommitment = MINIMUM_COMMITMENT[metadata.frequency] ?? null;
+						const minimumCommitment =
+							MINIMUM_COMMITMENT[metadata.type || "standard"]?.[metadata.frequency] ?? null;
 						if (
 							isCalendarConfigured() &&
 							minimumCommitment != null &&
@@ -225,6 +230,7 @@ export async function POST({ request }) {
 								metadata.address ? `Address: ${metadata.address}` : null,
 								metadata.access ? `Access: ${metadata.access}` : null,
 								metadata.pets ? `Pets: ${metadata.pets}` : null,
+				metadata.electricalAccess ? `Electrical Access: ${metadata.electricalAccess}` : null,
 								metadata.notes ? `Notes: ${metadata.notes}` : null,
 							].filter(Boolean);
 

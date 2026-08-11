@@ -25,6 +25,7 @@ export const JOB_DURATION_MINUTES = {
 	standard: 180, // one-time / weekly / bi-weekly / monthly
 	deep: 240,
 	moveInOut: 270,
+	carDetailing: 120, // one-time or monthly membership, per vehicle
 };
 
 export function durationForType(type) {

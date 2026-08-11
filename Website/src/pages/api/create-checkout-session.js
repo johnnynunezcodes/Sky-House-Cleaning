@@ -102,11 +102,16 @@ export async function POST({ request }) {
 	const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
 	const origin = new URL(request.url).origin;
 
-	// Weekly / bi-weekly / monthly standard cleanings are recurring plans —
-	// everything else (one-time, deep clean, move-in/out) is a single charge.
-	// Deep/move-in-out never recur even if `frequency` happens to be set,
-	// since those service types don't have recurring prices in the matrix.
-	const isRecurring = selections?.type === "standard" && isRecurringFrequency(selections?.frequency);
+	// Weekly / bi-weekly / monthly standard cleanings are recurring plans, and
+	// so is a Monthly Detailing Membership (Interior Car Detailing only offers
+	// "oneTime" or "monthly", never weekly/bi-weekly). Everything else
+	// (one-time cleaning, deep clean, move-in/out, one-time detailing) is a
+	// single charge — deep/move-in-out never recur even if `frequency` happens
+	// to be set, since those service types don't have recurring prices in the
+	// matrix.
+	const isRecurring =
+		(selections?.type === "standard" || selections?.type === "carDetailing") &&
+		isRecurringFrequency(selections?.frequency);
 	const recurring = isRecurring ? RECURRING_INTERVALS[selections.frequency] : null;
 
 	// Every line item is included in the Checkout Session and marked recurring
@@ -129,6 +134,7 @@ export async function POST({ request }) {
 		address: customer.address,
 		access: customer.access,
 		pets: customer.pets || "",
+		electricalAccess: customer.electricalAccess || "",
 		notes: customer.notes || "",
 		slotStart: slot.start,
 		slotEnd: slot.end,

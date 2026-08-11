@@ -10,6 +10,8 @@ By booking a Deep Cleaning service with Sky House Cleaning, you agree to the fol
 
 **No-Shows:** If our team cannot access the property upon arrival, the appointment will be considered a no-show and charged 100% of the scheduled service price.
 
+**Square Footage:** Quoted prices are based on the square footage entered at booking. We confirm your home's actual square footage before your service — if it's different from what was submitted, we'll let you know and adjust the price to reflect your home's actual size.
+
 **Home Condition:** Quoted prices assume the home is in a condition that a Deep Cleaning can reasonably address — more buildup and detail than a Standard Cleaning, but not extreme neglect. If conditions on arrival (for example, significant clutter, pest activity, or unsafe/biohazard conditions) fall outside what a Deep Cleaning can reasonably resolve, we may recommend an additional visit, a revised estimate, or a different service before work begins.
 
 **Satisfaction Guarantee:** If you're not satisfied with your cleaning, please notify us within 24 hours, and we'll return to address any missed areas included in the original scope of work.

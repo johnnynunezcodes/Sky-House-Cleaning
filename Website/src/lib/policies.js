@@ -10,10 +10,19 @@
 // pages are the published copy customers actually see and agree to. Keep
 // them in sync by hand when the vault changes.
 
+// Keyed by service type, then frequency — Interior Car Detailing shares the
+// "monthly" frequency string with Standard Cleaning's Monthly membership but
+// has its own, shorter commitment term, so this can't be keyed by frequency
+// alone (every lookup site below passes both).
 export const MINIMUM_COMMITMENT = {
-	weekly: 8,
-	biweekly: 4,
-	monthly: 3,
+	standard: {
+		weekly: 8,
+		biweekly: 4,
+		monthly: 3,
+	},
+	carDetailing: {
+		monthly: 2,
+	},
 };
 
 // Exported (not just used internally) so book.astro can pass this same data
@@ -41,7 +50,7 @@ export function policyFor({ type = "standard", frequency = "oneTime" } = {}) {
 	if (type === "standard" && frequency !== "oneTime" && RECURRING_POLICIES[frequency]) {
 		return {
 			...RECURRING_POLICIES[frequency],
-			minimumCommitment: MINIMUM_COMMITMENT[frequency] ?? null,
+			minimumCommitment: MINIMUM_COMMITMENT.standard[frequency] ?? null,
 			frequency,
 		};
 	}

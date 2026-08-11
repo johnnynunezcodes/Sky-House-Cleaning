@@ -13,6 +13,8 @@ import {
 	deepCleanLaundryAddOn,
 	laundryUnitTiers,
 	applianceQuantityTiers,
+	carDetailingPricing,
+	carDetailingAddOns,
 } from "../data/content.js";
 
 const FREQUENCY_LABELS = {
@@ -75,12 +77,17 @@ function findCatalogItem(id) {
 		if (item) return item;
 	}
 	if (id === deepCleanLaundryAddOn.id) return deepCleanLaundryAddOn;
+	const carAddon = carDetailingAddOns.find((candidate) => candidate.id === id);
+	if (carAddon) return carAddon;
 	return null;
 }
 
 function describeService(type, frequency) {
 	if (type === "deep") return "Deep Cleaning (One-Time)";
 	if (type === "moveInOut") return "Move-In / Move-Out Cleaning (One-Time)";
+	if (type === "carDetailing") {
+		return frequency === "monthly" ? "Monthly Detailing Membership" : "One-Time Interior Detail";
+	}
 	return FREQUENCY_LABELS[frequency] || FREQUENCY_LABELS.oneTime;
 }
 
@@ -91,9 +98,9 @@ function round2(n) {
 /**
  * @param {object} selections
  * @param {"oneTime"|"weekly"|"biweekly"|"monthly"} [selections.frequency]
- * @param {"standard"|"deep"|"moveInOut"} [selections.type]
- * @param {number} [selections.sqft]
- * @param {string[]} [selections.addons] - ids of checked flat-price add-ons (standard only)
+ * @param {"standard"|"deep"|"moveInOut"|"carDetailing"} [selections.type]
+ * @param {number} [selections.sqft] - ignored for carDetailing, which is flat-rate
+ * @param {string[]} [selections.addons] - ids of checked flat-price add-ons (standard/carDetailing only)
  * @param {{id: string, qty: number, unitsMultiplier?: number}[]} [selections.steppers] - per-unit add-ons (standard only)
  * @param {{qty: number, unitsMultiplier?: number}} [selections.deepLaundry] - deep-clean laundry add-on
  * @returns {{ total: number, lineItems: {label: string, amount: number}[], sqft: number, frequency: string, type: string }}
@@ -110,22 +117,29 @@ export function calculatePrice(selections) {
 
 	const safeFrequency = FREQUENCY_LABELS[frequency] ? frequency : "oneTime";
 	const clampedSqft = Math.min(Math.max(Number(sqft) || 500, 500), 9999);
-	const tier = pricingMatrix[tierIndexFor(clampedSqft)];
 
 	let basePrice;
-	if (type === "deep") {
-		basePrice = tier.deep;
-	} else if (type === "moveInOut") {
-		basePrice = tier.moveInOut;
+	if (type === "carDetailing") {
+		// Flat-rate, not tied to square footage — just One-Time vs the Monthly
+		// membership's per-visit rate.
+		basePrice = frequency === "monthly" ? carDetailingPricing.monthly : carDetailingPricing.oneTime;
 	} else {
-		basePrice = tier[safeFrequency] ?? tier.oneTime;
+		const tier = pricingMatrix[tierIndexFor(clampedSqft)];
+		if (type === "deep") {
+			basePrice = tier.deep;
+		} else if (type === "moveInOut") {
+			basePrice = tier.moveInOut;
+		} else {
+			basePrice = tier[safeFrequency] ?? tier.oneTime;
+		}
 	}
 
 	const lineItems = [{ label: describeService(type, safeFrequency), amount: basePrice }];
 	let total = basePrice;
 
-	// Flat-price and per-unit add-ons only apply to the Standard package.
-	if (type === "standard" && Array.isArray(addons)) {
+	// Flat-price and per-unit add-ons only apply to the Standard cleaning
+	// package and Interior Car Detailing.
+	if ((type === "standard" || type === "carDetailing") && Array.isArray(addons)) {
 		for (const id of addons) {
 			const item = findCatalogItem(id);
 			if (item && typeof item.price === "number") {

@@ -1,6 +1,6 @@
 # Add-On Services
 
-Add-ons customers can select on top of a cleaning, broken out by which service/frequency they're available for. These match what's live in the pricing configurator on the website's Pricing page.
+Add-ons customers can select on top of a service, broken out by which service/frequency they're available for. These match what's live in the pricing configurator on the website's Booking page (for cleaning) and the Interior Car Detailing service page (for detailing).
 
 ## Standard Cleaning Add-Ons
 
@@ -62,6 +62,18 @@ Applies to both Wash & Dry Laundry add-ons above (Standard Cleaning and Deep Cle
 
 None currently offered. Move-In/Move-Out already includes the deep-detail items (interior cabinets, interior oven/fridge/dishwasher, interior windows, walls & baseboards, ceiling fans) that would otherwise be add-ons on a Standard Cleaning — see [Move-In / Move-Out Cleaning](Move-In%20Move-Out%20Cleaning.md).
 
-## Garage Cleaning & Organization / Interior Car Detailing
+## Interior Car Detailing Add-Ons
 
-No add-ons currently configured for these services.
+Available on: **One-Time Interior Detail and Monthly Detailing Membership.**
+
+- Extensive Pet Hair Removal — $35
+
+Standard vacuuming already picks up everyday pet hair as part of every detail — this add-on is for heavier shedding that needs extra time.
+
+On the Monthly Detailing Membership, selecting an add-on isn't a one-time charge — the $35 is billed every visit for as long as the membership runs (same recurring-add-on behavior as Standard Cleaning memberships, see above). The website's configurator calls this out to the customer before checkout.
+
+The Monthly Detailing Membership itself requires a 2-month minimum commitment, shown on the plan at checkout.
+
+## Garage Cleaning & Organization
+
+No add-ons currently configured for this service.

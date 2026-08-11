@@ -40,7 +40,7 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 
 					<div class="book-step">
 						<h3><span class="book-step__num">2</span> Your details</h3>
-						<p class="book-step__hint">So we know who we're cleaning for and how to get in.</p>
+						<p class="book-step__hint" id="book-details-hint">So we know who we're cleaning for and how to get in.</p>
 
 						<form id="book-form" class="book-form">
 							<div class="book-form__row">
@@ -60,7 +60,7 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 								<input type="text" id="book-address" name="address" required autocomplete="street-address" />
 							</div>
 							<div class="book-form__row book-form__row--full">
-								<label for="book-access">How do we get in?</label>
+								<label for="book-access" id="book-access-label">How do we get in?</label>
 								<input
 									type="text"
 									id="book-access"
@@ -69,9 +69,19 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 									required
 								/>
 							</div>
-							<div class="book-form__row book-form__row--full">
+							<div class="book-form__row book-form__row--full" id="book-pets-row">
 								<label for="book-pets">Will pets be home? <span class="book-form__optional">(optional)</span></label>
 								<input type="text" id="book-pets" name="pets" placeholder="Kind, and anything we should know" />
+							</div>
+							<div class="book-form__row book-form__row--full" id="book-electrical-row" hidden>
+								<label for="book-electrical">How do we access an electrical outlet?</label>
+								<input
+									type="text"
+									id="book-electrical"
+									name="electricalAccess"
+									placeholder="Nearest outlet location, and how to reach it (garage, exterior, etc.)"
+									disabled
+								/>
 							</div>
 							<div class="book-form__row book-form__row--full">
 								<label for="book-notes">Anything else? <span class="book-form__optional">(optional)</span></label>
@@ -446,7 +456,7 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 			if (type === "standard" && frequency !== "oneTime" && recurringPolicies[frequency]) {
 				return {
 					...recurringPolicies[frequency],
-					minimumCommitment: minimumCommitment[frequency] ?? null,
+					minimumCommitment: minimumCommitment.standard[frequency] ?? null,
 				};
 			}
 			if (oneTimePolicies[type]) {
@@ -525,6 +535,39 @@ import { RECURRING_POLICIES, ONE_TIME_POLICIES, MINIMUM_COMMITMENT } from "../li
 			summaryLinesEl.append(li);
 		});
 		summaryTotalEl.textContent = formatMoney(selections.total);
+
+		// Car detailing books a vehicle, not a home — swap in copy that matches
+		// what we're actually asking for on this step.
+		if (selections.type === "carDetailing") {
+			const detailsHintEl = root.querySelector("#book-details-hint");
+			const accessLabelEl = root.querySelector("#book-access-label");
+			const accessInputEl = root.querySelector("#book-access");
+			const petsRowEl = root.querySelector("#book-pets-row");
+			const petsInputEl = root.querySelector("#book-pets");
+			const electricalRowEl = root.querySelector("#book-electrical-row");
+			const electricalInputEl = root.querySelector("#book-electrical");
+			if (detailsHintEl) {
+				detailsHintEl.textContent = "So we know whose vehicle we're detailing and how to access it.";
+			}
+			if (accessLabelEl) {
+				accessLabelEl.textContent = "How do we access your vehicle?";
+			}
+			if (accessInputEl) {
+				accessInputEl.placeholder = "Where it'll be parked, and whether it'll be unlocked or you'll be there to meet us";
+			}
+			// Pets aren't relevant to detailing a car — ask about electrical
+			// access instead, since we need power to run our equipment. Disable
+			// (rather than remove) the pets field so it's simply excluded from
+			// the form submission, and require the electrical field instead of
+			// leaving it optional like the pets question was.
+			if (petsRowEl) petsRowEl.hidden = true;
+			if (petsInputEl) petsInputEl.disabled = true;
+			if (electricalRowEl) electricalRowEl.hidden = false;
+			if (electricalInputEl) {
+				electricalInputEl.disabled = false;
+				electricalInputEl.required = true;
+			}
+		}
 
 		// Wire up the booking policy: which one applies depends on the service
 		// type/frequency picked on the pricing page. Shown as a required

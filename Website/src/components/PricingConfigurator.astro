@@ -52,8 +52,12 @@ const { ctaHref = "/schedule", ctaLabel = "Pick Your Date & Time" } = Astro.prop
 			<input type="range" id="pc-sqft" class="pc__slider" min="500" max="9999" step="50" value="1500" />
 			<div class="pc__slider-scale">
 				<span>500 sq ft</span>
-				<span>6,000+ sq ft</span>
+				<span>9,999 sq ft</span>
 			</div>
+			<p class="pc__hint">
+				We'll confirm your home's actual square footage before service — if it's different from what's
+				selected here, we'll adjust your price to match.
+			</p>
 			<p class="pc__hint" id="pc-hint">
 				Deep Clean and Move-In/Move-Out are only available as one-time services.
 			</p>

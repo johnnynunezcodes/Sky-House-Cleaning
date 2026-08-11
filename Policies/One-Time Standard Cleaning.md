@@ -10,6 +10,8 @@ By booking a one-time cleaning service with Sky House Cleaning, you agree to the
 
 **No-Shows:** If our team cannot access the property upon arrival, the appointment will be considered a no-show and charged 100% of the scheduled service price.
 
+**Square Footage:** Quoted prices are based on the square footage entered at booking. We confirm your home's actual square footage before your service — if it's different from what was submitted, we'll let you know and adjust the price to reflect your home's actual size.
+
 **Home Condition:** Quoted prices assume the home is in average condition for the selected service. Excessive buildup or conditions requiring substantially more work may result in a revised estimate or recommendation for a different service before work begins.
 
 **Satisfaction Guarantee:** If you're not satisfied with your cleaning, please notify us within 24 hours, and we'll return to address any missed areas included in the original scope of work.

@@ -70,6 +70,7 @@ export async function POST({ request }) {
 		metadata.address ? `Address: ${metadata.address}` : null,
 		metadata.access ? `Access: ${metadata.access}` : null,
 		metadata.pets ? `Pets: ${metadata.pets}` : null,
+		metadata.electricalAccess ? `Electrical Access: ${metadata.electricalAccess}` : null,
 		metadata.notes ? `Notes: ${metadata.notes}` : null,
 	].filter(Boolean);
 

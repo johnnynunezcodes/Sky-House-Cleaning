@@ -62,7 +62,7 @@ export async function GET({ url }) {
 					lastVisitEnd: metadata.lastVisitEnd || "",
 					afterNextVisitStart: nextStop?.start || "",
 					completedVisitCount: parseInt(metadata.completedVisitCount || "0", 10) || 0,
-					minimumCommitment: MINIMUM_COMMITMENT[metadata.frequency] ?? null,
+					minimumCommitment: MINIMUM_COMMITMENT[metadata.type || "standard"]?.[metadata.frequency] ?? null,
 				});
 			}
 		}

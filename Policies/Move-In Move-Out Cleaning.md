@@ -14,6 +14,8 @@ By booking a Move-In/Move-Out Cleaning service with Sky House Cleaning, you agre
 
 **Utilities:** Our team needs working water and electricity to complete the service. If utilities are not active at the time of your appointment, we may be unable to complete the cleaning as scheduled.
 
+**Square Footage:** Quoted prices are based on the square footage entered at booking. We confirm your home's actual square footage before your service — if it's different from what was submitted, we'll let you know and adjust the price to reflect your home's actual size.
+
 **Home Condition:** Quoted prices assume the home is empty or near-empty at the time of service. If the property still contains a significant amount of furniture or belongings, this may fall outside the scope of a Move-In/Move-Out Cleaning and could result in a revised estimate or a recommendation for a different service.
 
 **Satisfaction Guarantee:** If you're not satisfied with your cleaning, please notify us within 24 hours, and we'll return to address any missed areas included in the original scope of work.

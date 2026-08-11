@@ -9,6 +9,9 @@ Our focus is on exceptional quality, reliability, and a seamless customer experi
 To keep this file small, detailed reference material lives in separate files within this project folder instead of being pasted in here. Every external file must be linked below with a one-line description, so it's always found in future conversations.
 
 - [Pricing Matrix](Pricing/Pricing%20Matrix.md) — full pricing table by square footage and service type (one-time, weekly, bi-weekly, monthly, deep clean, move-in/out).
+- [Hourly Rate Analysis (Internal)](Pricing/Hourly%20Rate%20Analysis%20%28Internal%29.md) — private note estimating what we effectively charge per hour of job time, by service and home size. For Johnny's eyes only — not published on the website, never reference this when writing customer-facing copy.
+- [Crew Size Planning Guide (Internal)](Pricing/Crew%20Size%20Planning%20Guide%20%28Internal%29.md) — private note estimating elapsed job time with 1–5 cleaners dispatched, by service and home size, to help decide crew size per job. For Johnny's eyes only — not published on the website, never reference this when writing customer-facing copy.
+- [First Cleaning Savings](Pricing/First%20Cleaning%20Savings.md) — chart showing how much a recurring member saves at each home size by not being charged a mandatory first-visit deep clean fee (which many competitors charge). Not yet on the website — a candidate to eventually share with customers, but should be trimmed/reworded per Verbal Branding before it's ever sent to one.
 - [Services Overview](Services/Overview.md) — index of all services offered, linking out to individual service detail files.
 - [Verbal Branding](Branding/Verbal%20Branding.md) — voice, tone, and messaging guidelines. Always reference this file whenever writing any copy for me (services, marketing, pricing pages, anything customer-facing).
 - [Images Overview](Images/Images.md) — index of where logos and job photos live in this project.

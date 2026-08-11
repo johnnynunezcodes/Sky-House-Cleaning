@@ -54,7 +54,7 @@ export const otherServices = [
 		slug: "car-detailing",
 		title: "Interior Car Detailing",
 		blurb: "One-time or monthly membership detailing that brings your vehicle's interior back to life.",
-		startingAt: "From $275",
+		startingAt: "From $250 / visit",
 	},
 ];
 
@@ -166,6 +166,22 @@ export const laundryUnitTiers = [
 // same appliance (oven, fridge, freezer, dishwasher) — indexed by quantity - 1.
 // The discount applies to every unit in the order once that quantity is reached.
 export const applianceQuantityTiers = [1, 0.9, 0.85];
+
+// Interior Car Detailing pricing — flat rate, not square-footage-based like
+// the cleaning matrix above. `monthly` is the per-visit membership rate; the
+// membership is otherwise the same service as the one-time detail, just on a
+// recurring schedule.
+export const carDetailingPricing = {
+	oneTime: 275,
+	monthly: 250,
+};
+
+// Add-ons available on Interior Car Detailing bookings (both One-Time and
+// Monthly Membership). Standard vacuuming already picks up everyday pet
+// hair — this is for heavier shedding that needs extra time.
+export const carDetailingAddOns = [
+	{ id: "pet-hair-removal", label: "Extensive Pet Hair Removal", price: 35 },
+];
 
 export const pricingMatrix = [
 	{ sqft: "1–999", oneTime: 150, weekly: 105, biweekly: 120, monthly: 128, deep: 225, moveInOut: 263 },
