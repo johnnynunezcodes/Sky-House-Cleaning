@@ -84,7 +84,7 @@ const sections = [
 							<rect x="6" y="4" width="4" height="16" rx="1"></rect>
 							<rect x="14" y="4" width="4" height="16" rx="1"></rect>
 						</svg>
-						<svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true" hidden>
+						<svg class="icon-play is-hidden" viewBox="0 0 24 24" aria-hidden="true">
 							<path d="M7 4l13 8-13 8z"></path>
 						</svg>
 					</button>
@@ -206,6 +206,14 @@ const sections = [
 		height: 15px;
 		fill: currentColor;
 	}
+
+	/* Explicit class instead of the "hidden" attribute — this codebase has
+	   run into "hidden" silently losing to an equal-specificity author
+	   display rule before (see schedule.astro), so this sidesteps that
+	   entirely rather than risk both icons showing at once. */
+	.video-toggle svg.is-hidden {
+		display: none;
+	}
 </style>
 
 <script>
@@ -226,8 +234,8 @@ const sections = [
 
 		function updateIcon() {
 			const playing = !video.paused && !video.ended;
-			pauseIcon.hidden = !playing;
-			playIcon.hidden = playing;
+			pauseIcon.classList.toggle("is-hidden", !playing);
+			playIcon.classList.toggle("is-hidden", playing);
 			btn.setAttribute("aria-label", playing ? "Pause video" : "Play video");
 		}
 
