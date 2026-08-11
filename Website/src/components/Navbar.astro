@@ -9,6 +9,8 @@ const navItems = [
 			{ label: "Home Cleaning", href: "/services" },
 			{ label: "Car Detailing", href: "/services/car-detailing" },
 			{ label: "Garage Cleaning & Organization", href: "/services/garage-organization" },
+			{ label: "Office & Commercial Cleaning", href: "/services/office-commercial-cleaning" },
+			{ label: "Post-Construction Cleaning", href: "/services/post-construction-cleaning" },
 		],
 	},
 	{
@@ -128,7 +130,11 @@ const currentPath = Astro.url.pathname;
 		gap: 2rem;
 	}
 
-	.navbar__nav ul {
+	/* Scoped to the direct child only — ".navbar__nav ul" would also match the
+	   nested ".navbar__dropdown" list (it's a ul inside .navbar__nav too),
+	   forcing the dropdown into the same horizontal row as the top-level
+	   nav instead of letting it stack. */
+	.navbar__nav > ul {
 		display: flex;
 		align-items: stretch;
 		gap: 1.6rem;
@@ -194,7 +200,13 @@ const currentPath = Astro.url.pathname;
 		top: calc(100% + 0.85rem);
 		left: 0;
 		z-index: 60;
-		min-width: 240px;
+		width: max-content;
+		max-width: 440px;
+		/* Two columns so a longer list (5 services and counting) stacks into
+		   a compact block instead of stretching into a single wide row. */
+		display: grid;
+		grid-template-columns: repeat(2, minmax(180px, 1fr));
+		gap: 0.15rem 0.5rem;
 		margin: 0.5rem 0 0;
 		padding: 0.5rem;
 		list-style: none;
@@ -236,7 +248,7 @@ const currentPath = Astro.url.pathname;
 		color: var(--color-slate);
 		font-weight: 500;
 		font-size: 0.9rem;
-		white-space: nowrap;
+		line-height: 1.3;
 	}
 
 	.navbar__dropdown-link:hover {
@@ -340,6 +352,8 @@ const currentPath = Astro.url.pathname;
 			box-shadow: none;
 			padding: 0.25rem 0 0 1rem;
 			margin-top: 0.5rem;
+			width: auto;
+			max-width: none;
 			display: flex;
 			flex-direction: column;
 			gap: 0.5rem;

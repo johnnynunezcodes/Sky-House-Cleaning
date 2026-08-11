@@ -1,0 +1,85 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "Rough Clean",
+		items: [
+			"Removing construction debris, packaging, and leftover materials",
+			"Sweeping and vacuuming up dust and debris from floors",
+			"Wiping down dust from surfaces, sills, and ledges",
+			"Cleaning windows and glass of construction dust, stickers, and labels",
+		],
+	},
+	{
+		title: "Final Clean",
+		items: [
+			"Detailed cleaning of kitchens and bathrooms, including inside cabinets and drawers",
+			"Wiping down all surfaces, baseboards, and trim",
+			"Cleaning interior windows, tracks, and sills",
+			"Vacuuming carpets and mopping hard floors",
+			"Wiping down light fixtures and switch plates",
+			"Removing any remaining dust, stickers, or residue",
+		],
+	},
+];
+---
+
+<Layout
+	title="Post-Construction Cleaning | Sky House Cleaning"
+	description="Post-construction cleaning for new builds, renovations, and remodels in the San Francisco Bay Area. Rough clean and final clean available. Custom quotes."
+>
+	<PageHero
+		eyebrow="Commercial Cleaning · Custom Quote"
+		title="Post-Construction Cleaning"
+		lede="We clear away the dust and debris that construction, renovation, and remodeling work leaves behind, so your space is ready to use, move into, or hand off. Rough clean and final clean available."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/contact" class="btn btn--outline">Get a Quote</a>
+		</div>
+	</PageHero>
+
+	<section class="section section--white">
+		<div class="container">
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+			<p class="note">
+				For everyone's safety, we schedule post-construction cleaning once the job site is clear
+				of active work. This service is booked by phone or email, not through our online booking —
+				send us photos or a walkthrough request and we'll put together a plan.
+			</p>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Ready to get the space move-in ready?"
+		subtext="Every job site is different, so pricing is custom. Call or email us and we'll put together a quote."
+	/>
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+
+	.section--white {
+		background: var(--color-white);
+	}
+</style>

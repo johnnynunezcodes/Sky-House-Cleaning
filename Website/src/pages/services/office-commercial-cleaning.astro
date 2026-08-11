@@ -1,0 +1,85 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "General Cleaning",
+		items: [
+			"Emptying trash and replacing liners",
+			"Vacuuming carpets and mopping hard floors",
+			"Dusting desks, surfaces, and furniture",
+			"Wiping down and disinfecting high-touch surfaces, including door handles, light switches, and handrails",
+			"Cleaning interior glass, mirrors, and partitions",
+		],
+	},
+	{
+		title: "Restrooms, Break Rooms & Common Areas",
+		items: [
+			"Cleaning and disinfecting toilets, sinks, and countertops",
+			"Restocking paper towels, toilet paper, and soap when supplies are left on-site",
+			"Wiping down break room counters, tables, and the exterior of appliances",
+			"Emptying and relining trash bins",
+			"Wiping down reception desks and shared furniture near entrances",
+		],
+	},
+];
+---
+
+<Layout
+	title="Office & Commercial Cleaning | Sky House Cleaning"
+	description="Recurring office and commercial cleaning for the San Francisco Bay Area. Weekly, bi-weekly, or custom schedules for offices and small businesses. Custom quotes."
+>
+	<PageHero
+		eyebrow="Commercial Cleaning · Custom Quote"
+		title="Office & Commercial Cleaning"
+		lede="Recurring cleaning for offices and small businesses, so your space stays consistently welcoming for the people who work there and the customers who walk through the door. We work around your hours."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/contact" class="btn btn--outline">Get a Quote</a>
+		</div>
+	</PageHero>
+
+	<section class="section section--white">
+		<div class="container">
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+			<p class="note">
+				Available weekly, bi-weekly, or on a custom recurring schedule built around your business.
+				This service is booked by phone or email, not through our online booking — call or send us
+				a message and we'll put together a plan.
+			</p>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Ready for a cleaner workplace?"
+		subtext="Every business is different, so pricing is custom. Call or email us and we'll put together a quote."
+	/>
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+
+	.section--white {
+		background: var(--color-white);
+	}
+</style>

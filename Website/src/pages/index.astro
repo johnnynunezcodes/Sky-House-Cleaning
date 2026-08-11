@@ -5,21 +5,21 @@ import TestimonialCard from "../components/TestimonialCard.astro";
 import CtaBand from "../components/CtaBand.astro";
 import BeforeAfterSlider from "../components/BeforeAfterSlider.astro";
 import YouTubeEmbed from "../components/YouTubeEmbed.astro";
-import { cleaningServices, otherServices, testimonials } from "../data/content.js";
+import { cleaningServices, otherServices, commercialServices, testimonials } from "../data/content.js";
 ---
 
 <Layout
-	title="Sky House Cleaning | Bay Area Home Cleaning"
-	description="Trusted, detail-oriented home cleaning for the San Francisco Bay Area. One-time, weekly, bi-weekly, and monthly cleaning memberships, plus car detailing and garage organization."
+	title="Sky House Cleaning | Bay Area Home & Commercial Cleaning"
+	description="Trusted, detail-oriented cleaning for the San Francisco Bay Area. One-time, weekly, bi-weekly, and monthly home cleaning memberships, car detailing, garage organization, and office & commercial cleaning."
 >
 	<section class="hero">
 		<div class="container hero__inner">
 			<p class="eyebrow">Serving Oakland &amp; the Bay Area</p>
-			<h1>A cleaner home, cared for like it's our own</h1>
+			<h1>A cleaner space, cared for like it's our own</h1>
 			<p class="hero__lede">
-				One-time visits, recurring memberships, move-in/move-out cleans, car detailing, and garage
-				organization — reliable, detail-oriented service so you can spend less time on chores and
-				more time on what matters.
+				One-time visits, recurring memberships, move-in/move-out cleans, car detailing, garage
+				organization, and office & commercial cleaning — reliable, detail-oriented service so you
+				can spend less time on cleaning and more time on what matters.
 			</p>
 			<div class="hero__actions">
 				<a href="/booking" class="btn btn--primary">Schedule Your Cleaning</a>
@@ -42,7 +42,8 @@ import { cleaningServices, otherServices, testimonials } from "../data/content.j
 				<p>
 					Whether you want a recurring membership, a one-time deep clean, or help getting your
 					garage back in order, we'll put together a plan that fits your schedule and your space.
-					Our goal is simple: consistent, thorough cleaning you can count on, every visit.
+					Our goal is simple: consistent, thorough cleaning you can count on, every visit. Running
+					a business? See how we help offices and job sites below.
 				</p>
 			</div>
 
@@ -64,9 +65,10 @@ import { cleaningServices, otherServices, testimonials } from "../data/content.j
 			<div class="section-heading">
 				<p class="eyebrow">More Ways We Help</p>
 				<h2>Beyond the home</h2>
+				<p>Vehicle care, organization, and cleaning for offices and job sites.</p>
 			</div>
 			<div class="grid grid--2">
-				{otherServices.map((service) => (
+				{[...otherServices, ...commercialServices].map((service) => (
 					<ServiceCard
 						title={service.title}
 						blurb={service.blurb}

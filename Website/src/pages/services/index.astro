@@ -3,7 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import PageHero from "../../components/PageHero.astro";
 import ServiceCard from "../../components/ServiceCard.astro";
 import CtaBand from "../../components/CtaBand.astro";
-import { cleaningServices, otherServices, addOns } from "../../data/content.js";
+import { cleaningServices, otherServices, commercialServices, addOns } from "../../data/content.js";
 ---
 
 <Layout
@@ -12,8 +12,8 @@ import { cleaningServices, otherServices, addOns } from "../../data/content.js";
 >
 	<PageHero
 		eyebrow="What We Offer"
-		title="Services for every home, and every kind of clean"
-		lede="From a single reset clean to a recurring membership, plus car detailing and garage organization — here's everything we offer."
+		title="Services for every home and business"
+		lede="From a single reset clean to a recurring membership, plus car detailing, garage organization, and cleaning for offices and job sites — here's everything we offer."
 	/>
 
 	<section class="section">
@@ -43,6 +43,29 @@ import { cleaningServices, otherServices, addOns } from "../../data/content.js";
 			</div>
 			<div class="grid grid--2">
 				{otherServices.map((service) => (
+					<ServiceCard
+						title={service.title}
+						blurb={service.blurb}
+						href={`/services/${service.slug}`}
+						startingAt={service.startingAt}
+					/>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading section-heading--left">
+				<p class="eyebrow">For Businesses</p>
+				<h2>Commercial cleaning</h2>
+				<p>
+					Offices, small businesses, and job sites need the same reliability we bring to homes.
+					These are quote-based and booked by phone or email rather than online.
+				</p>
+			</div>
+			<div class="grid grid--2">
+				{commercialServices.map((service) => (
 					<ServiceCard
 						title={service.title}
 						blurb={service.blurb}

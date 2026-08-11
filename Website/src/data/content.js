@@ -58,6 +58,24 @@ export const otherServices = [
 	},
 ];
 
+// Commercial services are quote-based and booked by phone or email rather
+// than through the online booking flow — no configurator or /booking page
+// for these, just a "Call / Get a Quote" CTA on each service page.
+export const commercialServices = [
+	{
+		slug: "office-commercial-cleaning",
+		title: "Office & Commercial Cleaning",
+		blurb: "Recurring janitorial cleaning for offices and small businesses, on a schedule built around your hours.",
+		startingAt: "Custom quote",
+	},
+	{
+		slug: "post-construction-cleaning",
+		title: "Post-Construction Cleaning",
+		blurb: "Rough clean and final clean for new builds, renovations, and remodels.",
+		startingAt: "Custom quote",
+	},
+];
+
 export const addOns = [
 	"Interior Windows",
 	"Inside Oven",

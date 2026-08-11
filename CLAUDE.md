@@ -1,8 +1,8 @@
 ## Sky House Cleaning
 
-Sky House Cleaning is a premium residential cleaning company serving the San Francisco Bay Area. We offer one-time, weekly, bi-weekly, and monthly home cleaning memberships, as well as move-in/out cleanings, interior car detailing, and professional home organization services.
+Sky House Cleaning is a premium residential and commercial cleaning company serving the San Francisco Bay Area. We offer one-time, weekly, bi-weekly, and monthly home cleaning memberships, as well as move-in/out cleanings, interior car detailing, professional home organization services, and commercial cleaning (office & commercial cleaning, post-construction cleaning) for businesses and job sites.
 
-Our focus is on exceptional quality, reliability, and a seamless customer experience. We emphasize transparent pricing, thoughtfully designed recurring memberships, eco-conscious products whenever possible, and professional, detail-oriented service that helps homeowners enjoy cleaner, healthier homes with less stress.
+Our focus is on exceptional quality, reliability, and a seamless customer experience. We emphasize transparent pricing, thoughtfully designed recurring memberships, eco-conscious products whenever possible, and professional, detail-oriented service that helps homeowners and businesses enjoy cleaner, healthier spaces with less stress. Commercial services are quote-based and booked by phone or email rather than through the online booking flow.
 
 ## External Files
 
