@@ -87,37 +87,151 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		transform: translate(-50%, -50%) scale(1.08);
 	}
 
-	.yt :global(.yt__iframe) {
+	.yt :global(.yt__player-wrap) {
+		position: absolute;
+		inset: 0;
+	}
+
+	.yt :global(.yt__player-wrap iframe) {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
 		border: 0;
 		display: block;
+		/* The iframe is a cross-origin YouTube document, so a click inside
+		   it can never be observed by our page's JS — pointer-events: none
+		   sends clicks straight through to .yt__toggle (a same-origin
+		   button stacked on top of it, see below), which is what actually
+		   handles play/pause. */
+		pointer-events: none;
+	}
+
+	/* Covers the whole player so clicking anywhere pauses/resumes it, with
+	   a small Instagram-style icon pinned to the corner as the visible
+	   affordance — no native YouTube controls bar or settings gear at
+	   all, playerVars below removes those entirely. */
+	.yt :global(.yt__toggle) {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		width: 100%;
+		height: 100%;
+		padding: 0;
+		border: none;
+		background: none;
+		cursor: pointer;
+	}
+
+	.yt :global(.yt__toggle-icon) {
+		position: absolute;
+		bottom: 0.85rem;
+		right: 0.85rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
+		background: rgba(0, 0, 0, 0.45);
+		color: #fff;
+		transition: background 0.15s ease;
+	}
+
+	.yt :global(.yt__toggle:hover .yt__toggle-icon) {
+		background: rgba(0, 0, 0, 0.65);
+	}
+
+	.yt :global(.yt__toggle-icon svg) {
+		width: 15px;
+		height: 15px;
+		fill: currentColor;
+	}
+
+	/* Explicit class rather than the "hidden" attribute — this codebase
+	   has run into "hidden" silently losing to an equal-specificity
+	   author display rule before, so this sidesteps that entirely. */
+	.yt :global(.yt__toggle-icon svg.is-hidden) {
+		display: none;
 	}
 </style>
 
 <script>
+	let ytApiPromise;
+
+	function loadYouTubeApi() {
+		if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+		if (ytApiPromise) return ytApiPromise;
+
+		ytApiPromise = new Promise((resolve) => {
+			const previousCallback = window.onYouTubeIframeAPIReady;
+			window.onYouTubeIframeAPIReady = () => {
+				previousCallback?.();
+				resolve(window.YT);
+			};
+			const script = document.createElement("script");
+			script.src = "https://www.youtube.com/iframe_api";
+			document.head.appendChild(script);
+		});
+		return ytApiPromise;
+	}
+
 	function initYouTubeEmbeds() {
 		document.querySelectorAll(".yt").forEach((el) => {
 			if (!(el instanceof HTMLElement) || el.dataset.ytInit === "true") return;
 			el.dataset.ytInit = "true";
 
 			const button = el.querySelector(".yt__play");
-			button?.addEventListener("click", () => {
-				const id = el.dataset.ytId;
-				const title = el.dataset.ytTitle || "YouTube video";
+			button?.addEventListener("click", async () => {
+				const videoId = el.dataset.ytId;
+				if (!videoId) return;
 
-				const iframe = document.createElement("iframe");
-				iframe.className = "yt__iframe";
-				iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
-				iframe.title = title;
-				iframe.allow =
-					"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-				iframe.allowFullscreen = true;
+				const playerId = `yt-player-${Math.random().toString(36).slice(2, 9)}`;
+				el.innerHTML = `
+					<div class="yt__player-wrap"><div id="${playerId}"></div></div>
+					<button type="button" class="yt__toggle" aria-label="Pause video">
+						<span class="yt__toggle-icon" aria-hidden="true">
+							<svg class="icon-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>
+							<svg class="icon-play is-hidden" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></svg>
+						</span>
+					</button>
+				`;
 
-				el.innerHTML = "";
-				el.appendChild(iframe);
+				const toggleBtn = el.querySelector(".yt__toggle");
+				const pauseIcon = el.querySelector(".icon-pause");
+				const playIcon = el.querySelector(".icon-play");
+				if (!toggleBtn || !pauseIcon || !playIcon) return;
+
+				const YT = await loadYouTubeApi();
+
+				const player = new YT.Player(playerId, {
+					videoId,
+					host: "https://www.youtube-nocookie.com",
+					playerVars: {
+						autoplay: 1,
+						rel: 0,
+						controls: 0,
+						modestbranding: 1,
+						iv_load_policy: 3,
+						playsinline: 1,
+					},
+					events: {
+						onStateChange(event) {
+							const playing = event.data === YT.PlayerState.PLAYING;
+							pauseIcon.classList.toggle("is-hidden", !playing);
+							playIcon.classList.toggle("is-hidden", playing);
+							toggleBtn.setAttribute("aria-label", playing ? "Pause video" : "Play video");
+						},
+					},
+				});
+
+				toggleBtn.addEventListener("click", () => {
+					if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+						player.pauseVideo();
+					} else {
+						player.playVideo();
+					}
+				});
 			});
 		});
 	}

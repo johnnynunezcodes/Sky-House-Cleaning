@@ -18,5 +18,6 @@ To keep this file small, detailed reference material lives in separate files wit
 - [Policies Overview](Policies/Overview.md) — index of per-service booking policies, shown to customers at checkout via a required agreement checkbox.
 - [Website](Website/README.md) — the Astro project for the marketing website (source code, dev setup, project notes). This is a separate codebase with its own `CLAUDE.md` for coding-specific instructions.
 - [Cleaning Product Standards](Standards/Cleaning%20Product%20Standards.md) — what we look for in the cleaning products we use (safety ratings, eco-friendly formulas, vegan/cruelty-free, gentle but effective) and why it matters to us.
+- [Hero Video Description](Branding/Hero%20Video%20Description.md) — YouTube description copy for a company-overview video (what we do, services offered, service area). Not website copy — for the video's platform listing only.
 
 When you add a new file to this project, add a link for it here (with a one-line description) so I know to reference it.
