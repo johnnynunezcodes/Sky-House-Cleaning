@@ -60,25 +60,24 @@ const sections = [
 
 	<section class="section section--tint">
 		<div class="container">
-			<div class="section-heading">
-				<p class="eyebrow">See Us in Action</p>
-				<h2>Commercial-grade results</h2>
-				<p>Our team deep-cleaning a commercial kitchen floor.</p>
-			</div>
-			<div class="video-wrap">
-				<video
-					src="/videos/commercial-cleaning-kitchen-floor.mp4"
-					poster="/videos/commercial-cleaning-kitchen-floor-poster.jpg"
-					autoplay
-					muted
-					loop
-					playsinline
-					controls
-					width="720"
-					height="1280"
-				>
-					Your browser doesn't support embedded video. <a href="/videos/commercial-cleaning-kitchen-floor.mp4">Watch the video directly</a>.
-				</video>
+			<div class="video-feature">
+				<div class="video-feature__text section-heading">
+					<p class="eyebrow">See Us in Action</p>
+					<h2>Commercial-grade results</h2>
+					<p>Our team deep-cleaning a commercial kitchen floor.</p>
+				</div>
+				<div class="video-wrap">
+					<video
+						src="/videos/commercial-cleaning-kitchen-floor.mp4"
+						poster="/videos/commercial-cleaning-kitchen-floor-poster.jpg"
+						autoplay
+						muted
+						loop
+						playsinline
+					>
+						Your browser doesn't support embedded video. <a href="/videos/commercial-cleaning-kitchen-floor.mp4">Watch the video directly</a>.
+					</video>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -108,21 +107,51 @@ const sections = [
 		background: var(--color-white);
 	}
 
+	/* Stacked on mobile (text above, video below, both centered — the
+	   default .section-heading look). On desktop this becomes a row: the
+	   text sits to the left of the video, and the pair is centered as a
+	   single unit within the page rather than the text spanning the full
+	   container width above a centered video. */
+	.video-feature {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 2rem;
+	}
+
+	@media (min-width: 861px) {
+		.video-feature {
+			flex-direction: row;
+			justify-content: center;
+			align-items: center;
+			gap: 3rem;
+			max-width: 900px;
+			margin: 0 auto;
+		}
+
+		.video-feature__text {
+			text-align: left;
+			max-width: 380px;
+			margin: 0;
+		}
+	}
+
 	/* The source clip is a vertical (9:16) phone recording, so it's capped
 	   to a narrow column instead of stretching full-width like a landscape
-	   video would — the aspect-ratio reserves the space up front so the
-	   page doesn't jump once the video/poster loads. */
+	   video would. No fixed aspect-ratio or object-fit here on purpose —
+	   those were fighting the video's real intrinsic ratio and causing
+	   letterboxing bars. height: auto instead just lets the video render
+	   at its own true ratio, full-bleed, with nothing added or cropped. */
 	.video-wrap {
-		max-width: 360px;
+		max-width: 320px;
 		margin: 0 auto;
 	}
 
 	.video-wrap video {
 		display: block;
 		width: 100%;
-		aspect-ratio: 9 / 16;
+		height: auto;
 		border-radius: var(--radius);
 		box-shadow: var(--shadow-soft);
-		background: var(--color-ink);
 	}
 </style>
