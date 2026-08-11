@@ -66,7 +66,7 @@ const sections = [
 					<h2>Commercial-grade results</h2>
 					<p>Our team deep-cleaning a commercial kitchen floor.</p>
 				</div>
-				<div class="video-wrap">
+				<div class="video-wrap" id="commercial-video-wrap">
 					<video
 						src="/videos/commercial-cleaning-kitchen-floor.mp4"
 						poster="/videos/commercial-cleaning-kitchen-floor-poster.jpg"
@@ -76,10 +76,18 @@ const sections = [
 						playsinline
 						webkit-playsinline="true"
 						preload="auto"
-						controls
 					>
 						Your browser doesn't support embedded video. <a href="/videos/commercial-cleaning-kitchen-floor.mp4">Watch the video directly</a>.
 					</video>
+					<button type="button" class="video-toggle" aria-label="Pause video">
+						<svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+							<rect x="6" y="4" width="4" height="16" rx="1"></rect>
+							<rect x="14" y="4" width="4" height="16" rx="1"></rect>
+						</svg>
+						<svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true" hidden>
+							<path d="M7 4l13 8-13 8z"></path>
+						</svg>
+					</button>
 				</div>
 			</div>
 		</div>
@@ -143,6 +151,7 @@ const sections = [
 	   to a narrow column instead of stretching full-width like a landscape
 	   video would. */
 	.video-wrap {
+		position: relative;
 		max-width: 320px;
 		margin: 0 auto;
 	}
@@ -161,5 +170,85 @@ const sections = [
 		aspect-ratio: 9 / 16;
 		border-radius: var(--radius);
 		box-shadow: var(--shadow-soft);
+		cursor: pointer;
+	}
+
+	/* A small Instagram-style tap target instead of the native <video>
+	   controls bar — no gray scrubber/volume/fullscreen strip covering the
+	   footage, just a minimal circular icon. Clicking anywhere on the
+	   video itself also toggles play/pause (see script below); this
+	   button is just a visible, obvious affordance in the corner. */
+	.video-toggle {
+		position: absolute;
+		bottom: 0.85rem;
+		right: 0.85rem;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 34px;
+		height: 34px;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: rgba(0, 0, 0, 0.45);
+		color: #fff;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+
+	.video-toggle:hover {
+		background: rgba(0, 0, 0, 0.65);
+	}
+
+	.video-toggle svg {
+		width: 15px;
+		height: 15px;
+		fill: currentColor;
 	}
 </style>
+
+<script>
+	// Custom play/pause for the commercial-cleaning clip: clicking anywhere
+	// on the video, or the small corner button, toggles playback — no
+	// native <video controls> bar (that draws a gray strip over the
+	// bottom of the footage).
+	function initCommercialVideoToggle() {
+		const wrap = document.getElementById("commercial-video-wrap");
+		if (!wrap || wrap.dataset.toggleInit === "true") return;
+		wrap.dataset.toggleInit = "true";
+
+		const video = wrap.querySelector("video");
+		const btn = wrap.querySelector(".video-toggle");
+		const pauseIcon = wrap.querySelector(".icon-pause");
+		const playIcon = wrap.querySelector(".icon-play");
+		if (!video || !btn || !pauseIcon || !playIcon) return;
+
+		function updateIcon() {
+			const playing = !video.paused && !video.ended;
+			pauseIcon.hidden = !playing;
+			playIcon.hidden = playing;
+			btn.setAttribute("aria-label", playing ? "Pause video" : "Play video");
+		}
+
+		function toggle() {
+			if (video.paused || video.ended) {
+				video.play();
+			} else {
+				video.pause();
+			}
+		}
+
+		video.addEventListener("click", toggle);
+		btn.addEventListener("click", (event) => {
+			event.stopPropagation();
+			toggle();
+		});
+		video.addEventListener("play", updateIcon);
+		video.addEventListener("pause", updateIcon);
+		updateIcon();
+	}
+
+	initCommercialVideoToggle();
+	document.addEventListener("astro:page-load", initCommercialVideoToggle);
+</script>
