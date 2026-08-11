@@ -74,6 +74,8 @@ const sections = [
 						muted
 						loop
 						playsinline
+						webkit-playsinline="true"
+						preload="auto"
 					>
 						Your browser doesn't support embedded video. <a href="/videos/commercial-cleaning-kitchen-floor.mp4">Watch the video directly</a>.
 					</video>
@@ -138,10 +140,7 @@ const sections = [
 
 	/* The source clip is a vertical (9:16) phone recording, so it's capped
 	   to a narrow column instead of stretching full-width like a landscape
-	   video would. No fixed aspect-ratio or object-fit here on purpose —
-	   those were fighting the video's real intrinsic ratio and causing
-	   letterboxing bars. height: auto instead just lets the video render
-	   at its own true ratio, full-bleed, with nothing added or cropped. */
+	   video would. */
 	.video-wrap {
 		max-width: 320px;
 		margin: 0 auto;
@@ -150,7 +149,15 @@ const sections = [
 	.video-wrap video {
 		display: block;
 		width: 100%;
-		height: auto;
+		/* Reserves the correct portrait box up front (matches the file's
+		   real 720x1280 ratio exactly), so the video/poster has somewhere
+		   to render immediately on slower mobile connections instead of
+		   collapsing to the browser's fallback 300x150 box while metadata
+		   is still loading — that collapse is what made it disappear on
+		   mobile. Deliberately no object-fit override: since this ratio
+		   matches the file exactly, the browser default already renders
+		   it full-bleed with no letterboxing or cropping. */
+		aspect-ratio: 9 / 16;
 		border-radius: var(--radius);
 		box-shadow: var(--shadow-soft);
 	}
