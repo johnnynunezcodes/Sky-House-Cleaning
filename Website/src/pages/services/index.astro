@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import PageHero from "../../components/PageHero.astro";
 import ServiceCard from "../../components/ServiceCard.astro";
+import BeforeAfterSlider from "../../components/BeforeAfterSlider.astro";
 import CtaBand from "../../components/CtaBand.astro";
 import {
 	cleaningServices,
@@ -37,6 +38,23 @@ import {
 						startingAt={service.startingAt}
 					/>
 				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading section-heading--left">
+				<p class="eyebrow">See the Difference</p>
+				<h2>A real kitchen, before and after</h2>
+				<p>Drag the slider to see what a Sky House Cleaning visit looks like in person.</p>
+			</div>
+			<div class="before-after-wrap">
+				<BeforeAfterSlider
+					beforeSrc="/images/before-after/kitchen-2-before.jpg"
+					afterSrc="/images/before-after/kitchen-2-after.jpg"
+					alt="Kitchen cleaned by Sky House Cleaning"
+				/>
 			</div>
 		</div>
 	</section>
@@ -131,6 +149,11 @@ import {
 		text-align: left;
 		max-width: 640px;
 		margin: 0 0 2.5rem;
+	}
+
+	.before-after-wrap {
+		max-width: 760px;
+		margin: 0 auto;
 	}
 
 	/* Only one card in this section, so it's capped to a normal card width
