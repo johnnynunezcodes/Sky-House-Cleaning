@@ -61,6 +61,18 @@ export const otherServices = [
 // Commercial services are quote-based and booked by phone or email rather
 // than through the online booking flow — no configurator or /booking page
 // for these, just a "Call / Get a Quote" CTA on each service page.
+// Airbnb / short-term rental turnover cleaning — also quote-based and booked
+// by phone or email, but kept in its own list since it's neither a standard
+// residential service nor quite the same category as office/commercial work.
+export const shortTermRentalServices = [
+	{
+		slug: "airbnb-cleaning",
+		title: "Airbnb Cleaning",
+		blurb: "Fast turnover cleaning between guests, so your listing is spotless and guest-ready every time.",
+		startingAt: "Custom quote",
+	},
+];
+
 export const commercialServices = [
 	{
 		slug: "office-commercial-cleaning",

@@ -12,6 +12,9 @@ Sky House Cleaning offers:
 ### Vehicle Care
 - [Car Detailing](Car%20Detailing.md) — one-time Interior Car Detailing, or a Monthly Detailing Membership. Multiple vehicles can be booked in the same visit.
 
+### Short-Term Rentals
+- [Airbnb Cleaning](Airbnb%20Cleaning.md) — fast turnover cleaning between guests. Quote-based pricing.
+
 ### Commercial Cleaning
 - [Office & Commercial Cleaning](Office%20%26%20Commercial%20Cleaning.md) — recurring janitorial cleaning for offices and small businesses, on a weekly, bi-weekly, or custom schedule. Quote-based pricing.
 - [Post-Construction Cleaning](Post-Construction%20Cleaning.md) — rough clean and final clean for new builds, renovations, and remodels. Quote-based pricing.

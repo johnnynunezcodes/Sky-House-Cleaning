@@ -1,0 +1,228 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import ChecklistCard from "../../components/ChecklistCard.astro";
+import CtaBand from "../../components/CtaBand.astro";
+
+const sections = [
+	{
+		title: "Turnover Cleaning",
+		items: [
+			"Full clean of the kitchen, bathrooms, bedrooms, and living areas between every guest",
+			"Stripping used linens and remaking every bed with fresh ones",
+			"Washing, drying, and restocking towels",
+			"Vacuuming and mopping all floors",
+			"Taking out trash and resetting recycling",
+		],
+	},
+	{
+		title: "Guest-Ready Touches",
+		items: [
+			"Restocking guest essentials like toilet paper, paper towels, soap, and coffee",
+			"Fluffing pillows, straightening throws, and resetting staged decor",
+			"Wiping down and spot-checking appliances",
+			"A quick walkthrough to flag any damage, missing items, or maintenance issues",
+			"Turning the space around fast between checkout and check-in",
+		],
+	},
+];
+
+const photos = [
+	{
+		src: "/images/airbnb/kitchen.jpeg",
+		alt: "Fully stocked Airbnb kitchen with wood cabinetry, ready for the next guest",
+		class: "collage-1",
+	},
+	{
+		src: "/images/airbnb/bathroom-towels.jpeg",
+		alt: "Freshly folded towels on a heated towel rack in an Airbnb bathroom",
+		class: "collage-2",
+	},
+	{
+		src: "/images/airbnb/bunk-bed-studio.jpeg",
+		alt: "Airbnb studio with a space-saving bunk bed and full kitchen, reset for the next guest",
+		class: "collage-3",
+	},
+	{
+		src: "/images/airbnb/living-room.jpeg",
+		alt: "Tidy Airbnb living room with a made-up sofa and clean windows",
+		class: "collage-4",
+	},
+	{
+		src: "/images/airbnb/bedroom.jpeg",
+		alt: "Airbnb bedroom with a neatly made fold-down bed",
+		class: "collage-5",
+	},
+	{
+		src: "/images/airbnb/home-decor.jpeg",
+		alt: "Fresh flowers styled on the coffee table for an incoming guest",
+		class: "collage-6",
+	},
+];
+---
+
+<Layout
+	title="Airbnb Cleaning | Sky House Cleaning"
+	description="Fast, reliable turnover cleaning for Airbnb and short-term rental hosts in the San Francisco Bay Area. Guest-ready, every time. Custom quotes."
+>
+	<PageHero
+		eyebrow="Short-Term Rentals · Custom Quote"
+		title="Airbnb Cleaning"
+		lede="Fast, reliable turnover cleaning between guests, so your listing is spotless and guest-ready every time — even on a tight checkout-to-check-in window."
+	>
+		<div class="hero-actions">
+			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href="/contact" class="btn btn--outline">Get a Quote</a>
+		</div>
+	</PageHero>
+
+	<section class="section section--white">
+		<div class="container">
+			<div class="grid grid--2">
+				{sections.map((section) => (
+					<ChecklistCard title={section.title} items={section.items} />
+				))}
+			</div>
+			<p class="note">
+				Every listing and turnaround window is different, so we build a schedule around your
+				bookings — same-day turnovers included. This service is booked by phone or email, not
+				through our online booking — tell us about your property and we'll put together a plan.
+			</p>
+		</div>
+	</section>
+
+	<section class="section">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">Guest-Ready Results</p>
+				<h2>What guests walk into</h2>
+			</div>
+			<div class="collage">
+				{photos.map((photo) => (
+					<div class:list={["collage-item", photo.class]}>
+						<img src={photo.src} alt={photo.alt} loading="lazy" />
+					</div>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Ready for guest-ready turnovers?"
+		subtext="Every property is different, so pricing is custom. Call or email us and we'll put together a quote."
+	/>
+</Layout>
+
+<style>
+	.hero-actions {
+		display: flex;
+		gap: 1rem;
+		justify-content: center;
+		flex-wrap: wrap;
+		margin-top: 1.5rem;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+
+	.section--white {
+		background: var(--color-white);
+	}
+
+	/* A 4-column x 3-row bento grid sized so every photo — five landscape,
+	   one portrait (the towels) — gets a cell shaped to fit its orientation
+	   instead of being stretched: the portrait shot gets a tall 1x2 cell,
+	   the kitchen (our best shot) anchors the grid as a big 2x2 tile, and
+	   the remaining landscape shots fill 1x1 and 2x1 cells around them.
+	   object-fit: cover crops each photo to its cell without distortion. */
+	.collage {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		grid-template-rows: repeat(3, minmax(160px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.collage-item {
+		border-radius: var(--radius);
+		overflow: hidden;
+		box-shadow: var(--shadow-soft);
+	}
+
+	.collage-item img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.collage-1 {
+		grid-column: 1 / 3;
+		grid-row: 1 / 3;
+	}
+
+	.collage-2 {
+		grid-column: 3 / 4;
+		grid-row: 1 / 3;
+	}
+
+	.collage-3 {
+		grid-column: 4 / 5;
+		grid-row: 1 / 2;
+	}
+
+	.collage-4 {
+		grid-column: 4 / 5;
+		grid-row: 2 / 3;
+	}
+
+	.collage-5 {
+		grid-column: 1 / 3;
+		grid-row: 3 / 4;
+	}
+
+	.collage-6 {
+		grid-column: 3 / 5;
+		grid-row: 3 / 4;
+	}
+
+	/* Mobile: drop the bento layout for a simple 2-column grid of even
+	   square-ish tiles — the fixed spans above only make sense at the
+	   wider desktop grid width. The kitchen shot (collage-1) still gets a
+	   wide 2-column tile since it's the strongest photo, everything else
+	   is a plain 1x1 cell. */
+	@media (max-width: 720px) {
+		.collage {
+			grid-template-columns: repeat(2, 1fr);
+			grid-template-rows: none;
+			grid-auto-rows: 200px;
+		}
+
+		.collage-1,
+		.collage-2,
+		.collage-3,
+		.collage-4,
+		.collage-5,
+		.collage-6 {
+			grid-column: auto;
+			grid-row: auto;
+		}
+
+		.collage-1 {
+			grid-column: 1 / 3;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.collage {
+			grid-template-columns: 1fr;
+			grid-auto-rows: 220px;
+		}
+
+		.collage-1 {
+			grid-column: 1;
+		}
+	}
+</style>

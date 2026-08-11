@@ -58,6 +58,31 @@ const sections = [
 		</div>
 	</section>
 
+	<section class="section section--tint">
+		<div class="container">
+			<div class="section-heading">
+				<p class="eyebrow">See Us in Action</p>
+				<h2>Commercial-grade results</h2>
+				<p>Our team deep-cleaning a commercial kitchen floor.</p>
+			</div>
+			<div class="video-wrap">
+				<video
+					src="/videos/commercial-cleaning-kitchen-floor.mp4"
+					poster="/videos/commercial-cleaning-kitchen-floor-poster.jpg"
+					autoplay
+					muted
+					loop
+					playsinline
+					controls
+					width="720"
+					height="1280"
+				>
+					Your browser doesn't support embedded video. <a href="/videos/commercial-cleaning-kitchen-floor.mp4">Watch the video directly</a>.
+				</video>
+			</div>
+		</div>
+	</section>
+
 	<CtaBand
 		heading="Ready for a cleaner workplace?"
 		subtext="Every business is different, so pricing is custom. Call or email us and we'll put together a quote."
@@ -81,5 +106,23 @@ const sections = [
 
 	.section--white {
 		background: var(--color-white);
+	}
+
+	/* The source clip is a vertical (9:16) phone recording, so it's capped
+	   to a narrow column instead of stretching full-width like a landscape
+	   video would — the aspect-ratio reserves the space up front so the
+	   page doesn't jump once the video/poster loads. */
+	.video-wrap {
+		max-width: 360px;
+		margin: 0 auto;
+	}
+
+	.video-wrap video {
+		display: block;
+		width: 100%;
+		aspect-ratio: 9 / 16;
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		background: var(--color-ink);
 	}
 </style>

@@ -3,7 +3,13 @@ import Layout from "../../layouts/Layout.astro";
 import PageHero from "../../components/PageHero.astro";
 import ServiceCard from "../../components/ServiceCard.astro";
 import CtaBand from "../../components/CtaBand.astro";
-import { cleaningServices, otherServices, commercialServices, addOns } from "../../data/content.js";
+import {
+	cleaningServices,
+	otherServices,
+	shortTermRentalServices,
+	commercialServices,
+	addOns,
+} from "../../data/content.js";
 ---
 
 <Layout
@@ -43,6 +49,26 @@ import { cleaningServices, otherServices, commercialServices, addOns } from "../
 			</div>
 			<div class="grid grid--2">
 				{otherServices.map((service) => (
+					<ServiceCard
+						title={service.title}
+						blurb={service.blurb}
+						href={`/services/${service.slug}`}
+						startingAt={service.startingAt}
+					/>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section class="section section--tint">
+		<div class="container">
+			<div class="section-heading section-heading--left">
+				<p class="eyebrow">Short-Term Rentals</p>
+				<h2>Airbnb turnover cleaning</h2>
+				<p>Fast, guest-ready turnovers on your schedule. Quote-based and booked by phone or email.</p>
+			</div>
+			<div class="single-card">
+				{shortTermRentalServices.map((service) => (
 					<ServiceCard
 						title={service.title}
 						blurb={service.blurb}
@@ -105,6 +131,12 @@ import { cleaningServices, otherServices, commercialServices, addOns } from "../
 		text-align: left;
 		max-width: 640px;
 		margin: 0 0 2.5rem;
+	}
+
+	/* Only one card in this section, so it's capped to a normal card width
+	   instead of stretching full-width like a lone grid column would. */
+	.single-card {
+		max-width: 380px;
 	}
 
 	.addon-list {

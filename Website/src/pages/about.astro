@@ -108,6 +108,17 @@ const productStandards = [
 				We don't think you should have to choose between a clean home and a healthy one — so
 				we've already made that choice for you.
 			</p>
+
+			<figure class="product-standards__photo">
+				<img
+					src="/images/living-room/living-room-with-dog.jpeg"
+					alt="A small dog relaxing on a couch in a clean, tidy living room"
+					loading="lazy"
+					width="1600"
+					height="1067"
+				/>
+				<figcaption>Gentle enough for the ones who can't tell us if something's off.</figcaption>
+			</figure>
 		</div>
 	</section>
 
@@ -148,5 +159,25 @@ const productStandards = [
 		text-align: center;
 		font-size: 1.05rem;
 		color: var(--color-slate);
+	}
+
+	.product-standards__photo {
+		max-width: 640px;
+		margin: 2.5rem auto 0;
+		text-align: center;
+	}
+
+	.product-standards__photo img {
+		display: block;
+		width: 100%;
+		height: auto;
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+	}
+
+	.product-standards__photo figcaption {
+		margin-top: 0.85rem;
+		font-size: 0.9rem;
+		color: var(--color-slate-light);
 	}
 </style>
