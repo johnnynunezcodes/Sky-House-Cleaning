@@ -2,105 +2,48 @@
 interface Props {
 	id: string;
 	title: string;
-	aspectRatio?: string;
 }
 
-const { id, title, aspectRatio = "16 / 9" } = Astro.props;
-const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
-const watchUrl = `https://youtu.be/${id}`;
+const { id, title } = Astro.props;
 ---
 
 <!--
-	A plain link out to YouTube instead of an inline embed. We tried an
-	embedded player (with the IFrame API for custom pause/mute controls),
-	but some mobile visitors were hitting YouTube's "sign in to confirm
-	you're not a bot" wall when trying to play it — that's YouTube's own
-	network/IP-based bot check on the embedded player, not something fixable
-	from our end (we were already using the recommended youtube-nocookie.com
-	privacy-enhanced embed domain). Linking straight to the video lets
-	playback happen in the YouTube app or on youtube.com itself, in the
-	visitor's already-signed-in context, which sidesteps that check.
+	The stock YouTube embed — exactly what YouTube's own "Share > Embed"
+	code generates (native thumbnail, native red play button, native
+	controls), just wrapped in a responsive box so it scales with the page.
+	No custom play button, no custom controls, no JS of ours at all.
+	Using the youtube-nocookie.com domain — an option YouTube itself offers
+	in its embed generator, not a custom behavior change — since it also
+	tends to reduce how often the "sign in to confirm you're not a bot"
+	check shows up for viewers.
 -->
-<a
-	href={watchUrl}
-	target="_blank"
-	rel="noopener noreferrer"
-	class="yt"
-	style={`--ratio: ${aspectRatio};`}
-	aria-label={`Watch on YouTube: ${title}`}
->
-	<img src={thumbnail} alt="" class="yt__thumb" loading="lazy" />
-	<span class="yt__icon" aria-hidden="true">
-		<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-			<path d="M8 5v14l11-7z"></path>
-		</svg>
-	</span>
-	<span class="yt__badge">Watch on YouTube</span>
-</a>
+<div class="yt-embed">
+	<iframe
+		src={`https://www.youtube-nocookie.com/embed/${id}`}
+		title={title}
+		frameborder="0"
+		allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+		referrerpolicy="strict-origin-when-cross-origin"
+		allowfullscreen
+	></iframe>
+</div>
 
 <style>
-	.yt {
+	.yt-embed {
 		position: relative;
-		display: block;
 		width: 100%;
-		aspect-ratio: var(--ratio);
+		aspect-ratio: 16 / 9;
 		border-radius: var(--radius);
 		overflow: hidden;
 		box-shadow: var(--shadow-soft);
-		background: #0c0c0c;
 	}
 
-	.yt::after {
-		content: "";
-		position: absolute;
-		inset: 0;
-		background: rgba(12, 16, 24, 0.28);
-		transition: background 0.15s ease;
-	}
-
-	.yt:hover::after {
-		background: rgba(12, 16, 24, 0.4);
-	}
-
-	.yt__thumb {
+	.yt-embed iframe {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
+		border: 0;
 		display: block;
-	}
-
-	.yt__icon {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		width: 64px;
-		height: 64px;
-		border-radius: 50%;
-		background: rgba(0, 0, 0, 0.55);
-		color: #fff;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding-left: 3px;
-		transition: background 0.15s ease;
-	}
-
-	.yt:hover .yt__icon {
-		background: rgba(0, 0, 0, 0.75);
-	}
-
-	.yt__badge {
-		position: absolute;
-		bottom: 0.85rem;
-		right: 0.85rem;
-		padding: 0.4rem 0.75rem;
-		border-radius: 999px;
-		background: rgba(0, 0, 0, 0.55);
-		color: #fff;
-		font-size: 0.8rem;
-		font-weight: 600;
 	}
 </style>
