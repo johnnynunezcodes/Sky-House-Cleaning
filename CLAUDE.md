@@ -19,5 +19,6 @@ To keep this file small, detailed reference material lives in separate files wit
 - [Website](Website/README.md) — the Astro project for the marketing website (source code, dev setup, project notes). This is a separate codebase with its own `CLAUDE.md` for coding-specific instructions.
 - [Cleaning Product Standards](Standards/Cleaning%20Product%20Standards.md) — what we look for in the cleaning products we use (safety ratings, eco-friendly formulas, vegan/cruelty-free, gentle but effective) and why it matters to us.
 - [Hero Video Description](Branding/Hero%20Video%20Description.md) — YouTube description copy for a company-overview video (what we do, services offered, service area). Not website copy — for the video's platform listing only.
+- [Onboarding Overview](Onboarding/Overview.md) — index of new-hire onboarding materials (W-2 employee model): setting up as a CA employer, new-hire paperwork, pay structure, cleaning standards, service checklists, approved supplies, and dress code. Includes a polished PDF packet meant to be emailed to new hires. Older contractor-model docs are kept on hold, not deleted.
 
 When you add a new file to this project, add a link for it here (with a one-line description) so I know to reference it.

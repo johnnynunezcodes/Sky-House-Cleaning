@@ -7,34 +7,41 @@ interface Props {
 
 const { id, title, aspectRatio = "16 / 9" } = Astro.props;
 const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+const watchUrl = `https://youtu.be/${id}`;
 ---
 
 <!--
-	Before the first click, this shows our own thumbnail + play button —
-	no YouTube branding at all. Once clicked, it's a plain YouTube iframe
-	(controls=0, so no controls bar or settings gear) with a small
-	transparent button layered on top so a click anywhere pauses/resumes
-	it, plus a small corner icon as the visible affordance.
-
-	Note: YouTube always shows its own logo/title overlay whenever the
-	video isn't actively playing (on load, when paused, when it ends) —
-	that's not part of the controls bar and there's no embed setting that
-	removes it, so it'll be visible while paused. That's expected.
+	A plain link out to YouTube instead of an inline embed. We tried an
+	embedded player (with the IFrame API for custom pause/mute controls),
+	but some mobile visitors were hitting YouTube's "sign in to confirm
+	you're not a bot" wall when trying to play it — that's YouTube's own
+	network/IP-based bot check on the embedded player, not something fixable
+	from our end (we were already using the recommended youtube-nocookie.com
+	privacy-enhanced embed domain). Linking straight to the video lets
+	playback happen in the YouTube app or on youtube.com itself, in the
+	visitor's already-signed-in context, which sidesteps that check.
 -->
-<div class="yt" style={`--ratio: ${aspectRatio};`} data-yt-id={id} data-yt-title={title}>
-	<button type="button" class="yt__play" aria-label={`Play video: ${title}`}>
-		<img src={thumbnail} alt="" class="yt__thumb" loading="lazy" />
-		<span class="yt__icon" aria-hidden="true">
-			<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-				<path d="M8 5v14l11-7z"></path>
-			</svg>
-		</span>
-	</button>
-</div>
+<a
+	href={watchUrl}
+	target="_blank"
+	rel="noopener noreferrer"
+	class="yt"
+	style={`--ratio: ${aspectRatio};`}
+	aria-label={`Watch on YouTube: ${title}`}
+>
+	<img src={thumbnail} alt="" class="yt__thumb" loading="lazy" />
+	<span class="yt__icon" aria-hidden="true">
+		<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+			<path d="M8 5v14l11-7z"></path>
+		</svg>
+	</span>
+	<span class="yt__badge">Watch on YouTube</span>
+</a>
 
 <style>
 	.yt {
 		position: relative;
+		display: block;
 		width: 100%;
 		aspect-ratio: var(--ratio);
 		border-radius: var(--radius);
@@ -43,17 +50,16 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		background: #0c0c0c;
 	}
 
-	.yt__play {
+	.yt::after {
+		content: "";
 		position: absolute;
 		inset: 0;
-		width: 100%;
-		height: 100%;
-		padding: 0;
-		border: none;
-		margin: 0;
-		cursor: pointer;
-		display: block;
-		background: none;
+		background: rgba(12, 16, 24, 0.28);
+		transition: background 0.15s ease;
+	}
+
+	.yt:hover::after {
+		background: rgba(12, 16, 24, 0.4);
 	}
 
 	.yt__thumb {
@@ -65,251 +71,36 @@ const thumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 		display: block;
 	}
 
-	.yt__play::after {
-		content: "";
-		position: absolute;
-		inset: 0;
-		background: rgba(12, 16, 24, 0.28);
-		transition: background 0.15s ease;
-	}
-
-	.yt__play:hover::after {
-		background: rgba(12, 16, 24, 0.4);
-	}
-
-	/* Sized and positioned to match .yt__toggle-icon below, so the play
-	   button in this "before you've clicked" state sits in the exact same
-	   spot the pause/play icon lands in once the video's actually playing
-	   — nothing large sitting over the thumbnail itself. */
 	.yt__icon {
 		position: absolute;
-		bottom: 0.85rem;
-		right: 0.85rem;
-		width: 34px;
-		height: 34px;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: 64px;
+		height: 64px;
 		border-radius: 50%;
-		background: rgba(0, 0, 0, 0.45);
+		background: rgba(0, 0, 0, 0.55);
 		color: #fff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding-left: 1px;
+		padding-left: 3px;
 		transition: background 0.15s ease;
 	}
 
-	.yt__play:hover .yt__icon {
-		background: rgba(0, 0, 0, 0.65);
+	.yt:hover .yt__icon {
+		background: rgba(0, 0, 0, 0.75);
 	}
 
-	.yt :global(.yt__player-wrap) {
-		position: absolute;
-		inset: 0;
-	}
-
-	.yt :global(.yt__player-wrap iframe) {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		border: 0;
-		display: block;
-		/* Cross-origin YouTube document — a click inside it can never be
-		   observed by our page's JS, so this sends clicks straight through
-		   to .yt__toggle (a same-origin button stacked on top, see below). */
-		pointer-events: none;
-	}
-
-	.yt :global(.yt__toggle) {
-		position: absolute;
-		inset: 0;
-		z-index: 2;
-		width: 100%;
-		height: 100%;
-		padding: 0;
-		border: none;
-		background: none;
-		cursor: pointer;
-	}
-
-	/* Small icon-button cluster (mute, then play/pause), stacked above the
-	   full-cover .yt__toggle so their clicks land on the specific button
-	   underneath the cursor rather than the anywhere-click catcher. */
-	.yt :global(.yt__controls) {
+	.yt__badge {
 		position: absolute;
 		bottom: 0.85rem;
 		right: 0.85rem;
-		z-index: 3;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.yt :global(.yt__mute),
-	.yt :global(.yt__toggle-icon) {
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 34px;
-		height: 34px;
-		padding: 0;
-		border: none;
-		border-radius: 50%;
-		background: rgba(0, 0, 0, 0.45);
+		padding: 0.4rem 0.75rem;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.55);
 		color: #fff;
-		cursor: pointer;
-		transition: background 0.15s ease;
-	}
-
-	.yt :global(.yt__mute:hover),
-	.yt :global(.yt__toggle-icon:hover) {
-		background: rgba(0, 0, 0, 0.65);
-	}
-
-	.yt :global(.yt__toggle-icon svg) {
-		width: 15px;
-		height: 15px;
-		fill: currentColor;
-	}
-
-	.yt :global(.yt__mute svg) {
-		width: 16px;
-		height: 16px;
-	}
-
-	.yt :global(.yt__mute svg.is-hidden),
-	.yt :global(.yt__toggle-icon svg.is-hidden) {
-		display: none;
+		font-size: 0.8rem;
+		font-weight: 600;
 	}
 </style>
-
-<script>
-	let ytApiPromise;
-
-	function loadYouTubeApi() {
-		if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
-		if (ytApiPromise) return ytApiPromise;
-
-		ytApiPromise = new Promise((resolve) => {
-			const previousCallback = window.onYouTubeIframeAPIReady;
-			window.onYouTubeIframeAPIReady = () => {
-				previousCallback?.();
-				resolve(window.YT);
-			};
-			const script = document.createElement("script");
-			script.src = "https://www.youtube.com/iframe_api";
-			document.head.appendChild(script);
-		});
-		return ytApiPromise;
-	}
-
-	function initYouTubeEmbeds() {
-		document.querySelectorAll(".yt").forEach((el) => {
-			if (!(el instanceof HTMLElement) || el.dataset.ytInit === "true") return;
-			el.dataset.ytInit = "true";
-
-			const button = el.querySelector(".yt__play");
-			button?.addEventListener("click", async () => {
-				const videoId = el.dataset.ytId;
-				if (!videoId) return;
-
-				const playerId = `yt-player-${Math.random().toString(36).slice(2, 9)}`;
-				el.innerHTML = `
-					<div class="yt__player-wrap"><div id="${playerId}"></div></div>
-					<button type="button" class="yt__toggle" aria-label="Pause video"></button>
-					<div class="yt__controls">
-						<button type="button" class="yt__mute" aria-label="Mute video">
-							<svg class="icon-unmuted" viewBox="0 0 24 24" aria-hidden="true">
-								<path d="M4 9v6h3l4 3.5v-12.5l-4 3.5h-3z" fill="currentColor"></path>
-								<path d="M14.5 8.5a4.5 4.5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-								<path d="M17 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-							</svg>
-							<svg class="icon-muted is-hidden" viewBox="0 0 24 24" aria-hidden="true">
-								<path d="M4 9v6h3l4 3.5v-12.5l-4 3.5h-3z" fill="currentColor"></path>
-								<path d="M15 9l5 5M20 9l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-							</svg>
-						</button>
-						<button type="button" class="yt__toggle-icon" aria-label="Pause video">
-							<svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>
-							<svg class="icon-play is-hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>
-						</button>
-					</div>
-				`;
-
-				const toggleBtn = el.querySelector(".yt__toggle");
-				const toggleIconBtn = el.querySelector(".yt__toggle-icon");
-				const pauseIcon = el.querySelector(".icon-pause");
-				const playIcon = el.querySelector(".icon-play");
-				const muteBtn = el.querySelector(".yt__mute");
-				const unmutedIcon = el.querySelector(".icon-unmuted");
-				const mutedIcon = el.querySelector(".icon-muted");
-				if (!toggleBtn || !toggleIconBtn || !pauseIcon || !playIcon || !muteBtn || !unmutedIcon || !mutedIcon) return;
-
-				const YT = await loadYouTubeApi();
-
-				// mute()/unMute() are fire-and-forget postMessage calls to the
-				// cross-origin iframe — isMuted() can briefly report the old
-				// state right after calling them. Tracking it ourselves avoids
-				// that race instead of re-querying the player immediately after.
-				let isMuted = false;
-
-				function updateMuteIcon() {
-					unmutedIcon.classList.toggle("is-hidden", isMuted);
-					mutedIcon.classList.toggle("is-hidden", !isMuted);
-					muteBtn.setAttribute("aria-label", isMuted ? "Unmute video" : "Mute video");
-				}
-
-				const player = new YT.Player(playerId, {
-					videoId,
-					host: "https://www.youtube-nocookie.com",
-					playerVars: {
-						autoplay: 1,
-						rel: 0,
-						controls: 0,
-						modestbranding: 1,
-						iv_load_policy: 3,
-						playsinline: 1,
-					},
-					events: {
-						onReady() {
-							isMuted = player.isMuted();
-							updateMuteIcon();
-						},
-						onStateChange(event) {
-							const playing = event.data === YT.PlayerState.PLAYING;
-							pauseIcon.classList.toggle("is-hidden", !playing);
-							playIcon.classList.toggle("is-hidden", playing);
-							const label = playing ? "Pause video" : "Play video";
-							toggleBtn.setAttribute("aria-label", label);
-							toggleIconBtn.setAttribute("aria-label", label);
-						},
-					},
-				});
-
-				function togglePlayback() {
-					if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-						player.pauseVideo();
-					} else {
-						player.playVideo();
-					}
-				}
-
-				toggleBtn.addEventListener("click", togglePlayback);
-				toggleIconBtn.addEventListener("click", togglePlayback);
-
-				muteBtn.addEventListener("click", () => {
-					isMuted = !isMuted;
-					if (isMuted) {
-						player.mute();
-					} else {
-						player.unMute();
-					}
-					updateMuteIcon();
-				});
-			});
-		});
-	}
-
-	initYouTubeEmbeds();
-	document.addEventListener("astro:page-load", initYouTubeEmbeds);
-</script>
