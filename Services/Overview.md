@@ -10,8 +10,7 @@ Sky House Cleaning offers:
 - [Professional Garage Cleaning and Organization](Professional%20Garage%20Cleaning%20and%20Organization.md) — decluttering, organizing into zones, and a full clean of the garage.
 
 ### Vehicle Care
-- Interior Car Detailing (One-Time)
-- Monthly Interior Car Detailing Membership
+- [Car Detailing](Car%20Detailing.md) — one-time Interior Car Detailing, or a Monthly Detailing Membership. Multiple vehicles can be booked in the same visit.
 
 ### Add-On Services
 See [Add-Ons](Add-Ons.md) for the full list, broken out by which service/frequency each one is available for, with pricing.

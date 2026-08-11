@@ -14,7 +14,7 @@ export const WORKING_DAYS = [1, 2, 3, 4, 5, 6];
 export const WORKING_HOURS = { start: 8, end: 18 };
 
 // How far out customers can book, and the granularity of offered start times.
-export const BOOKING_WINDOW_DAYS = 21;
+export const BOOKING_WINDOW_DAYS = 60;
 export const SLOT_INTERVAL_MINUTES = 30;
 
 // Rough job duration by cleaning type, in minutes — used to block out enough

@@ -2,7 +2,15 @@
 const navItems = [
 	{ label: "Home", href: "/" },
 	{ label: "About", href: "/about" },
-	{ label: "Services", href: "/services" },
+	{
+		label: "Services",
+		href: "/services",
+		dropdown: [
+			{ label: "Home Cleaning", href: "/services" },
+			{ label: "Car Detailing", href: "/services/car-detailing" },
+			{ label: "Garage Cleaning & Organization", href: "/services/garage-organization" },
+		],
+	},
 	{ label: "Booking", href: "/booking" },
 	{ label: "Reviews", href: "/reviews" },
 	{ label: "Contact", href: "/contact" },
@@ -30,6 +38,30 @@ const currentPath = Astro.url.pathname;
 				{navItems.map((item) => {
 					const isActive =
 						item.href === "/" ? currentPath === "/" : currentPath.startsWith(item.href);
+
+					if (item.dropdown) {
+						return (
+							<li class="navbar__item--dropdown">
+								<a href={item.href} class:list={["navbar__link", { "is-active": isActive }]}>
+									{item.label}
+									<span class="navbar__caret" aria-hidden="true"></span>
+								</a>
+								<ul class="navbar__dropdown">
+									{item.dropdown.map((sub) => (
+										<li>
+											<a
+												href={sub.href}
+												class:list={["navbar__dropdown-link", { "is-active": currentPath === sub.href }]}
+											>
+												{sub.label}
+											</a>
+										</li>
+									))}
+								</ul>
+							</li>
+						);
+					}
+
 					return (
 						<li>
 							<a href={item.href} class:list={["navbar__link", { "is-active": isActive }]}>
@@ -109,8 +141,100 @@ const currentPath = Astro.url.pathname;
 		font-size: 0.95rem;
 	}
 
-	.navbar__link:hover,
+	.navbar__link:hover {
+		color: var(--color-sky-dark);
+	}
+
+	/* The current-page link itself goes black (var(--color-ink), the site's
+	   near-black) rather than blue — hover above stays blue as the
+	   interactive cue, this is the steady "you are here" state. */
 	.navbar__link.is-active {
+		color: var(--color-ink);
+	}
+
+	/* Sits close under the "Services" text — not centered in the gap, but
+	   hugging the text with most of the remaining space left between it and
+	   the active-page bar below (positioned relative to .navbar__link, which
+	   has its own position: relative below — the bar sits at bottom:
+	   -0.85rem) — matching the reference screenshot's spacing. Stays
+	   invisible until hovered — it's just a visual hint that a menu is
+	   available, separate from whether the menu is actually open (that's
+	   click-driven, see the .is-open rules and the script below). Drawn as a
+	   thin chevron (a rotated corner of a bordered box) rather than a text
+	   glyph, for a crisper, more consistent shape across platforms/fonts. */
+	.navbar__caret {
+		position: absolute;
+		left: 50%;
+		bottom: -0.2rem;
+		width: 6px;
+		height: 6px;
+		border-right: 1.5px solid var(--color-ink);
+		border-bottom: 1.5px solid var(--color-ink);
+		transform: translateX(-50%) rotate(45deg);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.15s ease, transform 0.15s ease;
+	}
+
+	.navbar__item--dropdown {
+		position: relative;
+	}
+
+	.navbar__dropdown {
+		position: absolute;
+		/* 0.85rem matches .navbar__inner's bottom padding, so this starts
+		   right at the header's bottom edge. */
+		top: calc(100% + 0.85rem);
+		left: 0;
+		z-index: 60;
+		min-width: 240px;
+		margin: 0.5rem 0 0;
+		padding: 0.5rem;
+		list-style: none;
+		background: var(--color-white);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		opacity: 0;
+		visibility: hidden;
+		transform: translateY(4px);
+		transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+	}
+
+	/* Opens only when clicked/selected (see the script below) — not on
+	   hover. The caret above still responds to hover on its own, as just a
+	   hint that "Services" has a menu. */
+	.navbar__item--dropdown.is-open .navbar__dropdown {
+		opacity: 1;
+		visibility: visible;
+		transform: translateY(0);
+	}
+
+	.navbar__item--dropdown:hover .navbar__caret,
+	.navbar__item--dropdown.is-open .navbar__caret {
+		opacity: 1;
+	}
+
+	.navbar__item--dropdown.is-open .navbar__caret {
+		/* 45deg is the chevron's resting "point down" angle — add 180 to flip
+		   it to "point up" while open. */
+		transform: translateX(-50%) rotate(225deg);
+	}
+
+	.navbar__dropdown-link {
+		display: block;
+		padding: 0.6rem 0.75rem;
+		border-radius: 8px;
+		text-decoration: none;
+		color: var(--color-slate);
+		font-weight: 500;
+		font-size: 0.9rem;
+		white-space: nowrap;
+	}
+
+	.navbar__dropdown-link:hover,
+	.navbar__dropdown-link.is-active {
+		background: var(--color-cream);
 		color: var(--color-sky-dark);
 	}
 
@@ -186,9 +310,38 @@ const currentPath = Astro.url.pathname;
 		}
 
 		.navbar__toggle-input:checked ~ .navbar__nav {
-			max-height: 420px;
+			max-height: 640px;
 			padding: 1.5rem;
 			visibility: visible;
+		}
+
+		/* No hover on touch — the dropdown is just always expanded, indented
+		   under "Services", in the stacked mobile menu instead of appearing
+		   as a hover flyout. */
+		.navbar__item--dropdown {
+			position: static;
+		}
+
+		.navbar__dropdown {
+			position: static;
+			opacity: 1;
+			visibility: visible;
+			transform: none;
+			border: none;
+			box-shadow: none;
+			padding: 0.25rem 0 0 1rem;
+			margin-top: 0.5rem;
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+
+		.navbar__dropdown-link {
+			padding: 0.2rem 0;
+		}
+
+		.navbar__caret {
+			display: none;
 		}
 
 		.navbar__cta {
@@ -226,4 +379,60 @@ const currentPath = Astro.url.pathname;
 
 	initNavbarScroll();
 	document.addEventListener("astro:page-load", initNavbarScroll);
+
+	// The Services dropdown opens only when clicked/selected — not on
+	// hover — and closes on an outside click, Escape, or picking another
+	// dropdown. On the stacked mobile menu the sub-links are already always
+	// visible (see the max-width: 860px styles), so the click there is left
+	// alone to behave as a normal link.
+	function initNavbarDropdowns() {
+		const header = document.getElementById("site-navbar");
+		if (!header || header.dataset.dropdownInit === "true") return;
+		header.dataset.dropdownInit = "true";
+
+		const items = Array.from(header.querySelectorAll(".navbar__item--dropdown"));
+		if (items.length === 0) return;
+
+		function closeAll() {
+			items.forEach((item) => {
+				item.classList.remove("is-open");
+				item.querySelector(":scope > .navbar__link")?.setAttribute("aria-expanded", "false");
+			});
+		}
+
+		items.forEach((item) => {
+			const trigger = item.querySelector(":scope > .navbar__link");
+			if (!trigger) return;
+			trigger.setAttribute("aria-haspopup", "true");
+			trigger.setAttribute("aria-expanded", "false");
+
+			trigger.addEventListener("click", (event) => {
+				if (window.matchMedia("(max-width: 860px)").matches) return;
+
+				event.preventDefault();
+				const wasOpen = item.classList.contains("is-open");
+				closeAll();
+				if (!wasOpen) {
+					item.classList.add("is-open");
+					trigger.setAttribute("aria-expanded", "true");
+				}
+			});
+		});
+
+		document.addEventListener("click", (event) => {
+			items.forEach((item) => {
+				if (!item.contains(event.target)) {
+					item.classList.remove("is-open");
+					item.querySelector(":scope > .navbar__link")?.setAttribute("aria-expanded", "false");
+				}
+			});
+		});
+
+		document.addEventListener("keydown", (event) => {
+			if (event.key === "Escape") closeAll();
+		});
+	}
+
+	initNavbarDropdowns();
+	document.addEventListener("astro:page-load", initNavbarDropdowns);
 </script>

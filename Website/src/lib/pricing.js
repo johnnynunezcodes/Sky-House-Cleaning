@@ -15,7 +15,6 @@ import {
 	applianceQuantityTiers,
 	carDetailingPricing,
 	carDetailingAddOns,
-	carDetailingVehicleQuantityTiers,
 	carDetailingMaxVehicles,
 } from "../data/content.js";
 
@@ -127,14 +126,11 @@ export function calculatePrice(selections) {
 	let serviceLabel = describeService(type, safeFrequency);
 	if (type === "carDetailing") {
 		// Flat-rate, not tied to square footage — just One-Time vs the Monthly
-		// membership's per-visit rate. Multiple vehicles in one visit get the
-		// same "per unit, at that tier" discount as the appliance add-ons (see
-		// carDetailingVehicleQuantityTiers in content.js).
+		// membership's per-visit rate. No quantity discount: every vehicle in
+		// the visit is billed at the same flat rate.
 		const perVehiclePrice = frequency === "monthly" ? carDetailingPricing.monthly : carDetailingPricing.oneTime;
 		vehicleQty = Math.min(Math.max(Math.floor(Number(vehicles) || 1), 1), carDetailingMaxVehicles);
-		const tierIndex = Math.min(Math.max(vehicleQty, 1), carDetailingVehicleQuantityTiers.length) - 1;
-		const vehicleMultiplier = carDetailingVehicleQuantityTiers[tierIndex] ?? 1;
-		basePrice = perVehiclePrice * vehicleQty * vehicleMultiplier;
+		basePrice = perVehiclePrice * vehicleQty;
 		if (vehicleQty > 1) serviceLabel += ` × ${vehicleQty} vehicles`;
 	} else {
 		const tier = pricingMatrix[tierIndexFor(clampedSqft)];

@@ -1,10 +1,5 @@
 ---
-import {
-	carDetailingPricing,
-	carDetailingAddOns,
-	carDetailingVehicleQuantityTiers,
-	carDetailingMaxVehicles,
-} from "../data/content.js";
+import { carDetailingPricing, carDetailingAddOns, carDetailingMaxVehicles } from "../data/content.js";
 
 interface Props {
 	ctaHref?: string;
@@ -41,7 +36,7 @@ const { ctaHref = "/schedule" } = Astro.props;
 			<div class="cd__vehicles">
 				<span class="cd__vehicles-text">
 					<span class="cd__vehicles-name">Number of vehicles</span>
-					<span class="cd__vehicles-hint">Price drops with each additional vehicle (up to {carDetailingMaxVehicles})</span>
+					<span class="cd__vehicles-hint">Book up to {carDetailingMaxVehicles} vehicles in the same visit</span>
 				</span>
 				<div class="cd__stepper">
 					<button type="button" class="cd__stepper-btn" id="cd-vehicles-minus" aria-label="Decrease number of vehicles">
@@ -329,7 +324,7 @@ const { ctaHref = "/schedule" } = Astro.props;
 	}
 </style>
 
-<script define:vars={{ carDetailingPricing, carDetailingAddOns, carDetailingVehicleQuantityTiers, carDetailingMaxVehicles }}>
+<script define:vars={{ carDetailingPricing, carDetailingAddOns, carDetailingMaxVehicles }}>
 	function initCarDetailingConfigurator() {
 		const root = document.getElementById("car-detailing-configurator");
 		if (!root || root.dataset.cdInit === "true") return;
@@ -379,12 +374,9 @@ const { ctaHref = "/schedule" } = Astro.props;
 			const perVehiclePrice = carDetailingPricing[frequency] ?? carDetailingPricing.oneTime;
 			const vehicles = currentVehicles();
 
-			// Same "per unit, at that tier" discount curve as the appliance
-			// add-ons elsewhere on the site — every vehicle in the order is
-			// priced at the rate for the total quantity, not just extra ones.
-			const tierIndex = Math.min(Math.max(vehicles, 1), carDetailingVehicleQuantityTiers.length) - 1;
-			const vehicleMultiplier = carDetailingVehicleQuantityTiers[tierIndex] ?? 1;
-			const basePrice = perVehiclePrice * vehicles * vehicleMultiplier;
+			// Flat rate — every vehicle in the visit is billed at the same
+			// per-vehicle price, no quantity discount.
+			const basePrice = perVehiclePrice * vehicles;
 
 			vehiclesMinusBtn.disabled = vehicles <= 1;
 			vehiclesPlusBtn.disabled = vehicles >= carDetailingMaxVehicles;
@@ -403,12 +395,8 @@ const { ctaHref = "/schedule" } = Astro.props;
 			priceEl.textContent = formatMoney(total);
 
 			if (vehicles > 1) {
-				const discountPct = Math.round((1 - vehicleMultiplier) * 100);
 				vehiclesNoteEl.hidden = false;
-				vehiclesNoteEl.textContent =
-					discountPct > 0
-						? `${vehicles} vehicles — ${discountPct}% off each (${formatMoney(perVehiclePrice)} → ${formatMoney(perVehiclePrice * vehicleMultiplier)} per vehicle)`
-						: `${vehicles} vehicles`;
+				vehiclesNoteEl.textContent = `${vehicles} vehicles × ${formatMoney(perVehiclePrice)} each`;
 			} else {
 				vehiclesNoteEl.hidden = true;
 			}

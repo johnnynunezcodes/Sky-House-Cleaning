@@ -76,15 +76,7 @@ The Monthly Detailing Membership itself requires a 2-month minimum commitment, s
 
 ### Multiple Vehicles
 
-Both plans let a customer book more than one vehicle in the same visit (e.g. two cars). Per-vehicle price drops the same way the oven/fridge/freezer/dishwasher quantity discounts do:
-
-| Vehicles | Per-Vehicle Rate (One-Time) | Per-Vehicle Rate (Monthly) |
-| --- | --- | --- |
-| 1 (standard) | $275.00 | $250.00 |
-| 2 (10% off) | $247.50 | $225.00 |
-| 3+ (15% off) | $233.75 | $212.50 |
-
-Rates shown are per vehicle, at that tier — e.g. 2 vehicles at the 2-vehicle One-Time rate is $247.50 × 2 = $495.00 total. Capped at 6 vehicles per booking.
+Both plans let a customer book more than one vehicle in the same visit (e.g. two cars), capped at 6 per booking. Flat rate — no quantity discount, unlike the oven/fridge/freezer/dishwasher add-ons above. Each vehicle is billed at the full rate: $275 per vehicle One-Time, $250 per vehicle Monthly (e.g. 2 vehicles One-Time is $275 × 2 = $550 total).
 
 ## Garage Cleaning & Organization
 
