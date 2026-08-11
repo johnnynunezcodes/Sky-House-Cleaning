@@ -1,0 +1,45 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import CtaBand from "../../components/CtaBand.astro";
+import CarDetailingConfigurator from "../../components/CarDetailingConfigurator.astro";
+---
+
+<Layout
+	title="Book Car Detailing | Sky House Cleaning"
+	description="Book interior car detailing — a one-time detail from $275, or a monthly membership from $250 per visit. Multiple vehicles welcome."
+>
+	<PageHero
+		eyebrow="Vehicle Care · One-Time $275 or Membership $250/Visit"
+		title="Book Your Interior Detail"
+		lede="Pick one-time or ongoing care, add any extras, and see your price update live. Not sure what's included? See the full details on our Interior Car Detailing page."
+	/>
+
+	<section class="section">
+		<div class="container">
+			<div class="configurator-wrap">
+				<CarDetailingConfigurator />
+			</div>
+			<p class="note">
+				Curious what's included in every detail? <a href="/services/car-detailing">See the full breakdown</a>.
+			</p>
+		</div>
+	</section>
+
+	<CtaBand
+		heading="Have questions before you book?"
+		subtext="Call or email us and we'll help you find the right plan."
+	/>
+</Layout>
+
+<style>
+	.configurator-wrap {
+		margin-bottom: 1.5rem;
+	}
+
+	.note {
+		max-width: 760px;
+		margin: 0 auto;
+		text-align: center;
+	}
+</style>

@@ -11,7 +11,14 @@ const navItems = [
 			{ label: "Garage Cleaning & Organization", href: "/services/garage-organization" },
 		],
 	},
-	{ label: "Booking", href: "/booking" },
+	{
+		label: "Booking",
+		href: "/booking",
+		dropdown: [
+			{ label: "Home Cleaning", href: "/booking" },
+			{ label: "Car Detailing", href: "/booking/car-detailing" },
+		],
+	},
 	{ label: "Reviews", href: "/reviews" },
 	{ label: "Contact", href: "/contact" },
 ];
@@ -232,9 +239,11 @@ const currentPath = Astro.url.pathname;
 		white-space: nowrap;
 	}
 
-	.navbar__dropdown-link:hover,
+	.navbar__dropdown-link:hover {
+		color: var(--color-sky-dark);
+	}
+
 	.navbar__dropdown-link.is-active {
-		background: var(--color-cream);
 		color: var(--color-sky-dark);
 	}
 

@@ -37,7 +37,7 @@ body {
 	margin: 0;
 	font-family: var(--font-body);
 	color: var(--color-ink);
-	background: var(--color-cream);
+	background: var(--color-white);
 	line-height: 1.6;
 	-webkit-font-smoothing: antialiased;
 }
@@ -94,7 +94,7 @@ ul {
 }
 
 .section--tint {
-	background: var(--color-sky-light);
+	background: var(--color-white);
 }
 
 .eyebrow {

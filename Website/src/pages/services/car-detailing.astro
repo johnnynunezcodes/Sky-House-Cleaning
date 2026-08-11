@@ -2,7 +2,6 @@
 import Layout from "../../layouts/Layout.astro";
 import PageHero from "../../components/PageHero.astro";
 import ChecklistCard from "../../components/ChecklistCard.astro";
-import CarDetailingConfigurator from "../../components/CarDetailingConfigurator.astro";
 import CtaBand from "../../components/CtaBand.astro";
 
 const sections = [
@@ -30,23 +29,14 @@ const sections = [
 		lede="Professional detailing, exceptional results. We bring your vehicle's interior back to life — whether it's a one-time refresh or a monthly membership to keep it that way."
 	>
 		<div class="hero-actions">
-			<a href="#car-detailing-configurator" class="btn btn--primary">Schedule Your Detail</a>
+			<a href="/booking/car-detailing" class="btn btn--primary">Schedule Your Detail</a>
 			<a href="tel:+18017592044" class="btn btn--outline">Call (801) 759-2044</a>
 		</div>
 	</PageHero>
 
-	<section class="section">
+	<section class="section section--white">
 		<div class="container">
-			<div class="section-heading">
-				<p class="eyebrow">Choose Your Plan</p>
-				<h2>Pick one-time or ongoing care</h2>
-				<p>A single detail to bring your interior back to life, or a monthly membership so it stays that way.</p>
-			</div>
-			<div class="configurator-wrap">
-				<CarDetailingConfigurator />
-			</div>
-
-			<div class="grid grid--2">
+			<div class="checklist-single">
 				{sections.map((section) => (
 					<ChecklistCard title={section.title} items={section.items} />
 				))}
@@ -71,13 +61,21 @@ const sections = [
 		margin-top: 1.5rem;
 	}
 
-	.configurator-wrap {
-		margin-bottom: 2.75rem;
-	}
-
 	.note {
 		max-width: 760px;
 		margin: 2.5rem auto 0;
 		text-align: center;
+	}
+
+	/* Only one checklist item on this page (unlike the 4-item grid on other
+	   service pages), so it's centered as a single column instead of sitting
+	   left-aligned in a half-empty two-column grid. */
+	.section--white {
+		background: var(--color-white);
+	}
+
+	.checklist-single {
+		max-width: 480px;
+		margin: 0 auto;
 	}
 </style>
