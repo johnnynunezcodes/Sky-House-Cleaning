@@ -61,7 +61,7 @@ const { ctaHref = "/schedule" } = Astro.props;
 		<div class="cd__field">
 			<label class="cd__label">Add-Ons</label>
 			<p class="cd__addons-recurring-note" id="cd-addons-recurring-note" hidden>
-				On the Monthly Detailing Membership, any add-ons you pick here are charged every visit — not just
+				On the Monthly Detailing Membership, any add-ons you pick here are charged every visit, not just
 				the first.
 			</p>
 			{carDetailingAddOns.map((addon) => (
@@ -73,7 +73,7 @@ const { ctaHref = "/schedule" } = Astro.props;
 						data-price={addon.price}
 						data-label={addon.label}
 					/>
-					<span>{addon.label} — ${addon.price}</span>
+					<span>{addon.label}: ${addon.price}</span>
 				</label>
 			))}
 		</div>

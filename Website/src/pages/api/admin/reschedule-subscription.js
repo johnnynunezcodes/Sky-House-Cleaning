@@ -102,7 +102,7 @@ export async function POST({ request }) {
 	const vehicle = describeVehicle(metadata);
 	const descriptionLines = [
 		`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
-		"Recurring cleaning — rescheduled by staff",
+		"Recurring cleaning, rescheduled by staff",
 		metadata.phone ? `Phone: ${metadata.phone}` : null,
 		metadata.address ? `Address: ${metadata.address}` : null,
 		vehicle ? `Vehicle: ${vehicle}` : null,
@@ -137,7 +137,7 @@ export async function POST({ request }) {
 			const created = await createBookingEvent({
 				start: start.toISOString(),
 				end: end.toISOString(),
-				summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
+				summary: `Sky House Cleaning: ${metadata.name || "Customer"}, ${service}`,
 				description: descriptionLines.join("\n"),
 				location: metadata.address || undefined,
 			});

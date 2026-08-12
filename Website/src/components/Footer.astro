@@ -42,7 +42,11 @@ const navLinks = [
 
 	<div class="footer__bottom container">
 		<p>Serving Oakland &amp; the greater Bay Area</p>
-		<p>&copy; {year} Sky House Cleaning. All rights reserved.</p>
+		<p>
+			&copy; {year} Sky House Cleaning. All rights reserved.
+			<span class="footer__bottom-sep">&middot;</span>
+			<a href="/privacy-policy">Privacy Policy</a>
+		</p>
 	</div>
 </footer>
 
@@ -137,6 +141,19 @@ const navLinks = [
 		margin: 0;
 		color: #8b96a9;
 		font-size: 0.8rem;
+	}
+
+	.footer__bottom-sep {
+		margin: 0 0.35rem;
+	}
+
+	.footer__bottom a {
+		color: #8b96a9;
+		text-decoration: underline;
+	}
+
+	.footer__bottom a:hover {
+		color: var(--color-sky);
 	}
 
 	@media (max-width: 720px) {

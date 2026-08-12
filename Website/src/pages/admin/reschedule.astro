@@ -25,7 +25,7 @@ import "../../styles/global.css";
 				</p>
 				<h1>Reschedule a Recurring Plan</h1>
 				<p class="admin-hint">
-					Use this to permanently move a customer's recurring cleaning to a new day/time — every
+					Use this to permanently move a customer's recurring cleaning to a new day/time. Every
 					future visit shifts too. For a <strong>one-time</strong> reschedule that should revert back
 					afterward, just edit that one event directly in Google Calendar instead; don't use this tool.
 				</p>
@@ -50,7 +50,7 @@ import "../../styles/global.css";
 			const resultsEl = document.getElementById("results");
 
 			function fmt(iso) {
-				if (!iso) return "—";
+				if (!iso) return "N/A";
 				return new Date(iso).toLocaleString("en-US", {
 					timeZone: "America/Los_Angeles",
 					weekday: "short",
@@ -87,11 +87,11 @@ import "../../styles/global.css";
 
 			function statusLabel(status) {
 				const labels = {
-					trialing: "Trialing (billing date was just re-anchored — expected, not an error)",
-					past_due: "Past due — card was declined",
-					unpaid: "Unpaid — repeated card declines",
+					trialing: "Trialing (billing date was just re-anchored, expected, not an error)",
+					past_due: "Past due, card was declined",
+					unpaid: "Unpaid, repeated card declines",
 					paused: "Paused",
-					incomplete: "Incomplete — first charge hasn't gone through",
+					incomplete: "Incomplete, first charge hasn't gone through",
 				};
 				return labels[status] || status;
 			}
@@ -110,7 +110,7 @@ import "../../styles/global.css";
 				}
 				const remaining = sub.minimumCommitment - sub.completedVisitCount;
 				const status = remaining <= 0 ? "minimum commitment met" : `${remaining} more to go`;
-				return `Completed visits: <strong>${sub.completedVisitCount} of ${sub.minimumCommitment}</strong> — ${status}`;
+				return `Completed visits: <strong>${sub.completedVisitCount} of ${sub.minimumCommitment}</strong>, ${status}`;
 			}
 
 			function setStatus(message, isError = false) {
@@ -134,7 +134,7 @@ import "../../styles/global.css";
 						<h3>${sub.name || "(no name on file)"}</h3>
 						<p class="admin-card__meta">${sub.address || ""}${sub.phone ? " · " + sub.phone : ""}</p>
 						<p class="admin-card__meta">
-							Plan: ${sub.frequency || "—"} · Current schedule: <strong>${fmt(sub.lastVisitStart)}</strong>
+							Plan: ${sub.frequency || "N/A"} · Current schedule: <strong>${fmt(sub.lastVisitStart)}</strong>
 							${sub.status && sub.status !== "active" ? ` · Status: <strong>${statusLabel(sub.status)}</strong>` : ""}
 						</p>
 						<p class="admin-card__meta">${commitmentLabel(sub)}</p>
@@ -152,19 +152,19 @@ import "../../styles/global.css";
 
 						<div class="admin-cancel-actions">
 							<button type="button" class="btn btn--outline admin-cancel-visit">
-								Cancel Next Visit — Still Charge
+								Cancel Next Visit: Still Charge
 							</button>
 							<button type="button" class="btn btn--outline admin-skip-visit">
-								Cancel Next Visit — Skip Charge
+								Cancel Next Visit: Skip Charge
 							</button>
 							<button type="button" class="btn btn--outline admin-cancel-now">
-								Cancel Plan — Immediately
+								Cancel Plan: Immediately
 							</button>
 						</div>
 
 						<div class="admin-cancel-period-block">
 							<p class="admin-hint admin-hint--tight">
-								Cancel the plan on a specific date — visits keep billing normally, right on
+								Cancel the plan on a specific date. Visits keep billing normally, right on
 								schedule, up through that date; nothing after it. Defaults to right after the
 								${fmt(sub.lastVisitStart)} visit, so that one still happens and gets billed.
 							</p>
@@ -178,7 +178,7 @@ import "../../styles/global.css";
 									<input type="time" name="cancelTime" value="${toTimeInputValue(sub.afterNextVisitStart)}" required />
 								</div>
 								<button type="submit" class="btn btn--outline admin-cancel-period">
-									Cancel Plan — On This Date
+									Cancel Plan: On This Date
 								</button>
 							</form>
 						</div>
@@ -217,7 +217,7 @@ import "../../styles/global.css";
 										return;
 									}
 									messageEl.hidden = false;
-									messageEl.textContent = "Not scheduled — pick a different time or confirm the overlap.";
+									messageEl.textContent = "Not scheduled. Pick a different time or confirm the overlap.";
 									messageEl.classList.add("admin-result-message--error");
 									return;
 								}
@@ -235,11 +235,11 @@ import "../../styles/global.css";
 									messageEl.textContent = data.warning;
 								} else {
 									messageEl.classList.remove("admin-result-message--error");
-									messageEl.textContent = `Done — all future visits, and billing, now aligned to ${fmt(data.newVisitStart)}.`;
+									messageEl.textContent = `Done. All future visits, and billing, now aligned to ${fmt(data.newVisitStart)}.`;
 								}
 							} catch {
 								messageEl.hidden = false;
-								messageEl.textContent = "Network error — please try again.";
+								messageEl.textContent = "Network error, please try again.";
 								messageEl.classList.add("admin-result-message--error");
 							} finally {
 								submitBtn.disabled = false;
@@ -271,9 +271,9 @@ import "../../styles/global.css";
 							const { ok, data } = await postJson("/api/admin/cancel-visit", {
 								subscriptionId: sub.subscriptionId,
 							});
-							showMessage(ok ? "Next visit canceled — the plan continues normally after that." : (data.error || "Something went wrong."), !ok);
+							showMessage(ok ? "Next visit canceled. The plan continues normally after that." : (data.error || "Something went wrong."), !ok);
 						} catch {
-							showMessage("Network error — please try again.", true);
+							showMessage("Network error, please try again.", true);
 						} finally {
 							cancelVisitBtn.disabled = false;
 						}
@@ -297,13 +297,13 @@ import "../../styles/global.css";
 							} else {
 								showMessage(
 									ok
-										? "Next visit canceled and unbilled — the plan resumes on the following visit."
+										? "Next visit canceled and unbilled. The plan resumes on the following visit."
 										: data.error || "Something went wrong.",
 									!ok,
 								);
 							}
 						} catch {
-							showMessage("Network error — please try again.", true);
+							showMessage("Network error, please try again.", true);
 						} finally {
 							skipVisitBtn.disabled = false;
 						}
@@ -336,13 +336,13 @@ import "../../styles/global.css";
 							} else {
 								showMessage(
 									ok
-										? `Plan will cancel on ${fmt(data.cancelAt)} — billed normally, right on schedule, until then.`
+										? `Plan will cancel on ${fmt(data.cancelAt)}. Billed normally, right on schedule, until then.`
 										: data.error || "Something went wrong.",
 									!ok,
 								);
 							}
 						} catch {
-							showMessage("Network error — please try again.", true);
+							showMessage("Network error, please try again.", true);
 						} finally {
 							submitBtn.disabled = false;
 						}
@@ -363,7 +363,7 @@ import "../../styles/global.css";
 								showMessage(ok ? "Plan canceled immediately and the upcoming visit was removed from the calendar." : (data.error || "Something went wrong."), !ok);
 							}
 						} catch {
-							showMessage("Network error — please try again.", true);
+							showMessage("Network error, please try again.", true);
 						} finally {
 							cancelNowBtn.disabled = false;
 						}
@@ -390,7 +390,7 @@ import "../../styles/global.css";
 					}
 					renderResults(data.subscriptions || []);
 				} catch {
-					setStatus("Network error — please try again.", true);
+					setStatus("Network error, please try again.", true);
 				}
 			});
 		</script>

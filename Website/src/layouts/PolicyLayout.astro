@@ -5,13 +5,20 @@ import PageHero from "../components/PageHero.astro";
 interface Props {
 	title: string;
 	updated?: string;
+	eyebrow?: string;
+	description?: string;
 }
 
-const { title, updated } = Astro.props;
+const {
+	title,
+	updated,
+	eyebrow = "Booking Policy",
+	description = `${title}: Sky House Cleaning's booking policy for this service.`,
+} = Astro.props;
 ---
 
-<Layout title={`${title} | Sky House Cleaning`} description={`${title} — Sky House Cleaning's booking policy for this service.`}>
-	<PageHero eyebrow="Booking Policy" title={title} />
+<Layout title={`${title} | Sky House Cleaning`} description={description}>
+	<PageHero eyebrow={eyebrow} title={title} />
 
 	<section class="section">
 		<div class="container policy-copy">

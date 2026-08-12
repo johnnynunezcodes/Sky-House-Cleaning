@@ -97,7 +97,7 @@ export async function POST({ request }) {
 				const createdEvent = await createBookingEvent({
 					start: metadata.slotStart,
 					end: metadata.slotEnd,
-					summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
+					summary: `Sky House Cleaning: ${metadata.name || "Customer"}, ${service}`,
 					description: descriptionLines.join("\n"),
 					location: metadata.address || undefined,
 					attendeeEmail: email,
@@ -183,9 +183,9 @@ export async function POST({ request }) {
 						) {
 							try {
 								await createReminderEvent({
-									summary: `✅ Minimum commitment met — ${metadata.name || "customer"} (${metadata.frequency})`,
+									summary: `✅ Minimum commitment met: ${metadata.name || "customer"} (${metadata.frequency})`,
 									description: [
-										`${metadata.name || "This customer"} has completed ${newCount} of ${minimumCommitment} required ${metadata.frequency} cleanings — their minimum commitment is met.`,
+										`${metadata.name || "This customer"} has completed ${newCount} of ${minimumCommitment} required ${metadata.frequency} cleanings. Their minimum commitment is met.`,
 										"They're free to cancel now if they ask. Approve/process it from /admin/reschedule, or see everyone's status at /admin/minimum-commitments.",
 										metadata.phone ? `Phone: ${metadata.phone}` : null,
 										metadata.address ? `Address: ${metadata.address}` : null,
@@ -238,7 +238,7 @@ export async function POST({ request }) {
 
 							const descriptionLines = [
 								`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
-								"Recurring cleaning — billed automatically",
+								"Recurring cleaning, billed automatically",
 								metadata.phone ? `Phone: ${metadata.phone}` : null,
 								email ? `Email: ${email}` : null,
 								metadata.address ? `Address: ${metadata.address}` : null,
@@ -256,7 +256,7 @@ export async function POST({ request }) {
 								const stillFree = await isSlotStillFree(nextWindow);
 								if (!stillFree) {
 									descriptionLines.unshift(
-										"⚠️ This time showed as busy on the calendar — please confirm there's no conflict.",
+										"⚠️ This time showed as busy on the calendar. Please confirm there's no conflict.",
 									);
 								}
 							} catch {
@@ -266,7 +266,7 @@ export async function POST({ request }) {
 							const createdEvent = await createBookingEvent({
 								start: nextWindow.start,
 								end: nextWindow.end,
-								summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
+								summary: `Sky House Cleaning: ${metadata.name || "Customer"}, ${service}`,
 								description: descriptionLines.join("\n"),
 								location: metadata.address || undefined,
 								attendeeEmail: email,

@@ -21,7 +21,7 @@ export async function POST({ request }) {
 	if (!secretKey) {
 		return new Response(
 			JSON.stringify({
-				error: "Payments aren't configured yet — STRIPE_SECRET_KEY is missing. See AGENTS.md for setup steps.",
+				error: "Payments aren't configured yet. STRIPE_SECRET_KEY is missing. See AGENTS.md for setup steps.",
 			}),
 			{ status: 500, headers: { "Content-Type": "application/json" } },
 		);
@@ -61,7 +61,7 @@ export async function POST({ request }) {
 			const stillFree = await isSlotStillFree(slot);
 			if (!stillFree) {
 				return new Response(
-					JSON.stringify({ error: "That time was just booked by someone else — please pick another." }),
+					JSON.stringify({ error: "That time was just booked by someone else. Please pick another." }),
 					{ status: 409, headers: { "Content-Type": "application/json" } },
 				);
 			}

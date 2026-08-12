@@ -24,7 +24,7 @@ let rows = [];
 let loadError = "";
 
 function fmt(iso) {
-	if (!iso) return "—";
+	if (!iso) return "N/A";
 	return new Date(iso).toLocaleString("en-US", {
 		timeZone: "America/Los_Angeles",
 		weekday: "short",
@@ -37,7 +37,7 @@ function fmt(iso) {
 const FREQUENCY_LABELS = { weekly: "Weekly", biweekly: "Bi-Weekly", monthly: "Monthly" };
 
 if (!secretKey) {
-	loadError = "Stripe isn't configured — STRIPE_SECRET_KEY is missing. See AGENTS.md for setup steps.";
+	loadError = "Stripe isn't configured. STRIPE_SECRET_KEY is missing. See AGENTS.md for setup steps.";
 } else {
 	try {
 		const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
@@ -113,7 +113,7 @@ const metCount = rows.filter((r) => r.met).length;
 				<p class="admin-hint">
 					Every active recurring plan and its progress toward that frequency's minimum-commitment
 					term. Counts every visit the customer was actually billed for, including "still charge"
-					cancellations — only skipped (never-billed) visits don't add to the total (see
+					cancellations. Only skipped (never-billed) visits don't add to the total (see
 					<code>completedVisitCount</code> in AGENTS.md). Nothing here cancels or blocks anything
 					automatically; use <a href="/admin/reschedule">Manage a specific customer's plan</a> to
 					act on one.
@@ -157,7 +157,7 @@ const metCount = rows.filter((r) => r.met).length;
 														? `${row.completedVisitCount} of ${row.minimumCommitment}`
 														: `${row.completedVisitCount} (minimum not written yet)`}
 												</td>
-												<td>{row.remaining != null ? row.remaining : "—"}</td>
+												<td>{row.remaining != null ? row.remaining : "N/A"}</td>
 												<td>
 													{row.met ? (
 														<span class="admin-badge admin-badge--met">Minimum met</span>

@@ -47,7 +47,7 @@ const { ctaHref = "/schedule", ctaLabel = "Pick Your Date & Time" } = Astro.prop
 
 		<div class="pc__field pc__field--full">
 			<label class="pc__label" for="pc-sqft">
-				Home Size — <span id="pc-sqft-value">1,500</span> sq ft
+				Home Size: <span id="pc-sqft-value">1,500</span> sq ft
 			</label>
 			<input type="range" id="pc-sqft" class="pc__slider" min="500" max="9999" step="50" value="1500" />
 			<div class="pc__slider-scale">
@@ -55,7 +55,7 @@ const { ctaHref = "/schedule", ctaLabel = "Pick Your Date & Time" } = Astro.prop
 				<span>9,999 sq ft</span>
 			</div>
 			<p class="pc__hint">
-				We'll confirm your home's actual square footage before service — if it's different from what's
+				We'll confirm your home's actual square footage before service. If it's different from what's
 				selected here, we'll adjust your price to match.
 			</p>
 			<p class="pc__hint" id="pc-hint">
@@ -75,7 +75,7 @@ const { ctaHref = "/schedule", ctaLabel = "Pick Your Date & Time" } = Astro.prop
 		<p class="pc__label">Add-Ons</p>
 		<p class="pc__addons-intro">Add extra detail to your standard cleaning.</p>
 		<p class="pc__addons-recurring-note" id="pc-addons-recurring-note" hidden>
-			On a recurring plan, any add-ons you pick here become part of every visit — we'll take care of them
+			On a recurring plan, any add-ons you pick here become part of every visit. We'll take care of them
 			each time we clean.
 		</p>
 

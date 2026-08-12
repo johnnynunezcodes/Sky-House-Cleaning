@@ -102,7 +102,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 						</div>
 
 						<div class="book-step admin-link-panel" id="book-link-panel" hidden>
-							<h3>Booking created — send this to the customer</h3>
+							<h3>Booking created, send this to the customer</h3>
 							<p class="book-step__hint" id="book-link-recap"></p>
 
 							<div class="admin-link-row">
@@ -112,7 +112,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 							</div>
 							<p class="admin-hint--tight">
 								Text or email this link to the customer to complete payment. Nothing is booked or
-								charged until they pay it — no calendar event exists yet. "Copy Message" copies a
+								charged until they pay it, no calendar event exists yet. "Copy Message" copies a
 								ready-to-send note with the link already in it, so you're not typing one out by hand.
 							</p>
 							<a href="#" target="_blank" rel="noopener" id="book-open-link" class="btn btn--outline">Open Payment Page</a>
@@ -583,7 +583,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 					timesEl.innerHTML = "";
 
 					if (slots.length === 0) {
-						timesEl.innerHTML = `<p class="book-times__empty">No open times this day — try another date.</p>`;
+						timesEl.innerHTML = `<p class="book-times__empty">No open times this day. Try another date.</p>`;
 						return;
 					}
 
@@ -643,7 +643,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 							hour: "numeric",
 							minute: "2-digit",
 						});
-						linkRecap.textContent = `${customer.name || "This customer"} — ${when}, ${formatMoney(selections.total)}`;
+						linkRecap.textContent = `${customer.name || "This customer"}: ${when}, ${formatMoney(selections.total)}`;
 						linkInput.value = data.url;
 						openLink.href = data.url;
 						lastCustomerName = (customer.name || "").trim();

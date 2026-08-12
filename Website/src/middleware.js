@@ -16,7 +16,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
 	if (!username || !password) {
 		return new Response(
-			"Staff tools aren't configured yet — ADMIN_USERNAME and ADMIN_PASSWORD need to be set. See AGENTS.md.",
+			"Staff tools aren't configured yet. ADMIN_USERNAME and ADMIN_PASSWORD need to be set. See AGENTS.md.",
 			{ status: 503 },
 		);
 	}

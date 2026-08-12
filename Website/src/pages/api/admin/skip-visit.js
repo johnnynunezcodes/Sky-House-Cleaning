@@ -75,7 +75,7 @@ export async function POST({ request }) {
 
 	const metadata = subscription.metadata || {};
 	if (!metadata.lastVisitStart || !metadata.lastVisitEnd || !metadata.frequency) {
-		return json({ error: "This subscription is missing schedule info — can't compute the next visit." }, 400);
+		return json({ error: "This subscription is missing schedule info. Can't compute the next visit." }, 400);
 	}
 
 	const nextWindow = nextVisitWindow(metadata.lastVisitStart, metadata.lastVisitEnd, metadata.frequency);
@@ -87,7 +87,7 @@ export async function POST({ request }) {
 	const vehicle = describeVehicle(metadata);
 	const descriptionLines = [
 		`Service: ${service}${metadata.sqft ? ` (${metadata.sqft} sq ft)` : ""}`,
-		"Recurring cleaning — resumes after a skipped, unbilled visit",
+		"Recurring cleaning, resumes after a skipped, unbilled visit",
 		metadata.phone ? `Phone: ${metadata.phone}` : null,
 		metadata.address ? `Address: ${metadata.address}` : null,
 		vehicle ? `Vehicle: ${vehicle}` : null,
@@ -121,7 +121,7 @@ export async function POST({ request }) {
 			const created = await createBookingEvent({
 				start: nextWindow.start,
 				end: nextWindow.end,
-				summary: `Sky House Cleaning — ${metadata.name || "Customer"} — ${service}`,
+				summary: `Sky House Cleaning: ${metadata.name || "Customer"}, ${service}`,
 				description: descriptionLines.join("\n"),
 				location: metadata.address || undefined,
 			});
@@ -158,7 +158,7 @@ export async function POST({ request }) {
 		});
 	} catch (err) {
 		billingWarning =
-			"The visit was skipped on the calendar, but pushing back the billing date failed — the customer may still be charged for the skipped visit: " +
+			"The visit was skipped on the calendar, but pushing back the billing date failed. The customer may still be charged for the skipped visit: " +
 			err.message;
 	}
 

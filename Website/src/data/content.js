@@ -11,7 +11,7 @@ export const testimonials = [
 	},
 	{
 		quote:
-			"Finding a high quality team with integrity is such a pleasure. Emily and Johnny spent the day cleaning and caring for our house — every room vacuumed and dusted, the bathrooms scrubbed clean, and the kitchen looking like new.",
+			"Finding a high quality team with integrity is such a pleasure. Emily and Johnny spent the day cleaning and caring for our house: every room vacuumed and dusted, the bathrooms scrubbed clean, and the kitchen looking like new.",
 		name: "Steve Moore",
 	},
 ];
@@ -26,7 +26,7 @@ export const cleaningServices = [
 	{
 		slug: "recurring-cleaning",
 		title: "Recurring Cleaning",
-		blurb: "The same thorough clean on a weekly, bi-weekly, or monthly membership — at a lower rate.",
+		blurb: "The same thorough clean on a weekly, bi-weekly, or monthly membership, at a lower rate.",
 		startingAt: "From $105 / visit",
 	},
 	{

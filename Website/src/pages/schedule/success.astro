@@ -24,7 +24,7 @@ if (!sessionId) {
 	try {
 		session = await stripe.checkout.sessions.retrieve(sessionId);
 	} catch {
-		errorMessage = "We couldn't verify your payment. If you were charged, don't worry — we'll be in touch.";
+		errorMessage = "We couldn't verify your payment. If you were charged, don't worry, we'll be in touch.";
 	}
 
 	// Recurring plans get a self-service link (update card, view invoices,
@@ -61,7 +61,7 @@ const isZeroToday = session?.amount_total === 0;
 		lede={
 			errorMessage ||
 			(isRecurring && isZeroToday
-				? "No payment was made today — your first cleaning is on the calendar, and your card will be billed automatically on the day of each visit, starting with this one."
+				? "No payment was made today. Your first cleaning is on the calendar, and your card will be billed automatically on the day of each visit, starting with this one."
 				: `We've received your payment${amountPaid ? ` of $${amountPaid}` : ""}${
 						email ? ` and a receipt is on its way to ${email}` : ""
 					}. Your cleaning is on the calendar for the date and time you picked.`)
@@ -74,7 +74,7 @@ const isZeroToday = session?.amount_total === 0;
 				{isRecurring && (
 					<p>
 						Your card is on file and future cleanings on this plan will be billed and scheduled
-						automatically for the same day and time — no need to rebook.
+						automatically for the same day and time, no need to rebook.
 					</p>
 				)}
 				<p>
