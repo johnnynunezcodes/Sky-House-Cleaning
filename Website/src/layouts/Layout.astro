@@ -67,14 +67,30 @@ const businessSchema = {
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<!-- /favicon.svg is still Astro's stock default icon (never replaced) —
+		     kept in place since it's harmless as a low-priority fallback, but
+		     every real icon reference below points at the actual Sky House
+		     logo instead. /favicon.ico WAS also the Astro default until this
+		     was regenerated from public/images/logo-icon.png; browsers/crawlers
+		     that probe /favicon.ico by convention (rather than reading these
+		     <link> tags) now get the real logo too. -->
+		<link rel="icon" type="image/png" href="/images/logo-icon.png" />
+		<link rel="icon" href="/favicon.ico" sizes="any" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
+		<!-- apple-touch-icon is what iMessage (and most other link-preview
+		     generators that don't use og:image) actually display next to a
+		     shared link — this is what was showing Astro's rocket instead of
+		     Sky House's logo in text message previews. -->
+		<link rel="apple-touch-icon" href="/images/logo-icon.png" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="description" content={description} />
 		<meta name="generator" content={Astro.generator} />
 		<meta property="og:title" content={title} />
 		<meta property="og:description" content={description} />
 		<meta property="og:type" content="website" />
+		<meta property="og:url" content={Astro.url.href} />
+		<meta property="og:image" content="https://www.skyhousecleaning.com/images/logo-full.png" />
+		<meta name="twitter:card" content="summary_large_image" />
 		<title>{title}</title>
 		<script type="application/ld+json" set:html={JSON.stringify(businessSchema)} />
 	</head>

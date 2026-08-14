@@ -176,7 +176,17 @@ export async function POST({ request }) {
 				quantity: 1,
 			})),
 			success_url: `${origin}/schedule/success?session_id={CHECKOUT_SESSION_ID}`,
-			cancel_url: `${origin}/schedule/canceled`,
+			// Stripe's own "‹ Back" link on the Checkout page (not the browser's
+			// back button) sends the customer here. For a phone booking, sending
+			// them to the generic public /schedule/canceled page would be wrong —
+			// its "Back to Booking" link points at /booking, a page this customer
+			// never touched, and they'd have no way to get back to their actual
+			// booking without calling in again. So a phone booking's cancel_url
+			// instead points right back at the same /confirm/[id] page they came
+			// from, which (per finalize-pending-booking.js) is still "pending" and
+			// ready to retry — the generic canceled page's promise of "pick up
+			// right where you left off" is only literally true for this path.
+			cancel_url: pendingBookingId ? `${origin}/confirm/${pendingBookingId}` : `${origin}/schedule/canceled`,
 			metadata: bookingMetadata,
 			// Subscriptions don't automatically inherit the Checkout Session's
 			// metadata, so it's duplicated onto the subscription itself —
