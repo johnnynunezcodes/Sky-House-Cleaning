@@ -5,32 +5,27 @@
 // assignment/status. See AGENTS.md → "Dispatcher (jobs)" and
 // src/lib/dispatch.js for why it's built this way instead of a duplicated
 // `jobs` collection.
+//
+// Three view modes share one date-range-aware read (list-jobs.js already
+// supported a `days` param before any of this existed): Day is the original
+// full-detail view (assign cleaners, change status, confirm) unchanged.
+// Week and Month are read-only overviews built for one purpose — seeing at
+// a glance which jobs across a wider range still need a cleaner assigned —
+// and clicking any job/day in them jumps into Day view to actually act on
+// it, rather than duplicating the assign/status editing controls three
+// times over.
 export const prerender = false;
 
-import "../../styles/global.css";
+import AdminLayout from "../../layouts/AdminLayout.astro";
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="robots" content="noindex, nofollow" />
-		<title>Dispatch | Sky House Cleaning Staff Tools</title>
-	</head>
-	<body>
-		<main class="section">
+<AdminLayout title="Dispatch | Sky House Cleaning Staff Tools">
 			<div class="container admin-container">
-				<p class="admin-nav">
-					<a href="/admin/crm/contacts">CRM: Contacts</a>
-					· <a href="/admin/crm/deals">CRM: Deals</a>
-					· <a href="/admin/reschedule">Manage a specific customer's plan →</a>
-				</p>
 				<h1>Dispatch</h1>
 				<p class="admin-hint">
-					Every real job on the calendar for the selected day, with who's assigned and their
-					status. This reads directly from Google Calendar, not a separate copy — reschedules,
-					cancellations, and new bookings show up here automatically.
+					Every real job on the calendar, with who's assigned, their status, and whether the
+					cleaner has confirmed. This reads directly from Google Calendar, not a separate copy —
+					reschedules, cancellations, and new bookings show up here automatically.
 				</p>
 
 				<details class="card admin-add-card">
@@ -54,28 +49,55 @@ import "../../styles/global.css";
 					<p class="admin-result-message" id="cleaner-message" hidden></p>
 				</details>
 
+				<div class="admin-view-switcher" role="group" aria-label="View">
+					<button type="button" class="admin-view-btn is-active" data-view="day">Day</button>
+					<button type="button" class="admin-view-btn" data-view="week">Week</button>
+					<button type="button" class="admin-view-btn" data-view="month">Month</button>
+				</div>
+
 				<div class="admin-day-nav">
-					<button type="button" id="prev-day" class="btn btn--outline">← Previous day</button>
+					<button type="button" id="prev-period" class="btn btn--outline">← Previous</button>
 					<input type="date" id="day-picker" />
-					<button type="button" id="next-day" class="btn btn--outline">Next day →</button>
+					<span id="period-label" class="admin-period-label" hidden></span>
+					<button type="button" id="next-period" class="btn btn--outline">Next →</button>
 					<button type="button" id="today-btn" class="btn btn--outline">Today</button>
 				</div>
 
 				<p id="load-status" class="admin-status">Loading…</p>
-				<div id="jobs-list"></div>
+
+				<div id="day-view" class="admin-day-view">
+					<div id="jobs-list"></div>
+				</div>
+
+				<div id="week-view" class="admin-week-view" hidden>
+					<div id="week-board" class="admin-week-board"></div>
+				</div>
+
+				<div id="month-view" class="admin-month-view" hidden>
+					<div class="admin-month-weekdays">
+						<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+					</div>
+					<div id="month-grid" class="admin-month-grid"></div>
+				</div>
 			</div>
-		</main>
 
 		<script>
 			const dayPicker = document.getElementById("day-picker");
-			const prevDayBtn = document.getElementById("prev-day");
-			const nextDayBtn = document.getElementById("next-day");
+			const prevPeriodBtn = document.getElementById("prev-period");
+			const nextPeriodBtn = document.getElementById("next-period");
 			const todayBtn = document.getElementById("today-btn");
+			const periodLabel = document.getElementById("period-label");
 			const loadStatus = document.getElementById("load-status");
 			const jobsList = document.getElementById("jobs-list");
 			const cleanersList = document.getElementById("cleaners-list");
 			const addCleanerForm = document.getElementById("add-cleaner-form");
 			const cleanerMessage = document.getElementById("cleaner-message");
+			const viewButtons = Array.from(document.querySelectorAll(".admin-view-btn"));
+			const dayViewEl = document.getElementById("day-view");
+			const weekViewEl = document.getElementById("week-view");
+			const monthViewEl = document.getElementById("month-view");
+			const weekBoard = document.getElementById("week-board");
+			const monthGrid = document.getElementById("month-grid");
 
 			const STATUS_LABELS = {
 				unassigned: "Unassigned",
@@ -87,6 +109,7 @@ import "../../styles/global.css";
 			const STATUS_ORDER = ["unassigned", "assigned", "en_route", "in_progress", "completed"];
 
 			let cleaners = [];
+			let viewMode = "day"; // "day" | "week" | "month"
 
 			function escapeHtml(str) {
 				const div = document.createElement("div");
@@ -118,6 +141,54 @@ import "../../styles/global.css";
 				return date.toISOString().slice(0, 10);
 			}
 
+			// Sunday-start, matching the weekday header row used both here and on
+			// the public/admin booking pages' own calendar (schedule.astro,
+			// admin/book.astro).
+			function startOfWeek(dateStr) {
+				const [y, m, d] = dateStr.split("-").map(Number);
+				const date = new Date(Date.UTC(y, m - 1, d));
+				date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+				return date.toISOString().slice(0, 10);
+			}
+
+			function startOfMonth(dateStr) {
+				return `${dateStr.slice(0, 7)}-01`;
+			}
+
+			function daysInMonthCount(dateStr) {
+				const [y, m] = dateStr.split("-").map(Number);
+				return new Date(Date.UTC(y, m, 0)).getUTCDate();
+			}
+
+			// Always normalized to the 1st — month view only ever anchors to
+			// "which month," never a specific day within it.
+			function addMonths(dateStr, delta) {
+				const [y, m] = dateStr.split("-").map(Number);
+				const date = new Date(Date.UTC(y, m - 1 + delta, 1));
+				return date.toISOString().slice(0, 10);
+			}
+
+			function localDate(dateStr) {
+				// Deliberately NOT `new Date(dateStr)` — that parses "YYYY-MM-DD" as
+				// UTC midnight, which can print as the previous day in a
+				// west-of-UTC browser. Appending a local time-of-day avoids that.
+				return new Date(dateStr + "T00:00:00");
+			}
+
+			function groupByDate(jobs) {
+				const map = new Map();
+				for (const j of jobs) {
+					if (!map.has(j.visitDate)) map.set(j.visitDate, []);
+					map.get(j.visitDate).push(j);
+				}
+				for (const arr of map.values()) arr.sort((a, b) => new Date(a.start) - new Date(b.start));
+				return map;
+			}
+
+			function cleanerNamesFor(ids) {
+				return (ids || []).map((id) => cleaners.find((c) => c.id === id)?.name).filter(Boolean);
+			}
+
 			async function loadCleaners() {
 				try {
 					const res = await fetch("/api/admin/dispatch/list-cleaners");
@@ -125,7 +196,7 @@ import "../../styles/global.css";
 					if (res.ok) cleaners = data.cleaners || [];
 					renderCleanersList();
 				} catch {
-					// Non-fatal for the day view — assignment dropdowns just come up empty.
+					// Non-fatal — assignment dropdowns/names just come up empty.
 				}
 			}
 
@@ -202,6 +273,8 @@ import "../../styles/global.css";
 					.join("");
 			}
 
+			// --- Day view (full detail — assign, status, confirm) ------------------
+
 			function jobCard(job) {
 				const card = document.createElement("div");
 				card.className = "card admin-job-card";
@@ -213,7 +286,10 @@ import "../../styles/global.css";
 							<p class="admin-card__meta">${escapeHtml(job.summary)}</p>
 							${job.location ? `<p class="admin-card__meta">${escapeHtml(job.location)}</p>` : ""}
 						</div>
-						<span class="admin-badge admin-badge--${job.status}">${STATUS_LABELS[job.status] || job.status}</span>
+						<div class="admin-job-card__badges">
+							<span class="admin-badge admin-badge--${job.status} admin-job-card__status-badge">${STATUS_LABELS[job.status] || job.status}</span>
+							<span class="admin-confirmed-check" ${job.cleanerConfirmed ? "" : "hidden"}>✓ Confirmed</span>
+						</div>
 					</div>
 					<div class="admin-job-card__controls">
 						<div class="admin-form__row">
@@ -228,12 +304,21 @@ import "../../styles/global.css";
 								${STATUS_ORDER.map((s) => `<option value="${s}" ${job.status === s ? "selected" : ""}>${STATUS_LABELS[s]}</option>`).join("")}
 							</select>
 						</div>
+						<div class="admin-form__row admin-form__row--checkbox">
+							<label class="admin-confirm-label">
+								<input type="checkbox" class="admin-confirmed-checkbox" ${job.cleanerConfirmed ? "checked" : ""} ${assignedIds.length === 0 ? "disabled" : ""} />
+								Confirmed by cleaner
+							</label>
+						</div>
 					</div>
 					<p class="admin-result-message" hidden></p>
 				`;
 
 				const assignSelect = card.querySelector(".admin-assign-select");
 				const statusSelect = card.querySelector(".admin-status-select");
+				const confirmedCheckbox = card.querySelector(".admin-confirmed-checkbox");
+				const statusBadge = card.querySelector(".admin-job-card__status-badge");
+				const confirmedBadge = card.querySelector(".admin-confirmed-check");
 				const messageEl = card.querySelector(".admin-result-message");
 
 				async function saveJob(extraFields) {
@@ -266,17 +351,42 @@ import "../../styles/global.css";
 					const selectedIds = Array.from(assignSelect.selectedOptions).map((o) => o.value);
 					const nextStatus = selectedIds.length && job.status === "unassigned" ? "assigned" : undefined;
 					if (nextStatus) statusSelect.value = nextStatus;
-					saveJob({ assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) });
+
+					const extra = { assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) };
+
+					// Unassigning everyone makes "confirmed" meaningless — reset it
+					// rather than leaving a stale confirmation attached to nobody.
+					confirmedCheckbox.disabled = selectedIds.length === 0;
+					if (selectedIds.length === 0 && confirmedCheckbox.checked) {
+						confirmedCheckbox.checked = false;
+						extra.cleanerConfirmed = false;
+						confirmedBadge.hidden = true;
+					}
+
+					saveJob(extra);
+					if (nextStatus) {
+						job.status = nextStatus;
+						statusBadge.className = `admin-badge admin-badge--${nextStatus} admin-job-card__status-badge`;
+						statusBadge.textContent = STATUS_LABELS[nextStatus];
+					}
 				});
 
 				statusSelect.addEventListener("change", () => {
+					job.status = statusSelect.value;
+					statusBadge.className = `admin-badge admin-badge--${statusSelect.value} admin-job-card__status-badge`;
+					statusBadge.textContent = STATUS_LABELS[statusSelect.value];
 					saveJob({ status: statusSelect.value });
+				});
+
+				confirmedCheckbox.addEventListener("change", () => {
+					confirmedBadge.hidden = !confirmedCheckbox.checked;
+					saveJob({ cleanerConfirmed: confirmedCheckbox.checked });
 				});
 
 				return card;
 			}
 
-			async function loadJobs() {
+			async function loadDayView() {
 				loadStatus.hidden = false;
 				loadStatus.textContent = "Loading…";
 				loadStatus.classList.remove("admin-status--error");
@@ -302,34 +412,210 @@ import "../../styles/global.css";
 				}
 			}
 
-			prevDayBtn.addEventListener("click", () => {
-				dayPicker.value = addDays(dayPicker.value, -1);
-				loadJobs();
+			// --- Week view (read-only board, click a job to jump into Day view) ----
+
+			function formatWeekRange(weekStart) {
+				const start = localDate(weekStart).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+				const end = localDate(addDays(weekStart, 6)).toLocaleDateString("en-US", {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+				});
+				return `${start} – ${end}`;
+			}
+
+			function weekCard(job) {
+				const card = document.createElement("button");
+				card.type = "button";
+				const assignedIds = job.assignedCleanerIds || [];
+				const isUnassigned = assignedIds.length === 0;
+				card.className = "admin-week-card" + (isUnassigned ? " admin-week-card--unassigned" : "");
+				const names = cleanerNamesFor(assignedIds);
+				card.innerHTML = `
+					<p class="admin-week-card__time">${fmtTime(job.start)}</p>
+					<p class="admin-week-card__summary">${escapeHtml(job.summary)}</p>
+					<p class="admin-week-card__cleaners${names.length ? "" : " admin-week-card__cleaners--empty"}">
+						${names.length ? escapeHtml(names.join(", ")) : "Needs cleaner"}
+					</p>
+					<div class="admin-week-card__footer">
+						<span class="admin-badge admin-badge--${job.status}">${STATUS_LABELS[job.status] || job.status}</span>
+						${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
+					</div>
+				`;
+				card.addEventListener("click", () => jumpToDay(job.visitDate));
+				return card;
+			}
+
+			function weekColumn(dateStr, jobs, isToday) {
+				const col = document.createElement("div");
+				col.className = "admin-week-col" + (isToday ? " is-today" : "");
+				const date = localDate(dateStr);
+				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
+
+				col.innerHTML = `
+					<div class="admin-week-col__header">
+						<span class="admin-week-col__day">${date.toLocaleDateString("en-US", { weekday: "short" })}</span>
+						<span class="admin-week-col__date">${date.getDate()}</span>
+						${unassignedCount ? `<span class="admin-week-col__badge">${unassignedCount}</span>` : ""}
+					</div>
+					<div class="admin-week-col__jobs"></div>
+				`;
+
+				const jobsEl = col.querySelector(".admin-week-col__jobs");
+				if (!jobs.length) {
+					jobsEl.innerHTML = `<p class="admin-week-empty">No jobs</p>`;
+				} else {
+					jobs.forEach((job) => jobsEl.appendChild(weekCard(job)));
+				}
+				return col;
+			}
+
+			async function loadWeekView() {
+				loadStatus.hidden = false;
+				loadStatus.textContent = "Loading…";
+				loadStatus.classList.remove("admin-status--error");
+				weekBoard.innerHTML = "";
+				const weekStart = startOfWeek(dayPicker.value);
+				periodLabel.hidden = false;
+				periodLabel.textContent = formatWeekRange(weekStart);
+				try {
+					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${weekStart}&days=7`);
+					const data = await res.json();
+					if (!res.ok) {
+						loadStatus.textContent = data.error || "Couldn't load jobs.";
+						loadStatus.classList.add("admin-status--error");
+						return;
+					}
+					loadStatus.hidden = true;
+					const byDate = groupByDate(data.jobs || []);
+					const today = todayLocalIso();
+					for (let i = 0; i < 7; i++) {
+						const dateStr = addDays(weekStart, i);
+						weekBoard.appendChild(weekColumn(dateStr, byDate.get(dateStr) || [], dateStr === today));
+					}
+				} catch {
+					loadStatus.textContent = "Network error, please try again.";
+					loadStatus.classList.add("admin-status--error");
+				}
+			}
+
+			// --- Month view (read-only grid, click a day to jump into Day view) ----
+
+			function monthCell(dateStr, dayNum, jobs, isToday) {
+				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
+				const cell = document.createElement("button");
+				cell.type = "button";
+				cell.className =
+					"admin-month-day" + (isToday ? " is-today" : "") + (unassignedCount ? " has-unassigned" : "");
+				cell.innerHTML = `
+					<span class="admin-month-day__num">${dayNum}</span>
+					${jobs.length ? `<span class="admin-month-day__count">${jobs.length} job${jobs.length === 1 ? "" : "s"}</span>` : ""}
+					${unassignedCount ? `<span class="admin-month-day__badge">${unassignedCount} unassigned</span>` : ""}
+				`;
+				cell.addEventListener("click", () => jumpToDay(dateStr));
+				return cell;
+			}
+
+			async function loadMonthView() {
+				loadStatus.hidden = false;
+				loadStatus.textContent = "Loading…";
+				loadStatus.classList.remove("admin-status--error");
+				monthGrid.innerHTML = "";
+				const monthStart = startOfMonth(dayPicker.value);
+				const totalDays = daysInMonthCount(monthStart);
+				periodLabel.hidden = false;
+				periodLabel.textContent = localDate(monthStart).toLocaleDateString("en-US", {
+					month: "long",
+					year: "numeric",
+				});
+				try {
+					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${monthStart}&days=${totalDays}`);
+					const data = await res.json();
+					if (!res.ok) {
+						loadStatus.textContent = data.error || "Couldn't load jobs.";
+						loadStatus.classList.add("admin-status--error");
+						return;
+					}
+					loadStatus.hidden = true;
+					const byDate = groupByDate(data.jobs || []);
+					const today = todayLocalIso();
+					const firstDow = localDate(monthStart).getDay();
+					for (let i = 0; i < firstDow; i++) {
+						const pad = document.createElement("span");
+						pad.className = "admin-month-pad";
+						monthGrid.appendChild(pad);
+					}
+					for (let d = 1; d <= totalDays; d++) {
+						const dateStr = `${monthStart.slice(0, 8)}${String(d).padStart(2, "0")}`;
+						monthGrid.appendChild(monthCell(dateStr, d, byDate.get(dateStr) || [], dateStr === today));
+					}
+				} catch {
+					loadStatus.textContent = "Network error, please try again.";
+					loadStatus.classList.add("admin-status--error");
+				}
+			}
+
+			// --- View switching / shared date nav ------------------------------------
+
+			function loadCurrentView() {
+				if (viewMode === "day") loadDayView();
+				else if (viewMode === "week") loadWeekView();
+				else loadMonthView();
+			}
+
+			function setViewMode(mode) {
+				viewMode = mode;
+				viewButtons.forEach((b) => b.classList.toggle("is-active", b.dataset.view === mode));
+				dayViewEl.hidden = mode !== "day";
+				weekViewEl.hidden = mode !== "week";
+				monthViewEl.hidden = mode !== "month";
+				periodLabel.hidden = mode === "day";
+			}
+
+			// Used by week/month cells to drop straight into the full-detail Day
+			// view for that date, rather than trying to edit assignment/status
+			// inline from a compact card.
+			function jumpToDay(dateStr) {
+				dayPicker.value = dateStr;
+				setViewMode("day");
+				loadDayView();
+			}
+
+			viewButtons.forEach((btn) => {
+				btn.addEventListener("click", () => {
+					if (btn.dataset.view === viewMode) return;
+					setViewMode(btn.dataset.view);
+					loadCurrentView();
+				});
 			});
-			nextDayBtn.addEventListener("click", () => {
-				dayPicker.value = addDays(dayPicker.value, 1);
-				loadJobs();
+
+			prevPeriodBtn.addEventListener("click", () => {
+				if (viewMode === "day") dayPicker.value = addDays(dayPicker.value, -1);
+				else if (viewMode === "week") dayPicker.value = addDays(dayPicker.value, -7);
+				else dayPicker.value = addMonths(dayPicker.value, -1);
+				loadCurrentView();
+			});
+			nextPeriodBtn.addEventListener("click", () => {
+				if (viewMode === "day") dayPicker.value = addDays(dayPicker.value, 1);
+				else if (viewMode === "week") dayPicker.value = addDays(dayPicker.value, 7);
+				else dayPicker.value = addMonths(dayPicker.value, 1);
+				loadCurrentView();
 			});
 			todayBtn.addEventListener("click", () => {
 				dayPicker.value = todayLocalIso();
-				loadJobs();
+				loadCurrentView();
 			});
-			dayPicker.addEventListener("change", loadJobs);
+			dayPicker.addEventListener("change", loadCurrentView);
 
 			dayPicker.value = todayLocalIso();
-			loadCleaners().then(loadJobs);
+			loadCleaners().then(loadCurrentView);
 		</script>
 
 		<style>
 			.admin-container {
-				max-width: 780px;
+				max-width: 1200px;
 				margin: 0 auto;
 				padding-block: 3rem;
-			}
-
-			.admin-nav {
-				margin-bottom: 1.5rem;
-				font-size: 0.9rem;
 			}
 
 			.admin-hint {
@@ -395,6 +681,48 @@ import "../../styles/global.css";
 				font-family: inherit;
 			}
 
+			.admin-form__row--checkbox {
+				justify-content: flex-end;
+			}
+
+			.admin-confirm-label {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+				cursor: pointer;
+			}
+
+			.admin-confirm-label input {
+				width: auto;
+			}
+
+			.admin-view-switcher {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				margin-bottom: 1rem;
+			}
+
+			.admin-view-btn {
+				padding: 0.4rem 1rem;
+				border-radius: 999px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				font-size: 0.85rem;
+				font-weight: 600;
+				color: var(--color-slate);
+				cursor: pointer;
+			}
+
+			.admin-view-btn.is-active {
+				background: var(--color-ink);
+				border-color: var(--color-ink);
+				color: var(--color-white);
+			}
+
 			.admin-day-nav {
 				display: flex;
 				align-items: center;
@@ -408,6 +736,17 @@ import "../../styles/global.css";
 				border: 1px solid var(--color-border);
 				border-radius: 8px;
 				font-family: inherit;
+			}
+
+			.admin-period-label {
+				font-family: var(--font-heading);
+				font-weight: 600;
+				color: var(--color-ink);
+			}
+
+			.admin-day-view {
+				max-width: 780px;
+				margin: 0 auto;
 			}
 
 			.admin-job-card {
@@ -426,6 +765,13 @@ import "../../styles/global.css";
 				margin: 0 0 0.35rem;
 			}
 
+			.admin-job-card__badges {
+				display: flex;
+				flex-direction: column;
+				align-items: flex-end;
+				gap: 0.4rem;
+			}
+
 			.admin-card__meta {
 				color: var(--color-slate);
 				margin: 0.2rem 0;
@@ -436,6 +782,7 @@ import "../../styles/global.css";
 				display: flex;
 				gap: 1.5rem;
 				flex-wrap: wrap;
+				align-items: flex-end;
 				margin-top: 1rem;
 				padding-top: 1rem;
 				border-top: 1px solid var(--color-border);
@@ -475,6 +822,18 @@ import "../../styles/global.css";
 				color: #1e7a34;
 			}
 
+			.admin-confirmed-check {
+				display: inline-block;
+				font-size: 0.78rem;
+				font-weight: 600;
+				color: #1e7a34;
+				white-space: nowrap;
+			}
+
+			.admin-confirmed-check[hidden] {
+				display: none;
+			}
+
 			.admin-result-message {
 				margin-top: 0.75rem;
 				font-weight: 600;
@@ -485,6 +844,208 @@ import "../../styles/global.css";
 			.admin-result-message--error {
 				color: #b3261e;
 			}
+
+			/* --- Week board --------------------------------------------------- */
+
+			.admin-week-board {
+				display: grid;
+				grid-template-columns: repeat(7, minmax(160px, 1fr));
+				gap: 0.75rem;
+				overflow-x: auto;
+				padding-bottom: 0.5rem;
+			}
+
+			.admin-week-col {
+				background: var(--color-white);
+				border: 1px solid var(--color-border);
+				border-radius: var(--radius);
+				padding: 0.75rem;
+				min-height: 120px;
+			}
+
+			.admin-week-col.is-today {
+				border-color: var(--color-sky);
+				box-shadow: 0 0 0 1px var(--color-sky);
+			}
+
+			.admin-week-col__header {
+				display: flex;
+				align-items: baseline;
+				gap: 0.4rem;
+				margin-bottom: 0.6rem;
+				padding-bottom: 0.5rem;
+				border-bottom: 1px solid var(--color-border);
+			}
+
+			.admin-week-col__day {
+				font-size: 0.72rem;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--color-slate-light);
+				font-weight: 600;
+			}
+
+			.admin-week-col__date {
+				font-family: var(--font-heading);
+				font-weight: 700;
+				color: var(--color-ink);
+			}
+
+			.admin-week-col__badge {
+				margin-left: auto;
+				background: #fdeceb;
+				color: #b3261e;
+				border-radius: 999px;
+				padding: 0.05rem 0.5rem;
+				font-size: 0.72rem;
+				font-weight: 700;
+			}
+
+			.admin-week-col__jobs {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+
+			.admin-week-empty {
+				margin: 0;
+				font-size: 0.8rem;
+				color: var(--color-slate-light);
+			}
+
+			.admin-week-card {
+				display: block;
+				width: 100%;
+				text-align: left;
+				background: var(--color-cream);
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+				padding: 0.5rem 0.65rem;
+				cursor: pointer;
+				font-family: inherit;
+			}
+
+			.admin-week-card:hover {
+				border-color: var(--color-sky);
+			}
+
+			.admin-week-card--unassigned {
+				background: #fdeceb;
+				border-color: #f3c8c5;
+			}
+
+			.admin-week-card__time {
+				margin: 0;
+				font-size: 0.78rem;
+				font-weight: 700;
+				color: var(--color-ink);
+			}
+
+			.admin-week-card__summary {
+				margin: 0.15rem 0;
+				font-size: 0.8rem;
+				color: var(--color-slate);
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+
+			.admin-week-card__cleaners {
+				margin: 0 0 0.4rem;
+				font-size: 0.75rem;
+				color: var(--color-slate);
+			}
+
+			.admin-week-card__cleaners--empty {
+				color: #b3261e;
+				font-weight: 600;
+			}
+
+			.admin-week-card__footer {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.4rem;
+			}
+
+			/* --- Month grid ----------------------------------------------------- */
+
+			.admin-month-weekdays {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				margin-bottom: 0.4rem;
+			}
+
+			.admin-month-weekdays span {
+				text-align: center;
+				font-size: 0.75rem;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+				color: var(--color-slate-light);
+			}
+
+			.admin-month-grid {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				gap: 0.4rem;
+			}
+
+			.admin-month-pad {
+				display: block;
+			}
+
+			.admin-month-day {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: flex-start;
+				gap: 0.2rem;
+				min-height: 72px;
+				padding: 0.5rem 0.3rem;
+				border-radius: 10px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				font-family: inherit;
+				cursor: pointer;
+			}
+
+			.admin-month-day:hover {
+				border-color: var(--color-sky);
+			}
+
+			.admin-month-day.is-today {
+				border-color: var(--color-sky);
+				box-shadow: 0 0 0 1px var(--color-sky);
+			}
+
+			.admin-month-day.has-unassigned {
+				background: #fdeceb;
+			}
+
+			.admin-month-day__num {
+				font-family: var(--font-heading);
+				font-weight: 700;
+				color: var(--color-ink);
+				font-size: 0.9rem;
+			}
+
+			.admin-month-day__count {
+				font-size: 0.7rem;
+				color: var(--color-slate);
+			}
+
+			.admin-month-day__badge {
+				font-size: 0.68rem;
+				font-weight: 700;
+				color: #b3261e;
+				text-align: center;
+			}
+
+			@media (max-width: 900px) {
+				.admin-week-board {
+					grid-template-columns: repeat(7, minmax(150px, 1fr));
+				}
+			}
 		</style>
-	</body>
-</html>
+</AdminLayout>

@@ -6,26 +6,11 @@
 // (Firebase/Firestore)" for the data model and setup status.
 export const prerender = false;
 
-import "../../../styles/global.css";
+import AdminLayout from "../../../layouts/AdminLayout.astro";
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="robots" content="noindex, nofollow" />
-		<title>CRM: Contacts | Sky House Cleaning Staff Tools</title>
-	</head>
-	<body>
-		<main class="section">
+<AdminLayout title="CRM: Contacts | Sky House Cleaning Staff Tools">
 			<div class="container admin-container">
-				<p class="admin-nav">
-					<a href="/admin/reschedule">← Manage a specific customer's plan</a>
-					· <a href="/admin/crm/deals">Deals pipeline →</a>
-					· <a href="/admin/dispatch">Dispatch →</a>
-					· <a href="/admin/minimum-commitments">Minimum commitments →</a>
-				</p>
 				<h1>CRM: Contacts</h1>
 				<p class="admin-hint">
 					Every client and lead, in one place — separate from Stripe/Calendar, so a lead can exist
@@ -91,7 +76,6 @@ import "../../../styles/global.css";
 
 				<div id="results"></div>
 			</div>
-		</main>
 
 		<script>
 			const loadStatus = document.getElementById("load-status");
@@ -304,11 +288,6 @@ import "../../../styles/global.css";
 				padding-block: 3rem;
 			}
 
-			.admin-nav {
-				margin-bottom: 1.5rem;
-				font-size: 0.9rem;
-			}
-
 			.admin-hint {
 				color: var(--color-slate);
 				margin-bottom: 1.5rem;
@@ -468,5 +447,4 @@ import "../../../styles/global.css";
 				color: #b3261e;
 			}
 		</style>
-	</body>
-</html>
+</AdminLayout>

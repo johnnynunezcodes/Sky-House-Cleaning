@@ -1,0 +1,395 @@
+---
+// Shared shell for every /admin/* staff tool (all gated by HTTP Basic Auth
+// in src/middleware.js). Gives every page the same left sidebar nav —
+// grouped sections like Jobber's, with the current page highlighted —
+// instead of each page repeating its own ad-hoc row of "→" links at the
+// top. Deliberately separate from the public site's Layout.astro: no
+// Navbar/Footer, no SEO/Open Graph tags, this is an internal tool that
+// should never be indexed or shared, not a marketing page.
+import "../styles/global.css";
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+const currentPath = Astro.url.pathname;
+
+// `activeMatch` only needs to be set when a section covers more than its
+// own exact URL — e.g. "New Booking" should stay highlighted through the
+// whole /admin/quote → /admin/book hand-off, not just on /admin/quote
+// itself, since to staff that's one flow, not two destinations.
+const navGroups = [
+	{
+		label: "Booking",
+		items: [
+			{
+				label: "New Booking",
+				href: "/admin/quote",
+				activeMatch: (path: string) => path.startsWith("/admin/quote") || path.startsWith("/admin/book"),
+			},
+			{ label: "Manage Plans", href: "/admin/reschedule" },
+			{ label: "Minimum Commitments", href: "/admin/minimum-commitments" },
+		],
+	},
+	{
+		label: "CRM",
+		items: [
+			{ label: "Contacts", href: "/admin/crm/contacts" },
+			{ label: "Deals", href: "/admin/crm/deals" },
+		],
+	},
+];
+
+// Sections with just one destination (nothing to group yet) sit below the
+// grouped sections as flat links, same indentation as a group label rather
+// than a nested item — Dispatch today, easy to promote into its own group
+// later (e.g. once a separate Cleaners page exists).
+const flatLinks = [{ label: "Dispatch", href: "/admin/dispatch" }];
+
+function isItemActive(item: { href: string; activeMatch?: (path: string) => boolean }) {
+	return item.activeMatch ? item.activeMatch(currentPath) : currentPath === item.href;
+}
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>{title}</title>
+	</head>
+	<body>
+		<div class="admin-shell">
+			<input type="checkbox" id="admin-sidebar-toggle" class="admin-sidebar-toggle-input" />
+			<label for="admin-sidebar-toggle" class="admin-sidebar-open" aria-label="Open menu">
+				<span></span><span></span><span></span>
+			</label>
+			<label for="admin-sidebar-toggle" class="admin-sidebar-backdrop" aria-hidden="true"></label>
+
+			<aside class="admin-sidebar">
+				<div class="admin-sidebar__brand">
+					<img src="/images/logo-icon.png" alt="" class="admin-sidebar__logo" />
+					<div>
+						<p class="admin-sidebar__brand-name">Sky House Cleaning</p>
+						<p class="admin-sidebar__brand-sub">Staff Tools</p>
+					</div>
+					<label for="admin-sidebar-toggle" class="admin-sidebar-close" aria-label="Close menu">✕</label>
+				</div>
+
+				<nav class="admin-sidebar__nav" aria-label="Staff tools navigation">
+					{
+						navGroups.map((group) => (
+							<div class="admin-nav-group">
+								<p class="admin-nav-group__label">{group.label}</p>
+								<ul>
+									{group.items.map((item) => (
+										<li>
+											<a href={item.href} class:list={["admin-nav-link", { "is-active": isItemActive(item) }]}>
+												{item.label}
+											</a>
+										</li>
+									))}
+								</ul>
+							</div>
+						))
+					}
+
+					<div class="admin-nav-group admin-nav-group--flat">
+						{
+							flatLinks.map((item) => (
+								<a
+									href={item.href}
+									class:list={["admin-nav-link", "admin-nav-link--flat", { "is-active": isItemActive(item) }]}
+								>
+									{item.label}
+									{item.href === "/admin/dispatch" && (
+										<span class="admin-nav-badge" id="dispatch-unassigned-badge" hidden />
+									)}
+								</a>
+							))
+						}
+					</div>
+				</nav>
+			</aside>
+
+			<main class="admin-main">
+				<slot />
+			</main>
+		</div>
+
+		<script>
+			// Lets staff see "something needs attention on Dispatch" from any
+			// admin page, not just after opening it — a lightweight reuse of the
+			// same list-jobs read the Dispatch page itself uses for its Day view,
+			// scoped to just today. Fails silently (no badge shown) if Firebase/
+			// Calendar aren't configured or the request errors — this is a
+			// convenience indicator, not something worth surfacing an error for
+			// on every single admin page.
+			function todayLocalIsoPT() {
+				return new Intl.DateTimeFormat("en-CA", {
+					timeZone: "America/Los_Angeles",
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+				}).format(new Date());
+			}
+
+			async function loadDispatchBadge() {
+				const badge = document.getElementById("dispatch-unassigned-badge");
+				if (!badge) return;
+				try {
+					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${todayLocalIsoPT()}`);
+					if (!res.ok) return;
+					const data = await res.json();
+					const unassigned = (data.jobs || []).filter((j) => (j.assignedCleanerIds || []).length === 0).length;
+					badge.textContent = String(unassigned);
+					badge.hidden = unassigned === 0;
+				} catch {
+					// Non-fatal — sidebar just shows no badge.
+				}
+			}
+
+			loadDispatchBadge();
+			document.addEventListener("astro:page-load", loadDispatchBadge);
+		</script>
+
+		<style>
+			.admin-shell {
+				display: flex;
+				min-height: 100vh;
+				background: var(--color-cream);
+			}
+
+			.admin-sidebar-toggle-input {
+				display: none;
+			}
+
+			.admin-sidebar-open,
+			.admin-sidebar-close {
+				display: none;
+			}
+
+			.admin-sidebar-backdrop {
+				display: none;
+			}
+
+			.admin-sidebar {
+				width: 240px;
+				flex-shrink: 0;
+				background: var(--color-white);
+				border-right: 1px solid var(--color-border);
+				padding: 1.5rem 1rem 2rem;
+				position: sticky;
+				top: 0;
+				height: 100vh;
+				overflow-y: auto;
+			}
+
+			.admin-sidebar__brand {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				padding: 0 0.5rem 1.25rem;
+				margin-bottom: 1rem;
+				border-bottom: 1px solid var(--color-border);
+			}
+
+			.admin-sidebar__logo {
+				width: 32px;
+				height: 32px;
+				flex-shrink: 0;
+			}
+
+			.admin-sidebar__brand-name {
+				margin: 0;
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.9rem;
+				color: var(--color-ink);
+				line-height: 1.3;
+			}
+
+			.admin-sidebar__brand-sub {
+				margin: 0;
+				font-size: 0.75rem;
+				color: var(--color-slate-light);
+			}
+
+			.admin-sidebar__nav {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+
+			.admin-nav-group {
+				margin-bottom: 0.25rem;
+			}
+
+			.admin-nav-group--flat {
+				padding-top: 0.75rem;
+				margin-top: 0.25rem;
+				border-top: 1px solid var(--color-border);
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+			}
+
+			.admin-nav-group__label {
+				margin: 0 0 0.35rem;
+				padding: 0 0.75rem;
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.72rem;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: var(--color-slate-light);
+			}
+
+			.admin-nav-group ul {
+				list-style: none;
+				margin: 0;
+				padding: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+			}
+
+			.admin-nav-link {
+				display: block;
+				padding: 0.55rem 0.75rem;
+				border-radius: 8px;
+				text-decoration: none;
+				color: var(--color-slate);
+				font-size: 0.9rem;
+				font-weight: 500;
+				transition: background 0.12s ease, color 0.12s ease;
+			}
+
+			.admin-nav-link:hover {
+				background: var(--color-sky-light);
+				color: var(--color-sky-dark);
+			}
+
+			.admin-nav-link.is-active {
+				background: var(--color-sky);
+				color: var(--color-white);
+				font-weight: 600;
+			}
+
+			.admin-nav-link--flat {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.85rem;
+			}
+
+			.admin-nav-badge {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				min-width: 20px;
+				height: 20px;
+				padding: 0 0.4rem;
+				border-radius: 999px;
+				background: #b3261e;
+				color: var(--color-white);
+				font-size: 0.72rem;
+				font-weight: 700;
+			}
+
+			.admin-nav-link--flat.is-active .admin-nav-badge {
+				background: var(--color-white);
+				color: var(--color-sky-dark);
+			}
+
+			.admin-nav-badge[hidden] {
+				display: none;
+			}
+
+			.admin-main {
+				flex: 1;
+				/* Flex items default to a minimum width equal to their content's
+				   natural (unwrapped) width — same overflow bug fixed elsewhere
+				   in this codebase (see /admin/book.astro's and /schedule.astro's
+				   own min-width: 0 comments). A wide page (e.g. the date-picker
+				   strip on the booking flow) would otherwise force this column
+				   wider than the space actually left next to the sidebar. */
+				min-width: 0;
+			}
+
+			@media (max-width: 900px) {
+				.admin-shell {
+					display: block;
+				}
+
+				.admin-sidebar {
+					position: fixed;
+					top: 0;
+					left: 0;
+					z-index: 60;
+					transform: translateX(-100%);
+					box-shadow: var(--shadow-soft);
+					transition: transform 0.2s ease;
+				}
+
+				.admin-sidebar-toggle-input:checked ~ .admin-sidebar {
+					transform: translateX(0);
+				}
+
+				.admin-sidebar-close {
+					display: block;
+					margin-left: auto;
+					flex-shrink: 0;
+					background: none;
+					border: none;
+					font-size: 1.1rem;
+					color: var(--color-slate);
+					cursor: pointer;
+					padding: 0.25rem;
+				}
+
+				.admin-sidebar-open {
+					display: flex;
+					flex-direction: column;
+					justify-content: center;
+					gap: 4px;
+					position: fixed;
+					top: 1rem;
+					left: 1rem;
+					z-index: 50;
+					width: 38px;
+					height: 38px;
+					background: var(--color-white);
+					border: 1px solid var(--color-border);
+					border-radius: 10px;
+					box-shadow: var(--shadow-soft);
+					cursor: pointer;
+				}
+
+				.admin-sidebar-open span {
+					display: block;
+					height: 2px;
+					margin: 0 8px;
+					background: var(--color-ink);
+					border-radius: 2px;
+				}
+
+				.admin-sidebar-toggle-input:checked ~ .admin-sidebar-backdrop {
+					display: block;
+					position: fixed;
+					inset: 0;
+					z-index: 55;
+					background: rgba(28, 43, 69, 0.4);
+				}
+
+				.admin-main {
+					padding-top: 4rem;
+				}
+			}
+		</style>
+	</body>
+</html>

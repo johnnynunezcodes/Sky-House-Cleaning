@@ -36,6 +36,9 @@ export async function POST({ request }) {
 	if (typeof body.dispatchNotes === "string") {
 		fields.dispatchNotes = body.dispatchNotes.trim();
 	}
+	if (typeof body.cleanerConfirmed === "boolean") {
+		fields.cleanerConfirmed = body.cleanerConfirmed;
+	}
 
 	try {
 		await upsertJobAssignment(jobKey, { eventId, visitDate, ...fields });

@@ -70,7 +70,16 @@ export async function updateCleaner(cleanerId, fields) {
 
 // ---- Job assignments (the dispatch overlay) ------------------------------
 
-const DEFAULT_ASSIGNMENT = { assignedCleanerIds: [], status: "unassigned", dispatchNotes: "" };
+// `cleanerConfirmed` is a manual staff toggle for now — checked by hand
+// after calling/texting the cleaner to confirm they've got the job — since
+// cleaners don't have their own login yet (see AGENTS.md → "Dispatcher
+// (jobs)" and task list item "Dispatcher: per-cleaner login + mobile crew
+// view"). It's deliberately named after the END STATE ("the cleaner has
+// confirmed"), not the mechanism ("staff checked a box"), so that once
+// per-cleaner login exists, a cleaner tapping "Accept" in their own mobile
+// view can just set this same field directly — nothing about this field or
+// its callers needs to change, only who's allowed to flip it.
+const DEFAULT_ASSIGNMENT = { assignedCleanerIds: [], status: "unassigned", dispatchNotes: "", cleanerConfirmed: false };
 
 // Batch-fetches assignment docs for a set of job keys in one round trip
 // (Firestore's `getAll` rather than N individual reads), returning a Map

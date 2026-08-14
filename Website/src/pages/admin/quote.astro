@@ -7,7 +7,7 @@
 // public /schedule page.
 export const prerender = false;
 
-import "../../styles/global.css";
+import AdminLayout from "../../layouts/AdminLayout.astro";
 import PricingConfigurator from "../../components/PricingConfigurator.astro";
 
 // If a CRM deal's "Convert to Booking" button sent us here with a
@@ -21,46 +21,29 @@ const contactId = Astro.url.searchParams.get("contactId");
 const bookHref = contactId ? `/admin/book?contactId=${encodeURIComponent(contactId)}` : "/admin/book";
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="robots" content="noindex, nofollow" />
-		<title>Build a Quote | Sky House Cleaning Staff Tools</title>
-	</head>
-	<body>
-		<main class="section">
-			<div class="container admin-container">
-				<p class="admin-nav"><a href="/admin/reschedule">← Manage existing plans</a></p>
-				<h1>Book a Customer Who Called In</h1>
-				<p class="admin-hint">
-					Build their quote below the same way the website does, then continue to pick a date/time
-					and enter their details. At the end you'll get a secure payment link to text or email them.
-					Nothing is booked or charged until they pay it.
-				</p>
+<AdminLayout title="Build a Quote | Sky House Cleaning Staff Tools">
+	<div class="container admin-container">
+		<h1>Book a Customer Who Called In</h1>
+		<p class="admin-hint">
+			Build their quote below the same way the website does, then continue to pick a date/time
+			and enter their details. At the end you'll get a secure payment link to text or email them.
+			Nothing is booked or charged until they pay it.
+		</p>
 
-				<PricingConfigurator ctaHref={bookHref} ctaLabel="Continue to date & customer details" />
-			</div>
-		</main>
+		<PricingConfigurator ctaHref={bookHref} ctaLabel="Continue to date & customer details" />
+	</div>
 
-		<style>
-			.admin-container {
-				max-width: 900px;
-				margin: 0 auto;
-				padding-block: 3rem;
-			}
+	<style>
+		.admin-container {
+			max-width: 900px;
+			margin: 0 auto;
+			padding-block: 3rem;
+		}
 
-			.admin-nav {
-				margin-bottom: 1.5rem;
-				font-size: 0.9rem;
-			}
-
-			.admin-hint {
-				color: var(--color-slate);
-				margin-bottom: 2rem;
-				max-width: 640px;
-			}
-		</style>
-	</body>
-</html>
+		.admin-hint {
+			color: var(--color-slate);
+			margin-bottom: 2rem;
+			max-width: 640px;
+		}
+	</style>
+</AdminLayout>

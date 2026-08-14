@@ -1,30 +1,15 @@
 ---
-// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Not part
-// of the public marketing site, so it intentionally skips the shared
-// Layout/Navbar/Footer and just pulls in the site's base styles for a
-// consistent look.
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Uses
+// AdminLayout.astro (the staff-tools sidebar shell), not the public site's
+// Layout.astro — no Navbar/Footer/SEO tags, this should never be indexed
+// or shared.
 export const prerender = false;
 
-import "../../styles/global.css";
+import AdminLayout from "../../layouts/AdminLayout.astro";
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="robots" content="noindex, nofollow" />
-		<title>Reschedule Recurring Cleaning | Sky House Cleaning Staff Tools</title>
-	</head>
-	<body>
-		<main class="section">
+<AdminLayout title="Reschedule Recurring Cleaning | Sky House Cleaning Staff Tools">
 			<div class="container admin-container">
-				<p class="admin-nav">
-					<a href="/admin/quote">Book a customer who called in →</a>
-					· <a href="/admin/minimum-commitments">See all customers' minimum commitments →</a>
-					· <a href="/admin/crm/contacts">CRM: Contacts →</a>
-					· <a href="/admin/dispatch">Dispatch →</a>
-				</p>
 				<h1>Reschedule a Recurring Plan</h1>
 				<p class="admin-hint">
 					Use this to permanently move a customer's recurring cleaning to a new day/time. Every
@@ -44,7 +29,6 @@ import "../../styles/global.css";
 
 				<div id="results"></div>
 			</div>
-		</main>
 
 		<script>
 			const searchForm = document.getElementById("search-form");
@@ -404,11 +388,6 @@ import "../../styles/global.css";
 				padding-block: 3rem;
 			}
 
-			.admin-nav {
-				margin-bottom: 1.5rem;
-				font-size: 0.9rem;
-			}
-
 			.admin-hint {
 				color: var(--color-slate);
 				margin-bottom: 2rem;
@@ -498,5 +477,4 @@ import "../../styles/global.css";
 				color: #b3261e;
 			}
 		</style>
-	</body>
-</html>
+</AdminLayout>

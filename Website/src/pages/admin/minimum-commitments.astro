@@ -14,7 +14,7 @@
 // through the browser first.
 export const prerender = false;
 
-import "../../styles/global.css";
+import AdminLayout from "../../layouts/AdminLayout.astro";
 import Stripe from "stripe";
 import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
 
@@ -97,18 +97,8 @@ const totalCount = rows.length;
 const metCount = rows.filter((r) => r.met).length;
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="robots" content="noindex, nofollow" />
-		<title>Minimum Commitments | Sky House Cleaning Staff Tools</title>
-	</head>
-	<body>
-		<main class="section">
+<AdminLayout title="Minimum Commitments | Sky House Cleaning Staff Tools">
 			<div class="container admin-container admin-container--wide">
-				<p class="admin-nav"><a href="/admin/reschedule">← Manage a specific customer's plan</a></p>
 				<h1>Minimum Commitments</h1>
 				<p class="admin-hint">
 					Every active recurring plan and its progress toward that frequency's minimum-commitment
@@ -178,7 +168,6 @@ const metCount = rows.filter((r) => r.met).length;
 					)
 				}
 			</div>
-		</main>
 
 		<style>
 			.admin-container {
@@ -189,11 +178,6 @@ const metCount = rows.filter((r) => r.met).length;
 
 			.admin-container--wide {
 				max-width: 1080px;
-			}
-
-			.admin-nav {
-				margin-bottom: 1.5rem;
-				font-size: 0.9rem;
 			}
 
 			.admin-hint {
@@ -276,5 +260,4 @@ const metCount = rows.filter((r) => r.met).length;
 				color: var(--color-slate);
 			}
 		</style>
-	</body>
-</html>
+</AdminLayout>

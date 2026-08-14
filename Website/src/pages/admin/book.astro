@@ -24,23 +24,17 @@
 // link" for the full reasoning.
 export const prerender = false;
 
-import "../../styles/global.css";
+import AdminLayout from "../../layouts/AdminLayout.astro";
 import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 ---
 
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="robots" content="noindex, nofollow" />
-		<title>Book a Customer | Sky House Cleaning Staff Tools</title>
-	</head>
-	<body>
-		<main class="section" id="book-page" data-working-days={JSON.stringify(WORKING_DAYS)} data-window-days={BOOKING_WINDOW_DAYS}>
-			<div class="container admin-container">
-				<p class="admin-nav"><a href="/admin/reschedule">← Manage existing plans</a></p>
-
+<AdminLayout title="Book a Customer | Sky House Cleaning Staff Tools">
+			<div
+				class="container admin-container"
+				id="book-page"
+				data-working-days={JSON.stringify(WORKING_DAYS)}
+				data-window-days={BOOKING_WINDOW_DAYS}
+			>
 				<div class="book-step" id="book-no-quote" hidden>
 					<h3>Let's start with a quote</h3>
 					<p>We couldn't find a saved quote for this session. Head back and build the customer's quote first.</p>
@@ -156,18 +150,12 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 					</aside>
 				</div>
 			</div>
-		</main>
 
 		<style>
 			.admin-container {
 				max-width: 1100px;
 				margin: 0 auto;
 				padding-block: 3rem;
-			}
-
-			.admin-nav {
-				margin-bottom: 1.5rem;
-				font-size: 0.9rem;
 			}
 
 			.book-layout {
@@ -1099,5 +1087,4 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 			initAdminBookPage();
 			document.addEventListener("astro:page-load", initAdminBookPage);
 		</script>
-	</body>
-</html>
+</AdminLayout>
