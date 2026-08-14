@@ -1,0 +1,470 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. CRM
+// Contacts: the client roster, backed by Firestore (src/lib/crm.js), not
+// Stripe/Calendar like the rest of /admin — a contact can exist here before
+// they've ever booked or paid anything (a lead). See AGENTS.md → "CRM
+// (Firebase/Firestore)" for the data model and setup status.
+export const prerender = false;
+
+import "../../../styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>CRM: Contacts | Sky House Cleaning Staff Tools</title>
+	</head>
+	<body>
+		<main class="section">
+			<div class="container admin-container">
+				<p class="admin-nav">
+					<a href="/admin/reschedule">← Manage a specific customer's plan</a>
+					· <a href="/admin/minimum-commitments">Minimum commitments →</a>
+				</p>
+				<h1>CRM: Contacts</h1>
+				<p class="admin-hint">
+					Every client and lead, in one place — separate from Stripe/Calendar, so a lead can exist
+					here before they've ever booked or paid anything. When a lead is ready to book for real,
+					use the normal booking flow (or <a href="/admin/quote">Book a customer who called in</a>)
+					and come back here to flip their stage to "Active client."
+				</p>
+
+				<p id="load-status" class="admin-status">Loading…</p>
+
+				<details class="card admin-add-card">
+					<summary class="admin-add-summary">+ Add a contact</summary>
+					<form id="add-form" class="admin-form">
+						<div class="admin-form__grid">
+							<div class="admin-form__row">
+								<label for="add-name">Name *</label>
+								<input type="text" id="add-name" name="name" required />
+							</div>
+							<div class="admin-form__row">
+								<label for="add-lifecycleStage">Stage</label>
+								<select id="add-lifecycleStage" name="lifecycleStage">
+									<option value="lead" selected>Lead</option>
+									<option value="active_client">Active client</option>
+									<option value="past_client">Past client</option>
+								</select>
+							</div>
+							<div class="admin-form__row">
+								<label for="add-phone">Phone</label>
+								<input type="tel" id="add-phone" name="phone" />
+							</div>
+							<div class="admin-form__row">
+								<label for="add-email">Email</label>
+								<input type="email" id="add-email" name="email" />
+							</div>
+							<div class="admin-form__row">
+								<label for="add-leadSource">Lead source</label>
+								<input type="text" id="add-leadSource" name="leadSource" placeholder="Referral, Google, Facebook…" />
+							</div>
+							<div class="admin-form__row admin-form__row--full">
+								<label for="add-address">Address</label>
+								<input type="text" id="add-address" name="address" />
+							</div>
+							<div class="admin-form__row admin-form__row--full">
+								<label for="add-accessNotes">Access notes</label>
+								<input type="text" id="add-accessNotes" name="accessNotes" placeholder="Key under the mat, gate code…" />
+							</div>
+							<div class="admin-form__row admin-form__row--full">
+								<label for="add-petNotes">Pet notes</label>
+								<input type="text" id="add-petNotes" name="petNotes" />
+							</div>
+						</div>
+						<button type="submit" class="btn btn--primary">Add Contact</button>
+						<p class="admin-result-message" hidden></p>
+					</form>
+				</details>
+
+				<div class="admin-filters" role="group" aria-label="Filter by stage">
+					<button type="button" class="admin-filter is-active" data-stage="">All</button>
+					<button type="button" class="admin-filter" data-stage="lead">Leads</button>
+					<button type="button" class="admin-filter" data-stage="active_client">Active clients</button>
+					<button type="button" class="admin-filter" data-stage="past_client">Past clients</button>
+				</div>
+
+				<div id="results"></div>
+			</div>
+		</main>
+
+		<script>
+			const loadStatus = document.getElementById("load-status");
+			const resultsEl = document.getElementById("results");
+			const addForm = document.getElementById("add-form");
+			const filterButtons = document.querySelectorAll(".admin-filter");
+
+			const STAGE_LABELS = { lead: "Lead", active_client: "Active client", past_client: "Past client" };
+			let currentStage = "";
+
+			function escapeHtml(str) {
+				const div = document.createElement("div");
+				div.textContent = str ?? "";
+				return div.innerHTML;
+			}
+
+			async function loadContacts() {
+				loadStatus.hidden = false;
+				loadStatus.textContent = "Loading…";
+				resultsEl.innerHTML = "";
+				try {
+					const qs = currentStage ? `?lifecycleStage=${encodeURIComponent(currentStage)}` : "";
+					const res = await fetch(`/api/admin/crm/list-clients${qs}`);
+					const data = await res.json();
+					if (!res.ok) {
+						loadStatus.textContent = data.error || "Couldn't load contacts.";
+						loadStatus.classList.add("admin-status--error");
+						return;
+					}
+					loadStatus.hidden = true;
+					renderContacts(data.clients || []);
+				} catch {
+					loadStatus.textContent = "Network error, please try again.";
+					loadStatus.classList.add("admin-status--error");
+				}
+			}
+
+			function renderContacts(clients) {
+				if (!clients.length) {
+					resultsEl.innerHTML = `<p class="admin-status">No contacts yet${currentStage ? " in this stage" : ""}.</p>`;
+					return;
+				}
+
+				resultsEl.innerHTML = "";
+				for (const client of clients) {
+					const card = document.createElement("div");
+					card.className = "card admin-card";
+					card.innerHTML = `
+						<div class="admin-card__header">
+							<h3>${escapeHtml(client.name) || "(no name)"}</h3>
+							<span class="admin-badge admin-badge--${client.lifecycleStage}">${STAGE_LABELS[client.lifecycleStage] || client.lifecycleStage}</span>
+						</div>
+						<p class="admin-card__meta">
+							${[client.phone, client.email].filter(Boolean).map(escapeHtml).join(" · ") || "No contact info on file"}
+						</p>
+						${client.address ? `<p class="admin-card__meta">${escapeHtml(client.address)}</p>` : ""}
+						${client.leadSource ? `<p class="admin-card__meta">Source: ${escapeHtml(client.leadSource)}</p>` : ""}
+						<button type="button" class="btn btn--outline admin-edit-toggle">Edit</button>
+						<form class="admin-form admin-edit-form" hidden>
+							<div class="admin-form__grid">
+								<div class="admin-form__row">
+									<label>Name</label>
+									<input type="text" name="name" value="${escapeHtml(client.name)}" required />
+								</div>
+								<div class="admin-form__row">
+									<label>Stage</label>
+									<select name="lifecycleStage">
+										<option value="lead" ${client.lifecycleStage === "lead" ? "selected" : ""}>Lead</option>
+										<option value="active_client" ${client.lifecycleStage === "active_client" ? "selected" : ""}>Active client</option>
+										<option value="past_client" ${client.lifecycleStage === "past_client" ? "selected" : ""}>Past client</option>
+									</select>
+								</div>
+								<div class="admin-form__row">
+									<label>Phone</label>
+									<input type="tel" name="phone" value="${escapeHtml(client.phone)}" />
+								</div>
+								<div class="admin-form__row">
+									<label>Email</label>
+									<input type="email" name="email" value="${escapeHtml(client.email)}" />
+								</div>
+								<div class="admin-form__row">
+									<label>Lead source</label>
+									<input type="text" name="leadSource" value="${escapeHtml(client.leadSource)}" />
+								</div>
+								<div class="admin-form__row admin-form__row--full">
+									<label>Address</label>
+									<input type="text" name="address" value="${escapeHtml(client.address)}" />
+								</div>
+								<div class="admin-form__row admin-form__row--full">
+									<label>Access notes</label>
+									<input type="text" name="accessNotes" value="${escapeHtml(client.accessNotes)}" />
+								</div>
+								<div class="admin-form__row admin-form__row--full">
+									<label>Pet notes</label>
+									<input type="text" name="petNotes" value="${escapeHtml(client.petNotes)}" />
+								</div>
+								<div class="admin-form__row admin-form__row--full">
+									<label>Stripe customer ID</label>
+									<input type="text" name="stripeCustomerId" value="${escapeHtml(client.stripeCustomerId)}" placeholder="cus_…" />
+								</div>
+							</div>
+							<button type="submit" class="btn btn--primary">Save</button>
+							<button type="button" class="btn btn--outline admin-edit-cancel">Cancel</button>
+							<p class="admin-result-message" hidden></p>
+						</form>
+					`;
+
+					const editToggle = card.querySelector(".admin-edit-toggle");
+					const editForm = card.querySelector(".admin-edit-form");
+					const editCancel = card.querySelector(".admin-edit-cancel");
+
+					editToggle.addEventListener("click", () => {
+						editForm.hidden = !editForm.hidden;
+						editToggle.hidden = !editForm.hidden;
+					});
+					editCancel.addEventListener("click", () => {
+						editForm.hidden = true;
+						editToggle.hidden = false;
+					});
+
+					editForm.addEventListener("submit", async (e) => {
+						e.preventDefault();
+						const messageEl = editForm.querySelector(".admin-result-message");
+						const submitBtn = editForm.querySelector("button[type=submit]");
+						const formData = new FormData(editForm);
+						const payload = { id: client.id };
+						for (const [key, value] of formData.entries()) payload[key] = value;
+
+						submitBtn.disabled = true;
+						messageEl.hidden = true;
+						try {
+							const res = await fetch("/api/admin/crm/update-client", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify(payload),
+							});
+							const data = await res.json();
+							if (!res.ok) {
+								messageEl.hidden = false;
+								messageEl.textContent = data.error || "Something went wrong.";
+								messageEl.classList.add("admin-result-message--error");
+								return;
+							}
+							await loadContacts();
+						} catch {
+							messageEl.hidden = false;
+							messageEl.textContent = "Network error, please try again.";
+							messageEl.classList.add("admin-result-message--error");
+						} finally {
+							submitBtn.disabled = false;
+						}
+					});
+
+					resultsEl.appendChild(card);
+				}
+			}
+
+			addForm.addEventListener("submit", async (e) => {
+				e.preventDefault();
+				const messageEl = addForm.querySelector(".admin-result-message");
+				const submitBtn = addForm.querySelector("button[type=submit]");
+				const formData = new FormData(addForm);
+				const payload = Object.fromEntries(formData.entries());
+
+				submitBtn.disabled = true;
+				messageEl.hidden = true;
+				try {
+					const res = await fetch("/api/admin/crm/create-client", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(payload),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						messageEl.hidden = false;
+						messageEl.textContent = data.error || "Something went wrong.";
+						messageEl.classList.add("admin-result-message--error");
+						return;
+					}
+					addForm.reset();
+					messageEl.hidden = false;
+					messageEl.classList.remove("admin-result-message--error");
+					messageEl.textContent = "Contact added.";
+					await loadContacts();
+				} catch {
+					messageEl.hidden = false;
+					messageEl.textContent = "Network error, please try again.";
+					messageEl.classList.add("admin-result-message--error");
+				} finally {
+					submitBtn.disabled = false;
+				}
+			});
+
+			filterButtons.forEach((btn) => {
+				btn.addEventListener("click", () => {
+					filterButtons.forEach((b) => b.classList.remove("is-active"));
+					btn.classList.add("is-active");
+					currentStage = btn.dataset.stage || "";
+					loadContacts();
+				});
+			});
+
+			loadContacts();
+		</script>
+
+		<style>
+			.admin-container {
+				max-width: 780px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-nav {
+				margin-bottom: 1.5rem;
+				font-size: 0.9rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-status {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status--error {
+				color: #b3261e;
+			}
+
+			.admin-add-card {
+				margin-bottom: 1.5rem;
+				padding: 1.25rem 1.5rem;
+			}
+
+			.admin-add-summary {
+				cursor: pointer;
+				font-weight: 600;
+				color: var(--color-ink);
+			}
+
+			.admin-add-card form {
+				margin-top: 1.25rem;
+			}
+
+			.admin-form__grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 1rem 1.5rem;
+				margin-bottom: 1.25rem;
+			}
+
+			.admin-form__row {
+				display: flex;
+				flex-direction: column;
+				gap: 0.35rem;
+			}
+
+			.admin-form__row--full {
+				grid-column: 1 / -1;
+			}
+
+			.admin-form__row label {
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-form__row input,
+			.admin-form__row select {
+				padding: 0.6rem 0.75rem;
+				border: 1px solid var(--color-border);
+				border-radius: 8px;
+				font-size: 0.95rem;
+				font-family: inherit;
+			}
+
+			@media (max-width: 640px) {
+				.admin-form__grid {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.admin-filters {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-filter {
+				padding: 0.4rem 0.9rem;
+				border-radius: 999px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				font-size: 0.85rem;
+				font-weight: 600;
+				color: var(--color-slate);
+				cursor: pointer;
+			}
+
+			.admin-filter.is-active {
+				background: var(--color-ink);
+				border-color: var(--color-ink);
+				color: var(--color-white);
+			}
+
+			.admin-card {
+				margin-bottom: 1.25rem;
+				padding: 1.5rem;
+			}
+
+			.admin-card__header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+			}
+
+			.admin-card__header h3 {
+				margin: 0;
+			}
+
+			.admin-card__meta {
+				color: var(--color-slate);
+				margin: 0.35rem 0;
+			}
+
+			.admin-badge {
+				display: inline-block;
+				padding: 0.2rem 0.6rem;
+				border-radius: 999px;
+				font-size: 0.8rem;
+				font-weight: 600;
+				white-space: nowrap;
+			}
+
+			.admin-badge--lead {
+				background: var(--color-sky-light);
+				color: var(--color-ink);
+			}
+
+			.admin-badge--active_client {
+				background: #e3f3e6;
+				color: #1e7a34;
+			}
+
+			.admin-badge--past_client {
+				background: #f1efe9;
+				color: var(--color-slate);
+			}
+
+			.admin-edit-toggle {
+				margin-top: 1rem;
+			}
+
+			.admin-edit-form {
+				margin-top: 1.25rem;
+				padding-top: 1.25rem;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.admin-edit-form .btn {
+				margin-right: 0.75rem;
+			}
+
+			.admin-result-message {
+				margin-top: 0.75rem;
+				font-weight: 600;
+				color: #1e7a34;
+			}
+
+			.admin-result-message--error {
+				color: #b3261e;
+			}
+		</style>
+	</body>
+</html>

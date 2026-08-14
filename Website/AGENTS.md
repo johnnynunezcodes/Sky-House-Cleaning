@@ -168,10 +168,13 @@ Internal CRM + dispatcher, built on Firebase, living under `/admin` alongside th
 - Deferred to the dispatcher phase: a `jobs` collection, an `activities` timeline collection, and a `companies` collection (for commercial/office accounts). Not built yet — don't assume they exist.
 
 **One-time setup, done 2026-08-14:**
-   - Firebase project `sky-house-cleaning` created under the `skyhousecleaning.com` Google Workspace organization, Spark (free) plan.
+   - Firebase project `sky-house-cleaning` created under the `skyhousecleaning.com` Google Workspace organization, Spark (free) plan. Firestore Database created (Standard edition, production mode, us-west1).
    - Web app registered (no Firebase Hosting — staying on Vercel), config values are in `.env` as the `PUBLIC_FIREBASE_*` vars (safe to expose, not secret).
-   - **Still pending:** Firestore Database creation (production mode, us-west1/us-west4) and enabling the Email/Password sign-in provider under Authentication (needed for the dispatcher's per-cleaner logins, not the CRM). Also still pending: generating the service-account private key (Project settings → Service accounts → Generate new private key) and filling in `FIREBASE_SERVICE_ACCOUNT_CLIENT_EMAIL` / `FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY` in `.env` — `firebaseAdmin.js` throws a clear error on any Firestore call until those are set.
-   - `firebase-admin` is in `package.json` but hasn't been installed yet (this environment's npm registry access is blocked) — needs a real `npm install` wherever this actually gets built/deployed.
+   - Service account key generated and both `FIREBASE_SERVICE_ACCOUNT_CLIENT_EMAIL` / `FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY` are set in `.env`. Note for future setup on a fresh Google Cloud org: key creation was initially blocked by the org-wide "Disable service account key creation" policy (`iam.disableServiceAccountKeyCreation`) — fixed via an org-policy override scoped to just this project (Google Cloud Console → IAM & Admin → Organization Policies → find that constraint → Override parent's policy → set not enforced for `sky-house-cleaning`). Policy changes can take several minutes to propagate.
+   - **Still pending:** enabling the Email/Password sign-in provider under Authentication — needed for the dispatcher's per-cleaner logins, not the CRM, so left for that phase.
+   - `firebase-admin` is in `package.json` but hasn't been installed yet (this environment's npm registry access is blocked) — needs a real `npm install` wherever this actually gets built/deployed, and a local `.astro` build/check couldn't be run here either (missing native `rolldown` binding in this sandbox) — worth a real `astro check` / `astro build` the first time this runs somewhere with full tooling, before trusting it blindly in production.
+
+**Contacts screens (v1, done):** `/admin/crm/contacts` — list with stage filter (All/Leads/Active/Past), an "Add a contact" form, and per-contact inline edit (click "Edit" on a card). Backed by `/api/admin/crm/list-clients.js`, `create-client.js`, `update-client.js`. Linked from `/admin/reschedule`'s nav line. Deals pipeline screen is next, not built yet.
 
 ## Summary
 
