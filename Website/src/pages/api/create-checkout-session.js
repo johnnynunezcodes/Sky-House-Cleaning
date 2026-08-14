@@ -205,7 +205,12 @@ export async function POST({ request }) {
 			}),
 		});
 
-		return new Response(JSON.stringify({ url: session.url }), {
+		// `sessionId` alongside `url` is additive — every existing caller only
+		// ever reads `data.url`, so this can't break them. It exists so
+		// /api/confirm/finalize-pending-booking.js (which calls this handler
+		// directly rather than duplicating this logic) can record which Stripe
+		// session a pendingBooking actually turned into.
+		return new Response(JSON.stringify({ url: session.url, sessionId: session.id }), {
 			status: 200,
 			headers: { "Content-Type": "application/json" },
 		});

@@ -2,20 +2,26 @@
 // Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Step two
 // of the phone-booking flow (step one is /admin/quote.astro, which builds
 // the `?s=` quote payload this page expects). This is a close adaptation of
-// the public /schedule.astro: same date/time picker and contact form, reusing
-// the same /api/availability and /api/create-checkout-session endpoints
-// unchanged — staff and online customers go through identical slot
-// validation and server-side pricing.
+// the public /schedule.astro: same date/time picker and contact form,
+// reusing the same /api/availability endpoint unchanged. Slot-picking is
+// identical to the public flow; what happens after picking a slot is not —
+// see below.
 //
-// The one real difference: /schedule.astro redirects the customer's own browser
-// straight to Stripe to pay. Here, staff are booking on someone else's
-// behalf over the phone, so there's no card to collect on this screen —
-// instead, once the Checkout Session is created, its payment link is shown
-// on screen to copy and text/email to the customer. Nothing is booked or
-// charged (no calendar event, no card charge) until the customer actually
-// completes that payment — same invariant as every other booking path,
-// enforced the same way, by stripe-webhook.js only acting on a completed
-// payment.
+// The real difference: /schedule.astro redirects the customer's own browser
+// straight to Stripe to pay, with the customer themselves checking the
+// policy-agreement box right before that. Here, staff are filling this out
+// on someone else's behalf over the phone — a checkbox on this screen would
+// only prove the STAFF member clicked it, not that the customer actually
+// agreed to anything. So instead of creating a Stripe Checkout Session
+// directly, this creates a "pending booking" (src/lib/pendingBookings.js)
+// and shows a link to the public /confirm/[id] page — the customer opens
+// that themselves, reviews the details, and checks the policy box, and only
+// then does /api/confirm/finalize-pending-booking.js actually create the
+// Stripe session. Nothing is booked or charged (no calendar event, no card
+// charge) until the customer completes THAT payment — same invariant as
+// every other booking path, enforced the same way, by stripe-webhook.js only
+// acting on a completed payment. See AGENTS.md → "Phone booking confirmation
+// link" for the full reasoning.
 export const prerender = false;
 
 import "../../styles/global.css";
@@ -48,6 +54,21 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 							<p class="book-step__hint">Choose a day, then an open time slot.</p>
 
 							<div class="book-dates" id="book-dates"></div>
+							<button type="button" class="book-dates-toggle" id="book-calendar-toggle" aria-expanded="false">
+								<span id="book-calendar-toggle-label">Show full calendar</span>
+								<span class="book-dates-toggle-icon" aria-hidden="true">▾</span>
+							</button>
+							<div class="book-calendar" id="book-calendar" hidden>
+								<div class="book-calendar__header">
+									<button type="button" class="book-calendar__nav" id="book-calendar-prev" aria-label="Previous month">‹</button>
+									<p class="book-calendar__month" id="book-calendar-month"></p>
+									<button type="button" class="book-calendar__nav" id="book-calendar-next" aria-label="Next month">›</button>
+								</div>
+								<div class="book-calendar__weekdays">
+									<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+								</div>
+								<div class="book-calendar__grid" id="book-calendar-grid"></div>
+							</div>
 							<div class="book-times" id="book-times">
 								<p class="book-times__placeholder" id="book-times-placeholder">Pick a date above to see open times.</p>
 							</div>
@@ -96,7 +117,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 								<p class="book-form__error" id="book-form-error" hidden></p>
 
 								<button type="submit" class="btn btn--primary book-form__submit" id="book-submit">
-									Create Booking &amp; Get Payment Link
+									Create Booking &amp; Get Confirmation Link
 								</button>
 							</form>
 						</div>
@@ -106,16 +127,17 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 							<p class="book-step__hint" id="book-link-recap"></p>
 
 							<div class="admin-link-row">
-								<input type="text" id="book-payment-link" class="admin-link-input" readonly />
+								<input type="text" id="book-confirm-link" class="admin-link-input" readonly />
 								<button type="button" class="btn btn--outline" id="book-copy-link">Copy Link</button>
 								<button type="button" class="btn btn--outline" id="book-copy-message">Copy Message</button>
 							</div>
 							<p class="admin-hint--tight">
-								Text or email this link to the customer to complete payment. Nothing is booked or
-								charged until they pay it, no calendar event exists yet. "Copy Message" copies a
-								ready-to-send note with the link already in it, so you're not typing one out by hand.
+								Text or email this link to the customer to review their booking and confirm it. Nothing
+								is booked or charged until they check the box and pay on that page, no calendar event
+								exists yet. "Copy Message" copies a ready-to-send note with the link already in it, so
+								you're not typing one out by hand.
 							</p>
-							<a href="#" target="_blank" rel="noopener" id="book-open-link" class="btn btn--outline">Open Payment Page</a>
+							<a href="#" target="_blank" rel="noopener" id="book-open-link" class="btn btn--outline">Open Confirmation Page</a>
 
 							<p class="admin-hint--tight admin-link-panel__next">
 								<a href="/admin/quote">Book another customer →</a>
@@ -159,6 +181,17 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 				display: flex;
 				flex-direction: column;
 				gap: 2rem;
+				/* Grid items default to a minimum width equal to their content's
+				   natural (unwrapped) width — and the date-picker strip below is
+				   ~20 buttons wide with no wrap, so without this, .book-main
+				   refuses to shrink to its 1.5fr share and instead forces the
+				   whole two-column grid (this + the Order Summary sidebar) wider
+				   than the viewport, causing horizontal scroll — same bug fixed on
+				   the public /schedule page (see its CSS comment), just never
+				   carried over to this admin twin. This lets the grid track
+				   shrink normally; .book-dates' own overflow-x: auto then handles
+				   the long date strip by scrolling inside its own card. */
+				min-width: 0;
 			}
 
 			.book-step {
@@ -196,10 +229,194 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 
 			.book-dates {
 				display: flex;
-				gap: 0.6rem;
+				align-items: flex-start;
+				gap: 1.5rem;
 				overflow-x: auto;
 				padding-bottom: 0.5rem;
 				margin-bottom: 1.25rem;
+			}
+
+			/* :global() — these groups (one per month) are JS-created. */
+			.book-dates :global(.book-date-group) {
+				flex: 0 0 auto;
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+
+			.book-dates :global(.book-date-group__days) {
+				display: flex;
+				gap: 0.6rem;
+			}
+
+			.book-dates :global(.book-date-month-header) {
+				display: flex;
+				align-items: center;
+				gap: 0.3rem;
+			}
+
+			.book-dates :global(.book-date-month) {
+				margin: 0;
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.8rem;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+				color: var(--color-sky-dark);
+				white-space: nowrap;
+			}
+
+			/* Scrolls the strip to the adjacent month's group — only present
+			   when there is an adjacent month (see the JS below). */
+			.book-dates :global(.book-date-month-nav) {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 18px;
+				height: 18px;
+				border: none;
+				background: none;
+				padding: 0;
+				font-size: 0.85rem;
+				line-height: 1;
+				color: var(--color-sky-dark);
+				cursor: pointer;
+			}
+
+			.book-dates :global(.book-date-month-nav:hover) {
+				color: var(--color-sky);
+			}
+
+			.book-dates-toggle {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.35rem;
+				border: none;
+				background: none;
+				padding: 0;
+				margin-bottom: 1.25rem;
+				font-family: var(--font-body);
+				font-size: 0.85rem;
+				font-weight: 600;
+				color: var(--color-sky-dark);
+				cursor: pointer;
+			}
+
+			.book-dates-toggle:hover {
+				text-decoration: underline;
+			}
+
+			.book-dates-toggle-icon {
+				font-size: 0.7rem;
+				transition: transform 0.15s ease;
+			}
+
+			.book-dates-toggle[aria-expanded="true"] .book-dates-toggle-icon {
+				transform: rotate(180deg);
+			}
+
+			.book-calendar {
+				border: 1px solid var(--color-border);
+				border-radius: var(--radius);
+				padding: 1.25rem;
+				margin-bottom: 1.25rem;
+			}
+
+			.book-calendar[hidden] {
+				display: none;
+			}
+
+			.book-calendar__header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 0.9rem;
+			}
+
+			.book-calendar__month {
+				margin: 0;
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 1rem;
+				color: var(--color-ink);
+			}
+
+			.book-calendar__nav {
+				width: 32px;
+				height: 32px;
+				border-radius: 50%;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				color: var(--color-ink);
+				font-size: 1.1rem;
+				line-height: 1;
+				cursor: pointer;
+			}
+
+			.book-calendar__nav:hover {
+				border-color: var(--color-sky);
+			}
+
+			.book-calendar__nav:disabled {
+				opacity: 0.35;
+				cursor: not-allowed;
+			}
+
+			.book-calendar__weekdays {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				margin-bottom: 0.4rem;
+			}
+
+			.book-calendar__weekdays span {
+				text-align: center;
+				font-size: 0.75rem;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+				color: var(--color-slate-light);
+			}
+
+			.book-calendar__grid {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				gap: 0.35rem;
+			}
+
+			/* :global() — grid cells (and padding placeholders) are JS-created. */
+			:global(.book-calendar__pad) {
+				display: block;
+			}
+
+			:global(.book-calendar__day) {
+				aspect-ratio: 1;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				border-radius: 8px;
+				border: 1px solid var(--color-border);
+				background: var(--color-cream);
+				color: var(--color-ink);
+				font-family: var(--font-body);
+				font-size: 0.9rem;
+				cursor: pointer;
+			}
+
+			:global(.book-calendar__day:hover:not(:disabled)) {
+				border-color: var(--color-sky);
+			}
+
+			:global(.book-calendar__day.is-selected) {
+				background: var(--color-sky);
+				border-color: var(--color-sky);
+				color: var(--color-white);
+			}
+
+			:global(.book-calendar__day:disabled) {
+				opacity: 0.3;
+				cursor: not-allowed;
+				background: transparent;
+				border-color: transparent;
 			}
 
 			.book-dates :global(.book-date-btn) {
@@ -379,6 +596,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 			.book-summary {
 				position: sticky;
 				top: 1.5rem;
+				min-width: 0;
 			}
 
 			.book-summary__label {
@@ -465,13 +683,20 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 				const summaryLinesEl = root.querySelector("#book-summary-lines");
 				const summaryTotalEl = root.querySelector("#book-summary-total");
 				const datesEl = root.querySelector("#book-dates");
+				const calendarToggleBtn = root.querySelector("#book-calendar-toggle");
+				const calendarToggleLabelEl = root.querySelector("#book-calendar-toggle-label");
+				const calendarEl = root.querySelector("#book-calendar");
+				const calendarMonthEl = root.querySelector("#book-calendar-month");
+				const calendarGridEl = root.querySelector("#book-calendar-grid");
+				const calendarPrevBtn = root.querySelector("#book-calendar-prev");
+				const calendarNextBtn = root.querySelector("#book-calendar-next");
 				const timesEl = root.querySelector("#book-times");
 				const formEl = root.querySelector("#book-form");
 				const submitBtn = root.querySelector("#book-submit");
 				const errorEl = root.querySelector("#book-form-error");
 				const linkPanel = root.querySelector("#book-link-panel");
 				const linkRecap = root.querySelector("#book-link-recap");
-				const linkInput = root.querySelector("#book-payment-link");
+				const linkInput = root.querySelector("#book-confirm-link");
 				const copyBtn = root.querySelector("#book-copy-link");
 				const copyMessageBtn = root.querySelector("#book-copy-message");
 				const openLink = root.querySelector("#book-open-link");
@@ -520,6 +745,29 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 					return;
 				}
 
+				// If a CRM deal's "Convert to Booking" button sent us here with a
+				// contactId (carried through /admin/quote's ctaHref), prefill the
+				// known contact fields so staff aren't retyping them — everything
+				// visit-specific (address/access/pets/notes) still gets entered
+				// fresh, since that can vary and isn't part of the CRM contact.
+				const contactId = new URLSearchParams(window.location.search).get("contactId");
+				if (contactId) {
+					fetch(`/api/admin/crm/get-client?id=${encodeURIComponent(contactId)}`)
+						.then((res) => res.json())
+						.then((data) => {
+							const client = data.client;
+							if (!client) return;
+							if (client.name) formEl.querySelector("#book-name").value = client.name;
+							if (client.email) formEl.querySelector("#book-email").value = client.email;
+							if (client.phone) formEl.querySelector("#book-phone").value = client.phone;
+							if (client.address) formEl.querySelector("#book-address").value = client.address;
+						})
+						.catch(() => {
+							// Non-fatal — the form just stays blank, same as any normal
+							// phone-in booking staff would fill out by hand.
+						});
+				}
+
 				// Display-only order summary — the actual charge is always
 				// re-derived server-side from `selections`, not from these lines.
 				(selections.lines || []).forEach((line) => {
@@ -536,10 +784,44 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 				const today = new Date();
 				today.setHours(0, 0, 0, 0);
 
+				// Last bookable day — used both to cap the quick-pick strip and to
+				// know when to disable "next month" in the full calendar below.
+				const maxDate = new Date(today);
+				maxDate.setDate(maxDate.getDate() + windowDays - 1);
+
+				// Groups the strip by month — each month gets its own label ("August",
+				// "September", etc., plain text, no year since the whole window is at
+				// most a few weeks out) sitting above its own row of date buttons, so
+				// it's never ambiguous which month a given day falls in, even when
+				// the window happens to roll from one month into the next.
+				let lastMonthKey = null;
+				let daysRowEl = null;
+				const monthGroups = []; // { el, headerEl } — one per month, in order
+
 				for (let i = 0; i < windowDays; i++) {
 					const date = new Date(today);
 					date.setDate(date.getDate() + i);
 					if (!workingDays.includes(date.getDay())) continue;
+
+					const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+					if (monthKey !== lastMonthKey) {
+						lastMonthKey = monthKey;
+						const groupEl = document.createElement("div");
+						groupEl.className = "book-date-group";
+
+						const headerEl = document.createElement("div");
+						headerEl.className = "book-date-month-header";
+						const monthLabel = document.createElement("p");
+						monthLabel.className = "book-date-month";
+						monthLabel.textContent = date.toLocaleDateString("en-US", { month: "long" });
+						headerEl.append(monthLabel);
+
+						daysRowEl = document.createElement("div");
+						daysRowEl.className = "book-date-group__days";
+						groupEl.append(headerEl, daysRowEl);
+						datesEl.append(groupEl);
+						monthGroups.push({ el: groupEl, headerEl });
+					}
 
 					const btn = document.createElement("button");
 					btn.type = "button";
@@ -549,16 +831,133 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 						<span class="book-date-btn__day">${date.toLocaleDateString("en-US", { weekday: "short" })}</span>
 						<span class="book-date-btn__num">${date.getDate()}</span>
 					`;
-					btn.addEventListener("click", () => selectDate(btn.dataset.date, btn));
-					datesEl.append(btn);
+					btn.addEventListener("click", () => selectDate(btn.dataset.date));
+					daysRowEl.append(btn);
 				}
 
-				async function selectDate(dateStr, btnEl) {
+				// Small ‹ › arrows next to each month label that jump the strip to the
+				// adjacent month's group (scrolled so that month's first date lands at
+				// the left edge) — only added where there actually is a previous/next
+				// month, so the first month only gets a right arrow, and the last
+				// month only gets a left arrow.
+				monthGroups.forEach((group, idx) => {
+					if (idx > 0) {
+						const prevBtn = document.createElement("button");
+						prevBtn.type = "button";
+						prevBtn.className = "book-date-month-nav";
+						prevBtn.setAttribute("aria-label", "Scroll to previous month");
+						prevBtn.textContent = "‹";
+						prevBtn.addEventListener("click", () => {
+							monthGroups[idx - 1].el.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+						});
+						group.headerEl.prepend(prevBtn);
+					}
+					if (idx < monthGroups.length - 1) {
+						const nextBtn = document.createElement("button");
+						nextBtn.type = "button";
+						nextBtn.className = "book-date-month-nav";
+						nextBtn.setAttribute("aria-label", "Scroll to next month");
+						nextBtn.textContent = "›";
+						nextBtn.addEventListener("click", () => {
+							monthGroups[idx + 1].el.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+						});
+						group.headerEl.append(nextBtn);
+					}
+				});
+
+				// Selecting a date can happen from either the quick-pick strip or the
+				// full calendar below — keep both in sync by date string rather than
+				// tracking which element was clicked.
+				function highlightSelectedDate(dateStr) {
+					root.querySelectorAll(".book-date-btn, .book-calendar__day").forEach((el) => {
+						el.classList.toggle("is-selected", el.dataset.date === dateStr);
+					});
+				}
+
+				// --- Full calendar (collapsed by default) ---------------------------
+				// Lets someone browse by month instead of scrolling the quick-pick
+				// strip. Days before today, outside working days, or past the
+				// `windowDays` booking window are shown (for context) but disabled —
+				// the bookable range itself isn't changed, just how it's browsed.
+				let calendarViewYear = today.getFullYear();
+				let calendarViewMonth = today.getMonth();
+				let calendarBuilt = false;
+
+				function isDateBookable(date) {
+					if (date < today || date > maxDate) return false;
+					return workingDays.includes(date.getDay());
+				}
+
+				function renderCalendar() {
+					const monthStart = new Date(calendarViewYear, calendarViewMonth, 1);
+					calendarMonthEl.textContent = monthStart.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+					calendarGridEl.innerHTML = "";
+
+					const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
+					for (let i = 0; i < monthStart.getDay(); i++) {
+						const pad = document.createElement("span");
+						pad.className = "book-calendar__pad";
+						calendarGridEl.append(pad);
+					}
+
+					for (let d = 1; d <= daysInMonth; d++) {
+						const date = new Date(calendarViewYear, calendarViewMonth, d);
+						const dateStr = toDateStr(date);
+
+						const cell = document.createElement("button");
+						cell.type = "button";
+						cell.className = "book-calendar__day";
+						cell.textContent = String(d);
+						cell.dataset.date = dateStr;
+
+						if (!isDateBookable(date)) {
+							cell.disabled = true;
+						} else {
+							cell.addEventListener("click", () => selectDate(dateStr));
+						}
+						if (selectedDate === dateStr) cell.classList.add("is-selected");
+						calendarGridEl.append(cell);
+					}
+
+					calendarPrevBtn.disabled = calendarViewYear === today.getFullYear() && calendarViewMonth === today.getMonth();
+					calendarNextBtn.disabled = calendarViewYear === maxDate.getFullYear() && calendarViewMonth === maxDate.getMonth();
+				}
+
+				calendarPrevBtn.addEventListener("click", () => {
+					calendarViewMonth -= 1;
+					if (calendarViewMonth < 0) {
+						calendarViewMonth = 11;
+						calendarViewYear -= 1;
+					}
+					renderCalendar();
+				});
+
+				calendarNextBtn.addEventListener("click", () => {
+					calendarViewMonth += 1;
+					if (calendarViewMonth > 11) {
+						calendarViewMonth = 0;
+						calendarViewYear += 1;
+					}
+					renderCalendar();
+				});
+
+				calendarToggleBtn.addEventListener("click", () => {
+					const expanding = calendarEl.hidden;
+					calendarEl.hidden = !expanding;
+					calendarToggleBtn.setAttribute("aria-expanded", String(expanding));
+					calendarToggleLabelEl.textContent = expanding ? "Hide full calendar" : "Show full calendar";
+					if (expanding && !calendarBuilt) {
+						calendarBuilt = true;
+						renderCalendar();
+					}
+				});
+
+				async function selectDate(dateStr) {
 					selectedDate = dateStr;
 					selectedSlot = null;
 
-					datesEl.querySelectorAll(".book-date-btn").forEach((b) => b.classList.remove("is-selected"));
-					btnEl.classList.add("is-selected");
+					highlightSelectedDate(dateStr);
 
 					timesEl.innerHTML = `<p class="book-times__placeholder">Loading times…</p>`;
 
@@ -623,7 +1022,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 					const customer = Object.fromEntries(formData.entries());
 
 					try {
-						const response = await fetch("/api/create-checkout-session", {
+						const response = await fetch("/api/admin/create-pending-booking", {
 							method: "POST",
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify({ selections, customer, slot: selectedSlot }),
@@ -631,8 +1030,8 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 
 						const data = await response.json();
 
-						if (!response.ok || !data.url) {
-							throw new Error(data.error || "Something went wrong starting checkout.");
+						if (!response.ok || !data.confirmUrl) {
+							throw new Error(data.error || "Something went wrong creating this booking.");
 						}
 
 						const when = new Date(selectedSlot.start).toLocaleString("en-US", {
@@ -644,20 +1043,20 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 							minute: "2-digit",
 						});
 						linkRecap.textContent = `${customer.name || "This customer"}: ${when}, ${formatMoney(selections.total)}`;
-						linkInput.value = data.url;
-						openLink.href = data.url;
+						linkInput.value = data.confirmUrl;
+						openLink.href = data.confirmUrl;
 						lastCustomerName = (customer.name || "").trim();
 						linkPanel.hidden = false;
 						linkPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 
 						formEl.reset();
 						submitBtn.disabled = false;
-						submitBtn.textContent = "Create Booking & Get Payment Link";
+						submitBtn.textContent = "Create Booking & Get Confirmation Link";
 					} catch (err) {
 						errorEl.textContent = err instanceof Error ? err.message : "Something went wrong. Please try again.";
 						errorEl.hidden = false;
 						submitBtn.disabled = false;
-						submitBtn.textContent = "Create Booking & Get Payment Link";
+						submitBtn.textContent = "Create Booking & Get Confirmation Link";
 					}
 				});
 
@@ -691,7 +1090,7 @@ import { WORKING_DAYS, BOOKING_WINDOW_DAYS } from "../../data/booking.js";
 
 				copyMessageBtn?.addEventListener("click", async () => {
 					const greetingName = lastCustomerName || "there";
-					const message = `Hi ${greetingName}, here's your secure link to complete your Sky House Cleaning booking: ${linkInput.value}\n\nNothing's charged until you finish this step.`;
+					const message = `Hi ${greetingName}, here's your secure link to review and confirm your Sky House Cleaning booking: ${linkInput.value}\n\nNothing's charged until you confirm and pay on that page.`;
 					await copyText(message);
 					flashCopied(copyMessageBtn);
 				});

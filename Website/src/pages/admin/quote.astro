@@ -9,6 +9,16 @@ export const prerender = false;
 
 import "../../styles/global.css";
 import PricingConfigurator from "../../components/PricingConfigurator.astro";
+
+// If a CRM deal's "Convert to Booking" button sent us here with a
+// contactId, thread it through to /admin/book so that page can prefill the
+// customer-details step from the contact record instead of a blank form.
+// PricingConfigurator appends its own `?s=<quote payload>` to whatever
+// ctaHref it's given (see its script's `separator`/`href` logic), so this
+// just needs to already contain `?contactId=...` for that to layer on top
+// correctly as `&s=...`.
+const contactId = Astro.url.searchParams.get("contactId");
+const bookHref = contactId ? `/admin/book?contactId=${encodeURIComponent(contactId)}` : "/admin/book";
 ---
 
 <!doctype html>
@@ -30,7 +40,7 @@ import PricingConfigurator from "../../components/PricingConfigurator.astro";
 					Nothing is booked or charged until they pay it.
 				</p>
 
-				<PricingConfigurator ctaHref="/admin/book" ctaLabel="Continue to date & customer details" />
+				<PricingConfigurator ctaHref={bookHref} ctaLabel="Continue to date & customer details" />
 			</div>
 		</main>
 

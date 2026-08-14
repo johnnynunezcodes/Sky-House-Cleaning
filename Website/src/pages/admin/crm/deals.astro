@@ -65,7 +65,18 @@ import "../../../styles/global.css";
 							</div>
 							<div class="admin-form__row">
 								<label for="add-serviceType">Service type</label>
-								<input type="text" id="add-serviceType" name="serviceType" placeholder="Weekly, deep clean, car detailing, commercial…" />
+								<select id="add-serviceType" name="serviceType">
+									<option value="">Not sure yet</option>
+									<option value="One-Time Cleaning">One-Time Cleaning</option>
+									<option value="Recurring Cleaning">Recurring Cleaning</option>
+									<option value="Deep Cleaning">Deep Cleaning</option>
+									<option value="Move-In / Move-Out Cleaning">Move-In / Move-Out Cleaning</option>
+									<option value="Garage Cleaning & Organization">Garage Cleaning &amp; Organization</option>
+									<option value="Interior Car Detailing">Interior Car Detailing</option>
+									<option value="Airbnb Cleaning">Airbnb Cleaning</option>
+									<option value="Office & Commercial Cleaning">Office &amp; Commercial Cleaning</option>
+									<option value="Post-Construction Cleaning">Post-Construction Cleaning</option>
+								</select>
 							</div>
 							<div class="admin-form__row">
 								<label for="add-estimatedValue">Estimated value ($)</label>
@@ -201,6 +212,7 @@ import "../../../styles/global.css";
 						${advanceStage ? `<button type="button" class="btn btn--outline admin-advance">Mark ${STAGE_LABELS[advanceStage]}</button>` : ""}
 						${deal.stage !== "won" && deal.stage !== "lost" ? `<button type="button" class="btn btn--outline admin-win">Mark Won</button>` : ""}
 						${deal.stage !== "won" && deal.stage !== "lost" ? `<button type="button" class="btn btn--outline admin-lost">Mark Lost</button>` : ""}
+						${deal.contactId ? `<a href="/admin/quote?contactId=${encodeURIComponent(deal.contactId)}" class="btn btn--outline">Convert to Booking</a>` : ""}
 					</div>
 					<p class="admin-result-message" hidden></p>
 				`;
