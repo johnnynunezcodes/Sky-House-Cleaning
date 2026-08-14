@@ -37,7 +37,7 @@ export async function POST({ request }) {
 		});
 	}
 
-	const { selections, customer, slot, policyAgreed } = body || {};
+	const { selections, customer, slot, policyAgreed, pendingBookingId } = body || {};
 
 	const missingField = REQUIRED_CUSTOMER_FIELDS.find((field) => !customer?.[field]);
 	if (missingField) {
@@ -153,6 +153,11 @@ export async function POST({ request }) {
 		policyPath: policy?.path || "",
 		policyLabel: policy?.label || "",
 		policyAgreedAt: policy ? new Date().toISOString() : "",
+		// Only set for phone bookings that went through /confirm/[id].astro —
+		// lets stripe-webhook.js mark the pendingBooking doc "converted" at the
+		// one moment that actually matters (real payment confirmation), instead
+		// of at session-creation time. See finalize-pending-booking.js.
+		pendingBookingId: pendingBookingId || "",
 	};
 
 	try {

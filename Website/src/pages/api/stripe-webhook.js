@@ -21,6 +21,8 @@ import {
 } from "../../lib/googleCalendar.js";
 import { nextVisitWindow } from "../../lib/pricing.js";
 import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
+import { markPendingBookingConverted } from "../../lib/pendingBookings.js";
+import { isConfigured as isFirebaseConfigured } from "../../lib/firebaseAdmin.js";
 
 function describeService(type, frequency, vehicles) {
 	if (type === "deep") return "Deep Cleaning";
@@ -74,6 +76,22 @@ export async function POST({ request }) {
 		const session = event.data.object;
 		const metadata = session.metadata || {};
 		const email = session.customer_details?.email || session.customer_email;
+
+		// If this session came from a staff-sent phone-booking confirmation
+		// link (/confirm/[id].astro), this is the one moment we actually know
+		// the customer paid — see finalize-pending-booking.js for why it's
+		// deliberately NOT marked converted any earlier than this.
+		if (metadata.pendingBookingId && isFirebaseConfigured()) {
+			try {
+				await markPendingBookingConverted(metadata.pendingBookingId, { stripeSessionId: session.id });
+			} catch (err) {
+				// Non-fatal — the payment already succeeded and the calendar
+				// event creation below doesn't depend on this. Worst case the
+				// pendingBooking doc just doesn't get flagged converted, which
+				// only affects a future admin dashboard, not the customer.
+				console.error("Failed to mark pendingBooking converted:", err?.message);
+			}
+		}
 
 		if (isCalendarConfigured() && metadata.slotStart && metadata.slotEnd) {
 			const service = describeService(metadata.type, metadata.frequency, metadata.vehicles);

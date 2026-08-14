@@ -16,7 +16,7 @@
 // policy checkbox.
 export const prerender = false;
 
-import { getPendingBooking, markPendingBookingConverted } from "../../../lib/pendingBookings.js";
+import { getPendingBooking } from "../../../lib/pendingBookings.js";
 import { isConfigured as isFirebaseConfigured } from "../../../lib/firebaseAdmin.js";
 import { policyFor } from "../../../lib/policies.js";
 import { POST as createCheckoutSession } from "../create-checkout-session.js";
@@ -74,6 +74,12 @@ export async function POST({ request }) {
 			// The customer just checked this box on THIS page, right now — this
 			// is the real consent event this whole flow exists to capture.
 			policyAgreed: true,
+			// Rides along in the Stripe session's metadata so stripe-webhook.js
+			// can mark this pendingBooking "converted" at the one moment that
+			// actually matters: real payment confirmation, not just a checkout
+			// session existing (see the comment below on why we don't mark it
+			// converted here).
+			pendingBookingId: id,
 		}),
 	});
 
@@ -93,15 +99,19 @@ export async function POST({ request }) {
 		return json({ error: checkoutData?.error || "Something went wrong starting checkout." }, checkoutResponse.status || 500);
 	}
 
-	try {
-		await markPendingBookingConverted(id, { stripeSessionId: checkoutData.sessionId || "" });
-	} catch {
-		// Non-fatal — the Stripe session is already real and valid at this
-		// point; worst case this pendingBooking doc just doesn't get marked
-		// converted, which only matters for future admin-side reporting, not
-		// for the customer's actual booking.
-	}
-
+	// Deliberately NOT marking this pendingBooking "converted" here — a
+	// Checkout Session existing just means the customer clicked Confirm and
+	// got redirected to Stripe, not that they actually paid. Marking it done
+	// at this point was the original (buggy) version of this file: if the
+	// customer then hit the browser back button, closed the tab, or Stripe
+	// declined their card, this link would permanently show "already
+	// confirmed and paid for" even though nothing was ever charged, with no
+	// way to retry. Instead, stripe-webhook.js marks it converted inside its
+	// `checkout.session.completed` handler — the one moment the codebase
+	// already treats as "the customer actually paid" everywhere else (that's
+	// also when the real calendar event gets created). Until then this
+	// pendingBooking just stays "pending", so re-opening the same confirm
+	// link after an abandoned checkout lets the customer simply try again.
 	return json({ url: checkoutData.url });
 }
 
