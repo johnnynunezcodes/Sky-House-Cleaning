@@ -19,6 +19,19 @@ const currentPath = Astro.url.pathname;
 // own exact URL — e.g. "New Booking" should stay highlighted through the
 // whole /admin/quote → /admin/book hand-off, not just on /admin/quote
 // itself, since to staff that's one flow, not two destinations.
+// Small hand-written line icons (no icon-library dependency — this project
+// avoids npm installs it doesn't have to make). Each is a 24x24 stroke-based
+// outline, matching Jobber's own minimalist sidebar icon style from the
+// reference screenshots.
+const ICONS = {
+	newBooking: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 14v6M9 17h6"/></svg>`,
+	managePlans: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`,
+	minimumCommitments: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`,
+	contacts: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>`,
+	deals: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>`,
+	dispatch: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="13" height="10"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="6" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>`,
+};
+
 const navGroups = [
 	{
 		label: "Booking",
@@ -26,17 +39,18 @@ const navGroups = [
 			{
 				label: "New Booking",
 				href: "/admin/quote",
+				icon: ICONS.newBooking,
 				activeMatch: (path: string) => path.startsWith("/admin/quote") || path.startsWith("/admin/book"),
 			},
-			{ label: "Manage Plans", href: "/admin/reschedule" },
-			{ label: "Minimum Commitments", href: "/admin/minimum-commitments" },
+			{ label: "Manage Plans", href: "/admin/reschedule", icon: ICONS.managePlans },
+			{ label: "Minimum Commitments", href: "/admin/minimum-commitments", icon: ICONS.minimumCommitments },
 		],
 	},
 	{
 		label: "CRM",
 		items: [
-			{ label: "Contacts", href: "/admin/crm/contacts" },
-			{ label: "Deals", href: "/admin/crm/deals" },
+			{ label: "Contacts", href: "/admin/crm/contacts", icon: ICONS.contacts },
+			{ label: "Deals", href: "/admin/crm/deals", icon: ICONS.deals },
 		],
 	},
 ];
@@ -45,7 +59,7 @@ const navGroups = [
 // grouped sections as flat links, same indentation as a group label rather
 // than a nested item — Dispatch today, easy to promote into its own group
 // later (e.g. once a separate Cleaners page exists).
-const flatLinks = [{ label: "Dispatch", href: "/admin/dispatch" }];
+const flatLinks = [{ label: "Dispatch", href: "/admin/dispatch", icon: ICONS.dispatch }];
 
 function isItemActive(item: { href: string; activeMatch?: (path: string) => boolean }) {
 	return item.activeMatch ? item.activeMatch(currentPath) : currentPath === item.href;
@@ -87,7 +101,8 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 									{group.items.map((item) => (
 										<li>
 											<a href={item.href} class:list={["admin-nav-link", { "is-active": isItemActive(item) }]}>
-												{item.label}
+												<span class="admin-nav-link__icon" set:html={item.icon} />
+												<span class="admin-nav-link__label">{item.label}</span>
 											</a>
 										</li>
 									))}
@@ -103,7 +118,10 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 									href={item.href}
 									class:list={["admin-nav-link", "admin-nav-link--flat", { "is-active": isItemActive(item) }]}
 								>
-									{item.label}
+									<span class="admin-nav-link__flat-main">
+										<span class="admin-nav-link__icon" set:html={item.icon} />
+										<span class="admin-nav-link__label">{item.label}</span>
+									</span>
 									{item.href === "/admin/dispatch" && (
 										<span class="admin-nav-badge" id="dispatch-unassigned-badge" hidden />
 									)}
@@ -257,7 +275,9 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 			}
 
 			.admin-nav-link {
-				display: block;
+				display: flex;
+				align-items: center;
+				gap: 0.65rem;
 				padding: 0.55rem 0.75rem;
 				border-radius: 8px;
 				text-decoration: none;
@@ -265,6 +285,18 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				font-size: 0.9rem;
 				font-weight: 500;
 				transition: background 0.12s ease, color 0.12s ease;
+			}
+
+			.admin-nav-link__icon {
+				display: flex;
+				flex-shrink: 0;
+				width: 18px;
+				height: 18px;
+			}
+
+			.admin-nav-link__icon :global(svg) {
+				width: 100%;
+				height: 100%;
 			}
 
 			.admin-nav-link:hover {
@@ -285,6 +317,12 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				font-family: var(--font-heading);
 				font-weight: 600;
 				font-size: 0.85rem;
+			}
+
+			.admin-nav-link__flat-main {
+				display: flex;
+				align-items: center;
+				gap: 0.65rem;
 			}
 
 			.admin-nav-badge {

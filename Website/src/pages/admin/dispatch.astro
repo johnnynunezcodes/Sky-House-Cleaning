@@ -6,21 +6,30 @@
 // src/lib/dispatch.js for why it's built this way instead of a duplicated
 // `jobs` collection.
 //
-// Three view modes share one date-range-aware read (list-jobs.js already
-// supported a `days` param before any of this existed): Day is the original
-// full-detail view (assign cleaners, change status, confirm) unchanged.
-// Week and Month are read-only overviews built for one purpose — seeing at
-// a glance which jobs across a wider range still need a cleaner assigned —
-// and clicking any job/day in them jumps into Day view to actually act on
-// it, rather than duplicating the assign/status editing controls three
-// times over.
+// Modeled after Jobber's own Schedule board (reference screenshots the
+// business owner provided): Month shows a colored chip per visit per day,
+// Week is a 7-column board, Day is an hour-ruler grid with one column per
+// cleaner. All three open the same job-detail modal to edit a job — there's
+// no separate inline-editing UI per view anymore (an earlier version had
+// Day view do its own inline dropdowns; that didn't generalize to Month/
+// Week, and Jobber's own click-a-visit-to-see-a-detail-card pattern is a
+// cleaner single editing surface reused everywhere).
+//
+// Deliberate scope cuts vs. Jobber, worth knowing about rather than
+// discovering by their absence: no drag-and-drop to reassign/reschedule a
+// visit (a materially bigger build — pointer tracking, collision handling,
+// touch support), and Day view doesn't try to lay overlapping jobs on the
+// same cleaner side-by-side (rare in practice for a small crew — a cleaner
+// can't really be double-booked — so overlapping blocks just overlap
+// visually rather than a getting a real layout algorithm).
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
+import { WORKING_HOURS } from "../../data/booking.js";
 ---
 
 <AdminLayout title="Dispatch | Sky House Cleaning Staff Tools">
-			<div class="container admin-container">
+			<div class="container admin-container" id="dispatch-page" data-working-hours-start={WORKING_HOURS.start} data-working-hours-end={WORKING_HOURS.end}>
 				<h1>Dispatch</h1>
 				<p class="admin-hint">
 					Every real job on the calendar, with who's assigned, their status, and whether the
@@ -66,7 +75,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				<p id="load-status" class="admin-status">Loading…</p>
 
 				<div id="day-view" class="admin-day-view">
-					<div id="jobs-list"></div>
+					<div id="day-grid" class="admin-daygrid"></div>
 				</div>
 
 				<div id="week-view" class="admin-week-view" hidden>
@@ -81,14 +90,53 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				</div>
 			</div>
 
+			<div class="admin-modal-backdrop" id="job-modal-backdrop" hidden>
+				<div class="admin-modal card" id="job-modal" role="dialog" aria-modal="true" aria-labelledby="job-modal-title">
+					<div class="admin-modal__header">
+						<div>
+							<h3 id="job-modal-title"></h3>
+							<p class="admin-card__meta" id="job-modal-time"></p>
+							<p class="admin-card__meta" id="job-modal-location"></p>
+						</div>
+						<button type="button" class="admin-modal__close" id="job-modal-close" aria-label="Close">✕</button>
+					</div>
+
+					<div class="admin-modal__body">
+						<div class="admin-form__row">
+							<label for="job-modal-assign">Team</label>
+							<select multiple class="admin-assign-select" id="job-modal-assign"></select>
+						</div>
+						<div class="admin-form__row">
+							<label for="job-modal-status">Status</label>
+							<select class="admin-status-select" id="job-modal-status"></select>
+						</div>
+						<div class="admin-form__row admin-form__row--checkbox">
+							<label class="admin-confirm-label">
+								<input type="checkbox" id="job-modal-confirmed" />
+								Confirmed by cleaner
+							</label>
+						</div>
+						<div class="admin-form__row">
+							<label for="job-modal-notes">Dispatch notes</label>
+							<textarea id="job-modal-notes" rows="2" placeholder="Anything the team should know"></textarea>
+						</div>
+					</div>
+
+					<p class="admin-result-message" id="job-modal-message" hidden></p>
+				</div>
+			</div>
+
 		<script>
+			const root = document.getElementById("dispatch-page");
+			const WORKING_HOURS_START = Number(root?.dataset.workingHoursStart) || 8;
+			const WORKING_HOURS_END = Number(root?.dataset.workingHoursEnd) || 18;
+
 			const dayPicker = document.getElementById("day-picker");
 			const prevPeriodBtn = document.getElementById("prev-period");
 			const nextPeriodBtn = document.getElementById("next-period");
 			const todayBtn = document.getElementById("today-btn");
 			const periodLabel = document.getElementById("period-label");
 			const loadStatus = document.getElementById("load-status");
-			const jobsList = document.getElementById("jobs-list");
 			const cleanersList = document.getElementById("cleaners-list");
 			const addCleanerForm = document.getElementById("add-cleaner-form");
 			const cleanerMessage = document.getElementById("cleaner-message");
@@ -96,6 +144,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 			const dayViewEl = document.getElementById("day-view");
 			const weekViewEl = document.getElementById("week-view");
 			const monthViewEl = document.getElementById("month-view");
+			const dayGrid = document.getElementById("day-grid");
 			const weekBoard = document.getElementById("week-board");
 			const monthGrid = document.getElementById("month-grid");
 
@@ -107,6 +156,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				completed: "Completed",
 			};
 			const STATUS_ORDER = ["unassigned", "assigned", "en_route", "in_progress", "completed"];
+			const HOUR_HEIGHT = 56; // px per hour row in the Day view grid
 
 			let cleaners = [];
 			let viewMode = "day"; // "day" | "week" | "month"
@@ -132,6 +182,30 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 					hour: "numeric",
 					minute: "2-digit",
 				});
+			}
+
+			function fmtDateTime(iso) {
+				return new Date(iso).toLocaleDateString("en-US", {
+					timeZone: "America/Los_Angeles",
+					weekday: "short",
+					month: "short",
+					day: "numeric",
+				});
+			}
+
+			// Minutes since local (Pacific) midnight — used for the Day view
+			// grid's time-to-pixel math. `hour12: false` can return "24" for
+			// midnight in some environments, hence the `% 24`.
+			function minutesSinceMidnightPT(iso) {
+				const parts = new Intl.DateTimeFormat("en-US", {
+					timeZone: "America/Los_Angeles",
+					hour: "2-digit",
+					minute: "2-digit",
+					hour12: false,
+				}).formatToParts(new Date(iso));
+				const hour = Number(parts.find((p) => p.type === "hour")?.value || "0") % 24;
+				const minute = Number(parts.find((p) => p.type === "minute")?.value || "0");
+				return hour * 60 + minute;
 			}
 
 			function addDays(dateStr, delta) {
@@ -273,124 +347,251 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 					.join("");
 			}
 
-			// --- Day view (full detail — assign, status, confirm) ------------------
+			// --- Shared job-detail modal (Month/Week/Day all open this to edit) ----
 
-			function jobCard(job) {
-				const card = document.createElement("div");
-				card.className = "card admin-job-card";
+			const modalBackdrop = document.getElementById("job-modal-backdrop");
+			const modalTitle = document.getElementById("job-modal-title");
+			const modalTime = document.getElementById("job-modal-time");
+			const modalLocation = document.getElementById("job-modal-location");
+			const modalClose = document.getElementById("job-modal-close");
+			const modalAssign = document.getElementById("job-modal-assign");
+			const modalStatus = document.getElementById("job-modal-status");
+			const modalConfirmed = document.getElementById("job-modal-confirmed");
+			const modalNotes = document.getElementById("job-modal-notes");
+			const modalMessage = document.getElementById("job-modal-message");
+
+			let currentModalJob = null;
+
+			function openJobModal(job) {
+				currentModalJob = job;
 				const assignedIds = job.assignedCleanerIds || [];
-				card.innerHTML = `
-					<div class="admin-job-card__header">
-						<div>
-							<h4>${fmtTime(job.start)} – ${fmtTime(job.end)}</h4>
-							<p class="admin-card__meta">${escapeHtml(job.summary)}</p>
-							${job.location ? `<p class="admin-card__meta">${escapeHtml(job.location)}</p>` : ""}
-						</div>
-						<div class="admin-job-card__badges">
-							<span class="admin-badge admin-badge--${job.status} admin-job-card__status-badge">${STATUS_LABELS[job.status] || job.status}</span>
-							<span class="admin-confirmed-check" ${job.cleanerConfirmed ? "" : "hidden"}>✓ Confirmed</span>
-						</div>
-					</div>
-					<div class="admin-job-card__controls">
-						<div class="admin-form__row">
-							<label>Assigned</label>
-							<select multiple class="admin-assign-select" size="${Math.min(4, Math.max(2, cleaners.length))}">
-								${cleanerOptions(assignedIds)}
-							</select>
-						</div>
-						<div class="admin-form__row">
-							<label>Status</label>
-							<select class="admin-status-select">
-								${STATUS_ORDER.map((s) => `<option value="${s}" ${job.status === s ? "selected" : ""}>${STATUS_LABELS[s]}</option>`).join("")}
-							</select>
-						</div>
-						<div class="admin-form__row admin-form__row--checkbox">
-							<label class="admin-confirm-label">
-								<input type="checkbox" class="admin-confirmed-checkbox" ${job.cleanerConfirmed ? "checked" : ""} ${assignedIds.length === 0 ? "disabled" : ""} />
-								Confirmed by cleaner
-							</label>
-						</div>
-					</div>
-					<p class="admin-result-message" hidden></p>
-				`;
+				modalTitle.textContent = job.summary || "Job";
+				modalTime.textContent = `${fmtDateTime(job.start)} · ${fmtTime(job.start)} – ${fmtTime(job.end)}`;
+				modalLocation.textContent = job.location || "";
+				modalLocation.hidden = !job.location;
+				modalAssign.innerHTML = cleanerOptions(assignedIds);
+				modalAssign.size = Math.min(4, Math.max(2, cleaners.length));
+				modalStatus.innerHTML = STATUS_ORDER.map(
+					(s) => `<option value="${s}" ${job.status === s ? "selected" : ""}>${STATUS_LABELS[s]}</option>`,
+				).join("");
+				modalConfirmed.checked = !!job.cleanerConfirmed;
+				modalConfirmed.disabled = assignedIds.length === 0;
+				modalNotes.value = job.dispatchNotes || "";
+				modalMessage.hidden = true;
+				modalBackdrop.hidden = false;
+			}
 
-				const assignSelect = card.querySelector(".admin-assign-select");
-				const statusSelect = card.querySelector(".admin-status-select");
-				const confirmedCheckbox = card.querySelector(".admin-confirmed-checkbox");
-				const statusBadge = card.querySelector(".admin-job-card__status-badge");
-				const confirmedBadge = card.querySelector(".admin-confirmed-check");
-				const messageEl = card.querySelector(".admin-result-message");
+			function closeJobModal() {
+				modalBackdrop.hidden = true;
+				currentModalJob = null;
+				// Anything edited in the modal can change which view (and the
+				// sidebar's unassigned badge, next page load) is stale — simplest
+				// correct thing is to just reload whichever view is open.
+				loadCurrentView();
+			}
 
-				async function saveJob(extraFields) {
-					messageEl.hidden = true;
-					try {
-						const res = await fetch("/api/admin/dispatch/update-job", {
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({
-								jobKey: job.jobKey,
-								eventId: job.eventId,
-								visitDate: job.visitDate,
-								...extraFields,
-							}),
-						});
-						const data = await res.json();
-						if (!res.ok) {
-							messageEl.hidden = false;
-							messageEl.textContent = data.error || "Something went wrong.";
-							messageEl.classList.add("admin-result-message--error");
-						}
-					} catch {
-						messageEl.hidden = false;
-						messageEl.textContent = "Network error, please try again.";
-						messageEl.classList.add("admin-result-message--error");
+			modalClose.addEventListener("click", closeJobModal);
+			modalBackdrop.addEventListener("click", (e) => {
+				if (e.target === modalBackdrop) closeJobModal();
+			});
+			document.addEventListener("keydown", (e) => {
+				if (e.key === "Escape" && !modalBackdrop.hidden) closeJobModal();
+			});
+
+			async function saveModalJob(extraFields) {
+				if (!currentModalJob) return;
+				modalMessage.hidden = true;
+				try {
+					const res = await fetch("/api/admin/dispatch/update-job", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							jobKey: currentModalJob.jobKey,
+							eventId: currentModalJob.eventId,
+							visitDate: currentModalJob.visitDate,
+							...extraFields,
+						}),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						modalMessage.hidden = false;
+						modalMessage.textContent = data.error || "Something went wrong.";
+						modalMessage.classList.add("admin-result-message--error");
 					}
+				} catch {
+					modalMessage.hidden = false;
+					modalMessage.textContent = "Network error, please try again.";
+					modalMessage.classList.add("admin-result-message--error");
+				}
+			}
+
+			modalAssign.addEventListener("change", () => {
+				const selectedIds = Array.from(modalAssign.selectedOptions).map((o) => o.value);
+				const nextStatus = selectedIds.length && currentModalJob.status === "unassigned" ? "assigned" : undefined;
+				if (nextStatus) modalStatus.value = nextStatus;
+
+				const extra = { assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) };
+
+				// Unassigning everyone makes "confirmed" meaningless — reset it
+				// rather than leaving a stale confirmation attached to nobody.
+				modalConfirmed.disabled = selectedIds.length === 0;
+				if (selectedIds.length === 0 && modalConfirmed.checked) {
+					modalConfirmed.checked = false;
+					extra.cleanerConfirmed = false;
 				}
 
-				assignSelect.addEventListener("change", () => {
-					const selectedIds = Array.from(assignSelect.selectedOptions).map((o) => o.value);
-					const nextStatus = selectedIds.length && job.status === "unassigned" ? "assigned" : undefined;
-					if (nextStatus) statusSelect.value = nextStatus;
+				currentModalJob.assignedCleanerIds = selectedIds;
+				if (nextStatus) currentModalJob.status = nextStatus;
+				saveModalJob(extra);
+			});
 
-					const extra = { assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) };
+			modalStatus.addEventListener("change", () => {
+				currentModalJob.status = modalStatus.value;
+				saveModalJob({ status: modalStatus.value });
+			});
 
-					// Unassigning everyone makes "confirmed" meaningless — reset it
-					// rather than leaving a stale confirmation attached to nobody.
-					confirmedCheckbox.disabled = selectedIds.length === 0;
-					if (selectedIds.length === 0 && confirmedCheckbox.checked) {
-						confirmedCheckbox.checked = false;
-						extra.cleanerConfirmed = false;
-						confirmedBadge.hidden = true;
+			modalConfirmed.addEventListener("change", () => {
+				currentModalJob.cleanerConfirmed = modalConfirmed.checked;
+				saveModalJob({ cleanerConfirmed: modalConfirmed.checked });
+			});
+
+			// Debounced — notes are free text, saving on every keystroke would be
+			// wasteful and could race with itself.
+			let notesDebounceTimer;
+			modalNotes.addEventListener("input", () => {
+				clearTimeout(notesDebounceTimer);
+				notesDebounceTimer = setTimeout(() => {
+					if (!currentModalJob) return;
+					currentModalJob.dispatchNotes = modalNotes.value;
+					saveModalJob({ dispatchNotes: modalNotes.value });
+				}, 600);
+			});
+
+			// --- Day view: hour-ruler grid, one column per cleaner -----------------
+
+			function hourLabel(h) {
+				const hour24 = ((h % 24) + 24) % 24;
+				const period = hour24 < 12 ? "AM" : "PM";
+				let hour12 = hour24 % 12;
+				if (hour12 === 0) hour12 = 12;
+				return `${hour12} ${period}`;
+			}
+
+			function dayBlock(job, gridStartHour) {
+				const startMin = minutesSinceMidnightPT(job.start);
+				// Never render a sliver too short to read/click — visually widened,
+				// doesn't change the real scheduled time (shown in the label and,
+				// authoritatively, in the modal).
+				const endMin = Math.max(minutesSinceMidnightPT(job.end), startMin + 20);
+				const top = (startMin - gridStartHour * 60) * (HOUR_HEIGHT / 60);
+				const height = Math.max((endMin - startMin) * (HOUR_HEIGHT / 60), 24);
+
+				const assignedIds = job.assignedCleanerIds || [];
+				const block = document.createElement("button");
+				block.type = "button";
+				block.className = "admin-daygrid__block" + (assignedIds.length === 0 ? " admin-daygrid__block--unassigned" : "");
+				block.style.top = `${top}px`;
+				block.style.height = `${height}px`;
+				block.innerHTML = `
+					<span class="admin-daygrid__block-time">${fmtTime(job.start)}</span>
+					<span class="admin-daygrid__block-title">${escapeHtml(job.summary)}</span>
+					${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
+				`;
+				block.addEventListener("click", () => openJobModal(job));
+				return block;
+			}
+
+			function buildDayGrid(jobs) {
+				dayGrid.innerHTML = "";
+
+				let startHour = WORKING_HOURS_START;
+				let endHour = WORKING_HOURS_END;
+				jobs.forEach((job) => {
+					const s = minutesSinceMidnightPT(job.start) / 60;
+					const e = minutesSinceMidnightPT(job.end) / 60;
+					startHour = Math.min(startHour, Math.floor(s));
+					endHour = Math.max(endHour, Math.ceil(e));
+				});
+				const totalHours = Math.max(1, endHour - startHour);
+				const gridHeight = totalHours * HOUR_HEIGHT;
+
+				// Only cleaners actually relevant today get a column: active ones,
+				// plus any inactive one who somehow still has a job assigned today
+				// (so an existing assignment never just disappears from view).
+				const dayCleaners = cleaners.filter(
+					(c) => c.active || jobs.some((j) => (j.assignedCleanerIds || []).includes(c.id)),
+				);
+				const columns = [{ id: "", name: "Unassigned" }, ...dayCleaners.map((c) => ({ id: c.id, name: c.name }))];
+
+				const inner = document.createElement("div");
+				inner.className = "admin-daygrid__inner";
+
+				const header = document.createElement("div");
+				header.className = "admin-daygrid__headers";
+				header.innerHTML =
+					`<div class="admin-daygrid__gutter-cell"></div>` +
+					columns
+						.map(
+							(col) => `
+						<div class="admin-daygrid__col-header${col.id ? "" : " admin-daygrid__col-header--unassigned"}">
+							${escapeHtml(col.name)}
+						</div>
+					`,
+						)
+						.join("");
+				inner.appendChild(header);
+
+				const body = document.createElement("div");
+				body.className = "admin-daygrid__body";
+				body.style.height = `${gridHeight}px`;
+
+				const gutter = document.createElement("div");
+				gutter.className = "admin-daygrid__gutter";
+				for (let h = startHour; h <= endHour; h++) {
+					const label = document.createElement("div");
+					label.className = "admin-daygrid__hour-label";
+					label.style.top = `${(h - startHour) * HOUR_HEIGHT}px`;
+					label.textContent = hourLabel(h);
+					gutter.appendChild(label);
+				}
+				body.appendChild(gutter);
+
+				columns.forEach((col) => {
+					const colEl = document.createElement("div");
+					colEl.className = "admin-daygrid__col";
+
+					for (let h = startHour; h <= endHour; h++) {
+						const line = document.createElement("div");
+						line.className = "admin-daygrid__gridline";
+						line.style.top = `${(h - startHour) * HOUR_HEIGHT}px`;
+						colEl.appendChild(line);
 					}
 
-					saveJob(extra);
-					if (nextStatus) {
-						job.status = nextStatus;
-						statusBadge.className = `admin-badge admin-badge--${nextStatus} admin-job-card__status-badge`;
-						statusBadge.textContent = STATUS_LABELS[nextStatus];
-					}
+					const colJobs = jobs.filter((j) => {
+						const ids = j.assignedCleanerIds || [];
+						return col.id ? ids.includes(col.id) : ids.length === 0;
+					});
+					colJobs.forEach((job) => colEl.appendChild(dayBlock(job, startHour)));
+
+					body.appendChild(colEl);
 				});
 
-				statusSelect.addEventListener("change", () => {
-					job.status = statusSelect.value;
-					statusBadge.className = `admin-badge admin-badge--${statusSelect.value} admin-job-card__status-badge`;
-					statusBadge.textContent = STATUS_LABELS[statusSelect.value];
-					saveJob({ status: statusSelect.value });
-				});
+				inner.appendChild(body);
 
-				confirmedCheckbox.addEventListener("change", () => {
-					confirmedBadge.hidden = !confirmedCheckbox.checked;
-					saveJob({ cleanerConfirmed: confirmedCheckbox.checked });
-				});
-
-				return card;
+				if (!jobs.length) {
+					const empty = document.createElement("p");
+					empty.className = "admin-status admin-daygrid__empty";
+					empty.textContent = "No jobs scheduled this day.";
+					dayGrid.appendChild(empty);
+				}
+				dayGrid.appendChild(inner);
 			}
 
 			async function loadDayView() {
 				loadStatus.hidden = false;
 				loadStatus.textContent = "Loading…";
 				loadStatus.classList.remove("admin-status--error");
-				jobsList.innerHTML = "";
+				dayGrid.innerHTML = "";
 				try {
 					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${dayPicker.value}`);
 					const data = await res.json();
@@ -400,19 +601,14 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 						return;
 					}
 					loadStatus.hidden = true;
-					const jobs = data.jobs || [];
-					if (!jobs.length) {
-						jobsList.innerHTML = `<p class="admin-status">No jobs scheduled this day.</p>`;
-						return;
-					}
-					for (const job of jobs) jobsList.appendChild(jobCard(job));
+					buildDayGrid(data.jobs || []);
 				} catch {
 					loadStatus.textContent = "Network error, please try again.";
 					loadStatus.classList.add("admin-status--error");
 				}
 			}
 
-			// --- Week view (read-only board, click a job to jump into Day view) ----
+			// --- Week view (7-column board, chips open the shared modal) -----------
 
 			function formatWeekRange(weekStart) {
 				const start = localDate(weekStart).toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -424,26 +620,26 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				return `${start} – ${end}`;
 			}
 
-			function weekCard(job) {
-				const card = document.createElement("button");
-				card.type = "button";
+			function jobChip(job) {
+				const chip = document.createElement("button");
+				chip.type = "button";
 				const assignedIds = job.assignedCleanerIds || [];
 				const isUnassigned = assignedIds.length === 0;
-				card.className = "admin-week-card" + (isUnassigned ? " admin-week-card--unassigned" : "");
+				chip.className = "admin-chip" + (isUnassigned ? " admin-chip--unassigned" : "");
 				const names = cleanerNamesFor(assignedIds);
-				card.innerHTML = `
-					<p class="admin-week-card__time">${fmtTime(job.start)}</p>
-					<p class="admin-week-card__summary">${escapeHtml(job.summary)}</p>
-					<p class="admin-week-card__cleaners${names.length ? "" : " admin-week-card__cleaners--empty"}">
+				chip.innerHTML = `
+					<span class="admin-chip__time">${fmtTime(job.start)}</span>
+					<span class="admin-chip__summary">${escapeHtml(job.summary)}</span>
+					<span class="admin-chip__cleaners${names.length ? "" : " admin-chip__cleaners--empty"}">
 						${names.length ? escapeHtml(names.join(", ")) : "Needs cleaner"}
-					</p>
-					<div class="admin-week-card__footer">
+					</span>
+					<span class="admin-chip__footer">
 						<span class="admin-badge admin-badge--${job.status}">${STATUS_LABELS[job.status] || job.status}</span>
 						${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
-					</div>
+					</span>
 				`;
-				card.addEventListener("click", () => jumpToDay(job.visitDate));
-				return card;
+				chip.addEventListener("click", () => openJobModal(job));
+				return chip;
 			}
 
 			function weekColumn(dateStr, jobs, isToday) {
@@ -453,19 +649,21 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
 
 				col.innerHTML = `
-					<div class="admin-week-col__header">
+					<button type="button" class="admin-week-col__header" data-date="${dateStr}">
 						<span class="admin-week-col__day">${date.toLocaleDateString("en-US", { weekday: "short" })}</span>
 						<span class="admin-week-col__date">${date.getDate()}</span>
 						${unassignedCount ? `<span class="admin-week-col__badge">${unassignedCount}</span>` : ""}
-					</div>
+					</button>
 					<div class="admin-week-col__jobs"></div>
 				`;
+
+				col.querySelector(".admin-week-col__header").addEventListener("click", () => jumpToDay(dateStr));
 
 				const jobsEl = col.querySelector(".admin-week-col__jobs");
 				if (!jobs.length) {
 					jobsEl.innerHTML = `<p class="admin-week-empty">No jobs</p>`;
 				} else {
-					jobs.forEach((job) => jobsEl.appendChild(weekCard(job)));
+					jobs.forEach((job) => jobsEl.appendChild(jobChip(job)));
 				}
 				return col;
 			}
@@ -499,20 +697,37 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				}
 			}
 
-			// --- Month view (read-only grid, click a day to jump into Day view) ----
+			// --- Month view (calendar grid, chips open the shared modal) -----------
 
 			function monthCell(dateStr, dayNum, jobs, isToday) {
 				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
-				const cell = document.createElement("button");
-				cell.type = "button";
-				cell.className =
-					"admin-month-day" + (isToday ? " is-today" : "") + (unassignedCount ? " has-unassigned" : "");
+				const cell = document.createElement("div");
+				cell.className = "admin-month-day" + (isToday ? " is-today" : "") + (unassignedCount ? " has-unassigned" : "");
+
 				cell.innerHTML = `
-					<span class="admin-month-day__num">${dayNum}</span>
-					${jobs.length ? `<span class="admin-month-day__count">${jobs.length} job${jobs.length === 1 ? "" : "s"}</span>` : ""}
-					${unassignedCount ? `<span class="admin-month-day__badge">${unassignedCount} unassigned</span>` : ""}
+					<button type="button" class="admin-month-day__header" data-date="${dateStr}">
+						<span class="admin-month-day__num">${dayNum}</span>
+						${jobs.length ? `<span class="admin-month-day__count">${jobs.length} visit${jobs.length === 1 ? "" : "s"}</span>` : ""}
+					</button>
+					<div class="admin-month-day__chips"></div>
 				`;
-				cell.addEventListener("click", () => jumpToDay(dateStr));
+
+				cell.querySelector(".admin-month-day__header").addEventListener("click", () => jumpToDay(dateStr));
+
+				const chipsEl = cell.querySelector(".admin-month-day__chips");
+				jobs.forEach((job) => {
+					const assignedIds = job.assignedCleanerIds || [];
+					const mini = document.createElement("button");
+					mini.type = "button";
+					mini.className = "admin-month-chip" + (assignedIds.length === 0 ? " admin-month-chip--unassigned" : "");
+					mini.innerHTML = `<span class="admin-month-chip__dot"></span>${escapeHtml(job.summary)}`;
+					mini.addEventListener("click", (e) => {
+						e.stopPropagation();
+						openJobModal(job);
+					});
+					chipsEl.appendChild(mini);
+				});
+
 				return cell;
 			}
 
@@ -572,9 +787,8 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				periodLabel.hidden = mode === "day";
 			}
 
-			// Used by week/month cells to drop straight into the full-detail Day
-			// view for that date, rather than trying to edit assignment/status
-			// inline from a compact card.
+			// Used by week/month "no chip clicked" areas to drop into the
+			// full-detail Day view for that date.
 			function jumpToDay(dateStr) {
 				dayPicker.value = dateStr;
 				setViewMode("day");
@@ -673,16 +887,19 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 			}
 
 			.admin-form__row input,
-			.admin-form__row select {
+			.admin-form__row select,
+			.admin-form__row textarea {
 				padding: 0.6rem 0.75rem;
 				border: 1px solid var(--color-border);
 				border-radius: 8px;
 				font-size: 0.95rem;
 				font-family: inherit;
+				resize: vertical;
 			}
 
 			.admin-form__row--checkbox {
-				justify-content: flex-end;
+				flex-direction: row;
+				align-items: center;
 			}
 
 			.admin-confirm-label {
@@ -744,50 +961,6 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				color: var(--color-ink);
 			}
 
-			.admin-day-view {
-				max-width: 780px;
-				margin: 0 auto;
-			}
-
-			.admin-job-card {
-				margin-bottom: 1.25rem;
-				padding: 1.25rem 1.5rem;
-			}
-
-			.admin-job-card__header {
-				display: flex;
-				align-items: flex-start;
-				justify-content: space-between;
-				gap: 1rem;
-			}
-
-			.admin-job-card__header h4 {
-				margin: 0 0 0.35rem;
-			}
-
-			.admin-job-card__badges {
-				display: flex;
-				flex-direction: column;
-				align-items: flex-end;
-				gap: 0.4rem;
-			}
-
-			.admin-card__meta {
-				color: var(--color-slate);
-				margin: 0.2rem 0;
-				font-size: 0.9rem;
-			}
-
-			.admin-job-card__controls {
-				display: flex;
-				gap: 1.5rem;
-				flex-wrap: wrap;
-				align-items: flex-end;
-				margin-top: 1rem;
-				padding-top: 1rem;
-				border-top: 1px solid var(--color-border);
-			}
-
 			.admin-badge {
 				display: inline-block;
 				padding: 0.2rem 0.6rem;
@@ -825,13 +998,9 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 			.admin-confirmed-check {
 				display: inline-block;
 				font-size: 0.78rem;
-				font-weight: 600;
+				font-weight: 700;
 				color: #1e7a34;
 				white-space: nowrap;
-			}
-
-			.admin-confirmed-check[hidden] {
-				display: none;
 			}
 
 			.admin-result-message {
@@ -843,6 +1012,65 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
 			.admin-result-message--error {
 				color: #b3261e;
+			}
+
+			/* --- Shared chip (used by Week columns) ------------------------------ */
+
+			.admin-chip {
+				display: block;
+				width: 100%;
+				text-align: left;
+				background: var(--color-cream);
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+				padding: 0.5rem 0.65rem;
+				cursor: pointer;
+				font-family: inherit;
+			}
+
+			.admin-chip:hover {
+				border-color: var(--color-sky);
+			}
+
+			.admin-chip--unassigned {
+				background: #fdeceb;
+				border-color: #f3c8c5;
+			}
+
+			.admin-chip__time {
+				display: block;
+				font-size: 0.78rem;
+				font-weight: 700;
+				color: var(--color-ink);
+			}
+
+			.admin-chip__summary {
+				display: block;
+				margin: 0.15rem 0;
+				font-size: 0.8rem;
+				color: var(--color-slate);
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+
+			.admin-chip__cleaners {
+				display: block;
+				margin: 0 0 0.4rem;
+				font-size: 0.75rem;
+				color: var(--color-slate);
+			}
+
+			.admin-chip__cleaners--empty {
+				color: #b3261e;
+				font-weight: 600;
+			}
+
+			.admin-chip__footer {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.4rem;
 			}
 
 			/* --- Week board --------------------------------------------------- */
@@ -872,9 +1100,14 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				display: flex;
 				align-items: baseline;
 				gap: 0.4rem;
+				width: 100%;
 				margin-bottom: 0.6rem;
-				padding-bottom: 0.5rem;
+				padding: 0 0 0.5rem;
+				border: none;
 				border-bottom: 1px solid var(--color-border);
+				background: none;
+				cursor: pointer;
+				font-family: inherit;
 			}
 
 			.admin-week-col__day {
@@ -913,61 +1146,6 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				color: var(--color-slate-light);
 			}
 
-			.admin-week-card {
-				display: block;
-				width: 100%;
-				text-align: left;
-				background: var(--color-cream);
-				border: 1px solid var(--color-border);
-				border-radius: 10px;
-				padding: 0.5rem 0.65rem;
-				cursor: pointer;
-				font-family: inherit;
-			}
-
-			.admin-week-card:hover {
-				border-color: var(--color-sky);
-			}
-
-			.admin-week-card--unassigned {
-				background: #fdeceb;
-				border-color: #f3c8c5;
-			}
-
-			.admin-week-card__time {
-				margin: 0;
-				font-size: 0.78rem;
-				font-weight: 700;
-				color: var(--color-ink);
-			}
-
-			.admin-week-card__summary {
-				margin: 0.15rem 0;
-				font-size: 0.8rem;
-				color: var(--color-slate);
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-			}
-
-			.admin-week-card__cleaners {
-				margin: 0 0 0.4rem;
-				font-size: 0.75rem;
-				color: var(--color-slate);
-			}
-
-			.admin-week-card__cleaners--empty {
-				color: #b3261e;
-				font-weight: 600;
-			}
-
-			.admin-week-card__footer {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 0.4rem;
-			}
-
 			/* --- Month grid ----------------------------------------------------- */
 
 			.admin-month-weekdays {
@@ -998,20 +1176,12 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 			.admin-month-day {
 				display: flex;
 				flex-direction: column;
-				align-items: center;
-				justify-content: flex-start;
-				gap: 0.2rem;
-				min-height: 72px;
-				padding: 0.5rem 0.3rem;
+				gap: 0.3rem;
+				min-height: 90px;
+				padding: 0.4rem;
 				border-radius: 10px;
 				border: 1px solid var(--color-border);
 				background: var(--color-white);
-				font-family: inherit;
-				cursor: pointer;
-			}
-
-			.admin-month-day:hover {
-				border-color: var(--color-sky);
 			}
 
 			.admin-month-day.is-today {
@@ -1023,6 +1193,18 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 				background: #fdeceb;
 			}
 
+			.admin-month-day__header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.3rem;
+				border: none;
+				background: none;
+				padding: 0;
+				cursor: pointer;
+				font-family: inherit;
+			}
+
 			.admin-month-day__num {
 				font-family: var(--font-heading);
 				font-weight: 700;
@@ -1031,15 +1213,232 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 			}
 
 			.admin-month-day__count {
-				font-size: 0.7rem;
-				color: var(--color-slate);
+				font-size: 0.65rem;
+				font-weight: 600;
+				color: var(--color-slate-light);
+				background: var(--color-sky-light);
+				border-radius: 999px;
+				padding: 0.05rem 0.4rem;
+				white-space: nowrap;
 			}
 
-			.admin-month-day__badge {
+			.admin-month-day__chips {
+				display: flex;
+				flex-direction: column;
+				gap: 0.2rem;
+			}
+
+			.admin-month-chip {
+				display: flex;
+				align-items: center;
+				gap: 0.3rem;
+				width: 100%;
+				text-align: left;
+				border: none;
+				border-radius: 6px;
+				background: #eaf1fb;
+				color: #1a3a5c;
+				padding: 0.15rem 0.35rem;
+				font-size: 0.7rem;
+				font-family: inherit;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				cursor: pointer;
+			}
+
+			.admin-month-chip__dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: #1a5fb4;
+				flex-shrink: 0;
+			}
+
+			.admin-month-chip--unassigned {
+				background: #fdeceb;
+				color: #7a1a15;
+			}
+
+			.admin-month-chip--unassigned .admin-month-chip__dot {
+				background: #b3261e;
+			}
+
+			/* --- Day view: hour grid, one column per cleaner --------------------- */
+
+			.admin-daygrid {
+				border: 1px solid var(--color-border);
+				border-radius: var(--radius);
+				overflow-x: auto;
+				background: var(--color-white);
+			}
+
+			.admin-daygrid__empty {
+				margin: 1rem 1.25rem 0;
+			}
+
+			.admin-daygrid__inner {
+				min-width: fit-content;
+			}
+
+			.admin-daygrid__headers,
+			.admin-daygrid__body {
+				display: flex;
+			}
+
+			.admin-daygrid__gutter-cell,
+			.admin-daygrid__gutter {
+				width: 64px;
+				flex-shrink: 0;
+			}
+
+			.admin-daygrid__headers {
+				border-bottom: 1px solid var(--color-border);
+				position: sticky;
+				top: 0;
+				background: var(--color-white);
+				z-index: 2;
+			}
+
+			.admin-daygrid__col-header {
+				flex: 1 0 170px;
+				padding: 0.6rem 0.75rem;
+				border-left: 1px solid var(--color-border);
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-daygrid__col-header--unassigned {
+				color: #b3261e;
+			}
+
+			.admin-daygrid__gutter {
+				position: relative;
+			}
+
+			.admin-daygrid__hour-label {
+				position: absolute;
+				right: 8px;
+				transform: translateY(-50%);
+				font-size: 0.7rem;
+				color: var(--color-slate-light);
+				white-space: nowrap;
+			}
+
+			.admin-daygrid__col {
+				position: relative;
+				flex: 1 0 170px;
+				border-left: 1px solid var(--color-border);
+			}
+
+			.admin-daygrid__gridline {
+				position: absolute;
+				left: 0;
+				right: 0;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.admin-daygrid__block {
+				position: absolute;
+				left: 4px;
+				right: 4px;
+				display: flex;
+				flex-direction: column;
+				gap: 0.1rem;
+				border-radius: 6px;
+				background: #eaf1fb;
+				border: 1px solid #1a5fb4;
+				color: #1a3a5c;
+				text-align: left;
+				padding: 0.25rem 0.4rem;
+				overflow: hidden;
+				cursor: pointer;
+				font-family: inherit;
+			}
+
+			.admin-daygrid__block:hover {
+				filter: brightness(0.97);
+			}
+
+			.admin-daygrid__block--unassigned {
+				background: #fdeceb;
+				border-color: #b3261e;
+				color: #7a1a15;
+			}
+
+			.admin-daygrid__block-time {
 				font-size: 0.68rem;
 				font-weight: 700;
-				color: #b3261e;
-				text-align: center;
+			}
+
+			.admin-daygrid__block-title {
+				font-size: 0.75rem;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+
+			/* --- Job detail modal (Month/Week/Day all share this) ---------------- */
+
+			.admin-modal-backdrop {
+				position: fixed;
+				inset: 0;
+				z-index: 80;
+				background: rgba(28, 43, 69, 0.45);
+				display: flex;
+				align-items: flex-start;
+				justify-content: center;
+				padding: 4rem 1.5rem;
+				overflow-y: auto;
+			}
+
+			.admin-modal-backdrop[hidden] {
+				display: none;
+			}
+
+			.admin-modal {
+				width: 100%;
+				max-width: 480px;
+				padding: 1.5rem;
+			}
+
+			.admin-modal__header {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				gap: 1rem;
+				margin-bottom: 1rem;
+				padding-bottom: 1rem;
+				border-bottom: 1px solid var(--color-border);
+			}
+
+			.admin-modal__header h3 {
+				margin: 0 0 0.3rem;
+			}
+
+			.admin-modal__close {
+				flex-shrink: 0;
+				width: 32px;
+				height: 32px;
+				border-radius: 50%;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				color: var(--color-slate);
+				cursor: pointer;
+				font-size: 0.9rem;
+			}
+
+			.admin-modal__close:hover {
+				border-color: var(--color-sky);
+				color: var(--color-sky-dark);
+			}
+
+			.admin-modal__body {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
 			}
 
 			@media (max-width: 900px) {
