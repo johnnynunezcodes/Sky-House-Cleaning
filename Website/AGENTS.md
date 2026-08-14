@@ -174,7 +174,27 @@ Internal CRM + dispatcher, built on Firebase, living under `/admin` alongside th
    - **Still pending:** enabling the Email/Password sign-in provider under Authentication — needed for the dispatcher's per-cleaner logins, not the CRM, so left for that phase.
    - `firebase-admin` is in `package.json` but hasn't been installed yet (this environment's npm registry access is blocked) — needs a real `npm install` wherever this actually gets built/deployed, and a local `.astro` build/check couldn't be run here either (missing native `rolldown` binding in this sandbox) — worth a real `astro check` / `astro build` the first time this runs somewhere with full tooling, before trusting it blindly in production.
 
-**Contacts screens (v1, done):** `/admin/crm/contacts` — list with stage filter (All/Leads/Active/Past), an "Add a contact" form, and per-contact inline edit (click "Edit" on a card). Backed by `/api/admin/crm/list-clients.js`, `create-client.js`, `update-client.js`. Linked from `/admin/reschedule`'s nav line. Deals pipeline screen is next, not built yet.
+**Contacts screens (v1, done):** `/admin/crm/contacts` — list with stage filter (All/Leads/Active/Past), an "Add a contact" form, and per-contact inline edit (click "Edit" on a card). Backed by `/api/admin/crm/list-clients.js`, `create-client.js`, `update-client.js`. Linked from `/admin/reschedule`'s nav line.
+
+**Deals screens (v1, done):** `/admin/crm/deals` — a 3-column open-pipeline board (New Inquiry / Quote Sent / Follow-Up), plus Won/Lost/All tabs that switch to a flat list. "+ Add a deal" lets you pick an existing contact or create one inline (name/phone/email/lead source) in the same step. Each card has a contextual "Mark [next stage]" advance button plus always-available "Mark Won" (confirms, then calls `win-deal.js` → `markDealWon`, which flips the linked client to `active_client`) and "Mark Lost" (prompts for a reason, stored as `lostReason`). Backed by `/api/admin/crm/list-deals.js` (joins in contact name/phone), `create-deal.js`, `update-deal.js` (blocks setting stage to `won` directly — that must go through `win-deal.js`), and `win-deal.js`. Linked from both `/admin/crm/contacts` and its own nav back to Contacts.
+
+CRM v1 (Contacts + Deals) is now feature-complete per the original scope. Not built: activity timeline and Companies — see the task list.
+
+## Dispatcher (jobs)
+
+Lives at `/admin/dispatch`, same Basic Auth gate, no separate login yet (that's the per-cleaner phase below).
+
+**Architecture — deliberately NOT a duplicated `jobs` collection.** Google Calendar is already the source of truth for what's scheduled (bookings create/move real calendar events — see "Booking & payments architecture" above). Firestore only adds the dispatch-specific overlay: which cleaner(s) are assigned and what status the job is in. `src/lib/googleCalendar.js` gained `listEvents({ timeMin, timeMax })` to read a date range (filters out cancelled events and the transparent staff-reminder events from `createReminderEvent`). `src/lib/dispatch.js` handles the Firestore side: a `jobAssignments` collection and a `cleaners` collection.
+
+**Why the job key is `${eventId}::${visitDate}`, not just the eventId:** recurring plans reuse the same calendar event, moving it forward to the next date each cycle (`updateBookingEvent`) rather than creating a fresh event every time. Keying by eventId alone would mean marking last week's visit "completed" stays stuck on this week's not-yet-done occurrence once the event moves. Folding in the visit's local date means each occurrence gets a clean "unassigned" default automatically, and past keys are left behind as a free history of completed jobs — see the comment at the top of `dispatch.js` for the full reasoning.
+
+**Data model:**
+- `cleaners` collection: name, phone, email, `active`, `firebaseAuthUid` (empty until the per-cleaner login phase below).
+- `jobAssignments` collection, doc id = `jobKey(eventId, visitDate)`: eventId, visitDate, `assignedCleanerIds` (array), `status` (`unassigned` → `assigned` → `en_route` → `in_progress` → `completed`), `dispatchNotes`.
+
+**UI (done):** `/admin/dispatch` — day view with prev/next/today navigation, a job card per calendar event (time, summary, location straight from Calendar) with a multi-select cleaner assignment and a status dropdown, both auto-saving on change. A collapsible "Manage cleaners" section at the top handles the roster (add + toggle active/inactive). Backed by `/api/admin/dispatch/list-jobs.js` (the merge), `update-job.js`, `list-cleaners.js`, `create-cleaner.js`, `update-cleaner.js`.
+
+**Not built yet:** per-cleaner Firebase Authentication (Email/Password sign-in provider still needs enabling in the Firebase console — see the CRM setup notes above) and the phone-friendly crew view where a cleaner logs in and sees just their own day. Today, only admin/staff (via the shared Basic Auth) can see or edit the dispatch board.
 
 ## Summary
 

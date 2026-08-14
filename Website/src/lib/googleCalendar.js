@@ -311,6 +311,39 @@ export async function createReminderEvent({ summary, description }) {
 }
 
 /**
+ * Lists real, non-cancelled events on the business calendar between two
+ * instants — powers the dispatch board's day/week view. Deliberately
+ * simple (no pagination) since a single-crew cleaning business will never
+ * come close to Calendar API's per-page event limit in a week's window;
+ * revisit with `pageToken` if that ever stops being true. Excludes the
+ * short-lived staff reminder events from createReminderEvent() above (they
+ * carry `transparency: "transparent"`, same signal already used to keep
+ * them out of freebusy/availability checks) so the dispatch board only
+ * ever shows real, dispatchable jobs.
+ */
+export async function listEvents({ timeMin, timeMax, timeZone = DEFAULT_TIME_ZONE }) {
+	const auth = getAuth();
+	if (!auth) throw new Error("Google Calendar isn't configured yet.");
+
+	const calendar = google.calendar({ version: "v3", auth });
+	const calendarId = getCalendarId();
+
+	const res = await calendar.events.list({
+		calendarId,
+		timeMin,
+		timeMax,
+		timeZone,
+		singleEvents: true,
+		orderBy: "startTime",
+		maxResults: 250,
+	});
+
+	return (res.data.items || []).filter(
+		(event) => event.status !== "cancelled" && event.transparency !== "transparent",
+	);
+}
+
+/**
  * Removes a single calendar event outright — used by the staff tool to
  * cancel one upcoming visit (the recurring plan continues normally; the
  * cycle after this one is still computed from the subscription's stored

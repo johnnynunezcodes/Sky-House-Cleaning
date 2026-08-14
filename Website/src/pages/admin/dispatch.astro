@@ -1,0 +1,490 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. The
+// dispatch board: reads real bookings straight from Google Calendar (the
+// existing source of truth) and layers on a Firestore overlay for
+// assignment/status. See AGENTS.md → "Dispatcher (jobs)" and
+// src/lib/dispatch.js for why it's built this way instead of a duplicated
+// `jobs` collection.
+export const prerender = false;
+
+import "../../styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Dispatch | Sky House Cleaning Staff Tools</title>
+	</head>
+	<body>
+		<main class="section">
+			<div class="container admin-container">
+				<p class="admin-nav">
+					<a href="/admin/crm/contacts">CRM: Contacts</a>
+					· <a href="/admin/crm/deals">CRM: Deals</a>
+					· <a href="/admin/reschedule">Manage a specific customer's plan →</a>
+				</p>
+				<h1>Dispatch</h1>
+				<p class="admin-hint">
+					Every real job on the calendar for the selected day, with who's assigned and their
+					status. This reads directly from Google Calendar, not a separate copy — reschedules,
+					cancellations, and new bookings show up here automatically.
+				</p>
+
+				<details class="card admin-add-card">
+					<summary class="admin-add-summary">Manage cleaners</summary>
+					<div id="cleaners-list"></div>
+					<form id="add-cleaner-form" class="admin-form admin-inline-form">
+						<div class="admin-form__row">
+							<label for="add-cleaner-name">Name *</label>
+							<input type="text" id="add-cleaner-name" name="name" required />
+						</div>
+						<div class="admin-form__row">
+							<label for="add-cleaner-phone">Phone</label>
+							<input type="tel" id="add-cleaner-phone" name="phone" />
+						</div>
+						<div class="admin-form__row">
+							<label for="add-cleaner-email">Email</label>
+							<input type="email" id="add-cleaner-email" name="email" />
+						</div>
+						<button type="submit" class="btn btn--outline">Add Cleaner</button>
+					</form>
+					<p class="admin-result-message" id="cleaner-message" hidden></p>
+				</details>
+
+				<div class="admin-day-nav">
+					<button type="button" id="prev-day" class="btn btn--outline">← Previous day</button>
+					<input type="date" id="day-picker" />
+					<button type="button" id="next-day" class="btn btn--outline">Next day →</button>
+					<button type="button" id="today-btn" class="btn btn--outline">Today</button>
+				</div>
+
+				<p id="load-status" class="admin-status">Loading…</p>
+				<div id="jobs-list"></div>
+			</div>
+		</main>
+
+		<script>
+			const dayPicker = document.getElementById("day-picker");
+			const prevDayBtn = document.getElementById("prev-day");
+			const nextDayBtn = document.getElementById("next-day");
+			const todayBtn = document.getElementById("today-btn");
+			const loadStatus = document.getElementById("load-status");
+			const jobsList = document.getElementById("jobs-list");
+			const cleanersList = document.getElementById("cleaners-list");
+			const addCleanerForm = document.getElementById("add-cleaner-form");
+			const cleanerMessage = document.getElementById("cleaner-message");
+
+			const STATUS_LABELS = {
+				unassigned: "Unassigned",
+				assigned: "Assigned",
+				en_route: "En route",
+				in_progress: "In progress",
+				completed: "Completed",
+			};
+			const STATUS_ORDER = ["unassigned", "assigned", "en_route", "in_progress", "completed"];
+
+			let cleaners = [];
+
+			function escapeHtml(str) {
+				const div = document.createElement("div");
+				div.textContent = str ?? "";
+				return div.innerHTML;
+			}
+
+			function todayLocalIso() {
+				return new Intl.DateTimeFormat("en-CA", {
+					timeZone: "America/Los_Angeles",
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+				}).format(new Date());
+			}
+
+			function fmtTime(iso) {
+				return new Date(iso).toLocaleTimeString("en-US", {
+					timeZone: "America/Los_Angeles",
+					hour: "numeric",
+					minute: "2-digit",
+				});
+			}
+
+			function addDays(dateStr, delta) {
+				const [y, m, d] = dateStr.split("-").map(Number);
+				const date = new Date(Date.UTC(y, m - 1, d));
+				date.setUTCDate(date.getUTCDate() + delta);
+				return date.toISOString().slice(0, 10);
+			}
+
+			async function loadCleaners() {
+				try {
+					const res = await fetch("/api/admin/dispatch/list-cleaners");
+					const data = await res.json();
+					if (res.ok) cleaners = data.cleaners || [];
+					renderCleanersList();
+				} catch {
+					// Non-fatal for the day view — assignment dropdowns just come up empty.
+				}
+			}
+
+			function renderCleanersList() {
+				if (!cleaners.length) {
+					cleanersList.innerHTML = `<p class="admin-card__meta">No cleaners added yet.</p>`;
+					return;
+				}
+				cleanersList.innerHTML = cleaners
+					.map(
+						(c) => `
+						<div class="admin-cleaner-row">
+							<span>${escapeHtml(c.name)}${c.phone ? " · " + escapeHtml(c.phone) : ""}${c.active ? "" : " (inactive)"}</span>
+							<button type="button" class="btn btn--outline admin-toggle-active" data-id="${c.id}" data-active="${c.active}">
+								${c.active ? "Mark inactive" : "Mark active"}
+							</button>
+						</div>
+					`,
+					)
+					.join("");
+
+				cleanersList.querySelectorAll(".admin-toggle-active").forEach((btn) => {
+					btn.addEventListener("click", async () => {
+						btn.disabled = true;
+						try {
+							await fetch("/api/admin/dispatch/update-cleaner", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ id: btn.dataset.id, active: btn.dataset.active !== "true" }),
+							});
+							await loadCleaners();
+						} finally {
+							btn.disabled = false;
+						}
+					});
+				});
+			}
+
+			addCleanerForm.addEventListener("submit", async (e) => {
+				e.preventDefault();
+				const formData = new FormData(addCleanerForm);
+				const payload = Object.fromEntries(formData.entries());
+				const submitBtn = addCleanerForm.querySelector("button[type=submit]");
+				submitBtn.disabled = true;
+				cleanerMessage.hidden = true;
+				try {
+					const res = await fetch("/api/admin/dispatch/create-cleaner", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(payload),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						cleanerMessage.hidden = false;
+						cleanerMessage.textContent = data.error || "Something went wrong.";
+						cleanerMessage.classList.add("admin-result-message--error");
+						return;
+					}
+					addCleanerForm.reset();
+					await loadCleaners();
+				} catch {
+					cleanerMessage.hidden = false;
+					cleanerMessage.textContent = "Network error, please try again.";
+					cleanerMessage.classList.add("admin-result-message--error");
+				} finally {
+					submitBtn.disabled = false;
+				}
+			});
+
+			function cleanerOptions(selectedIds) {
+				return cleaners
+					.filter((c) => c.active || selectedIds.includes(c.id))
+					.map((c) => `<option value="${c.id}" ${selectedIds.includes(c.id) ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
+					.join("");
+			}
+
+			function jobCard(job) {
+				const card = document.createElement("div");
+				card.className = "card admin-job-card";
+				const assignedIds = job.assignedCleanerIds || [];
+				card.innerHTML = `
+					<div class="admin-job-card__header">
+						<div>
+							<h4>${fmtTime(job.start)} – ${fmtTime(job.end)}</h4>
+							<p class="admin-card__meta">${escapeHtml(job.summary)}</p>
+							${job.location ? `<p class="admin-card__meta">${escapeHtml(job.location)}</p>` : ""}
+						</div>
+						<span class="admin-badge admin-badge--${job.status}">${STATUS_LABELS[job.status] || job.status}</span>
+					</div>
+					<div class="admin-job-card__controls">
+						<div class="admin-form__row">
+							<label>Assigned</label>
+							<select multiple class="admin-assign-select" size="${Math.min(4, Math.max(2, cleaners.length))}">
+								${cleanerOptions(assignedIds)}
+							</select>
+						</div>
+						<div class="admin-form__row">
+							<label>Status</label>
+							<select class="admin-status-select">
+								${STATUS_ORDER.map((s) => `<option value="${s}" ${job.status === s ? "selected" : ""}>${STATUS_LABELS[s]}</option>`).join("")}
+							</select>
+						</div>
+					</div>
+					<p class="admin-result-message" hidden></p>
+				`;
+
+				const assignSelect = card.querySelector(".admin-assign-select");
+				const statusSelect = card.querySelector(".admin-status-select");
+				const messageEl = card.querySelector(".admin-result-message");
+
+				async function saveJob(extraFields) {
+					messageEl.hidden = true;
+					try {
+						const res = await fetch("/api/admin/dispatch/update-job", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({
+								jobKey: job.jobKey,
+								eventId: job.eventId,
+								visitDate: job.visitDate,
+								...extraFields,
+							}),
+						});
+						const data = await res.json();
+						if (!res.ok) {
+							messageEl.hidden = false;
+							messageEl.textContent = data.error || "Something went wrong.";
+							messageEl.classList.add("admin-result-message--error");
+						}
+					} catch {
+						messageEl.hidden = false;
+						messageEl.textContent = "Network error, please try again.";
+						messageEl.classList.add("admin-result-message--error");
+					}
+				}
+
+				assignSelect.addEventListener("change", () => {
+					const selectedIds = Array.from(assignSelect.selectedOptions).map((o) => o.value);
+					const nextStatus = selectedIds.length && job.status === "unassigned" ? "assigned" : undefined;
+					if (nextStatus) statusSelect.value = nextStatus;
+					saveJob({ assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) });
+				});
+
+				statusSelect.addEventListener("change", () => {
+					saveJob({ status: statusSelect.value });
+				});
+
+				return card;
+			}
+
+			async function loadJobs() {
+				loadStatus.hidden = false;
+				loadStatus.textContent = "Loading…";
+				loadStatus.classList.remove("admin-status--error");
+				jobsList.innerHTML = "";
+				try {
+					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${dayPicker.value}`);
+					const data = await res.json();
+					if (!res.ok) {
+						loadStatus.textContent = data.error || "Couldn't load jobs.";
+						loadStatus.classList.add("admin-status--error");
+						return;
+					}
+					loadStatus.hidden = true;
+					const jobs = data.jobs || [];
+					if (!jobs.length) {
+						jobsList.innerHTML = `<p class="admin-status">No jobs scheduled this day.</p>`;
+						return;
+					}
+					for (const job of jobs) jobsList.appendChild(jobCard(job));
+				} catch {
+					loadStatus.textContent = "Network error, please try again.";
+					loadStatus.classList.add("admin-status--error");
+				}
+			}
+
+			prevDayBtn.addEventListener("click", () => {
+				dayPicker.value = addDays(dayPicker.value, -1);
+				loadJobs();
+			});
+			nextDayBtn.addEventListener("click", () => {
+				dayPicker.value = addDays(dayPicker.value, 1);
+				loadJobs();
+			});
+			todayBtn.addEventListener("click", () => {
+				dayPicker.value = todayLocalIso();
+				loadJobs();
+			});
+			dayPicker.addEventListener("change", loadJobs);
+
+			dayPicker.value = todayLocalIso();
+			loadCleaners().then(loadJobs);
+		</script>
+
+		<style>
+			.admin-container {
+				max-width: 780px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-nav {
+				margin-bottom: 1.5rem;
+				font-size: 0.9rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-status {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status--error {
+				color: #b3261e;
+			}
+
+			.admin-add-card {
+				margin-bottom: 1.5rem;
+				padding: 1.25rem 1.5rem;
+			}
+
+			.admin-add-summary {
+				cursor: pointer;
+				font-weight: 600;
+				color: var(--color-ink);
+			}
+
+			.admin-cleaner-row {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				padding: 0.5rem 0;
+				border-bottom: 1px solid var(--color-border);
+				font-size: 0.9rem;
+			}
+
+			.admin-inline-form {
+				display: flex;
+				align-items: flex-end;
+				gap: 1rem;
+				flex-wrap: wrap;
+				margin-top: 1rem;
+			}
+
+			.admin-form__row {
+				display: flex;
+				flex-direction: column;
+				gap: 0.35rem;
+			}
+
+			.admin-form__row label {
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-form__row input,
+			.admin-form__row select {
+				padding: 0.6rem 0.75rem;
+				border: 1px solid var(--color-border);
+				border-radius: 8px;
+				font-size: 0.95rem;
+				font-family: inherit;
+			}
+
+			.admin-day-nav {
+				display: flex;
+				align-items: center;
+				gap: 0.75rem;
+				flex-wrap: wrap;
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-day-nav input[type="date"] {
+				padding: 0.6rem 0.75rem;
+				border: 1px solid var(--color-border);
+				border-radius: 8px;
+				font-family: inherit;
+			}
+
+			.admin-job-card {
+				margin-bottom: 1.25rem;
+				padding: 1.25rem 1.5rem;
+			}
+
+			.admin-job-card__header {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				gap: 1rem;
+			}
+
+			.admin-job-card__header h4 {
+				margin: 0 0 0.35rem;
+			}
+
+			.admin-card__meta {
+				color: var(--color-slate);
+				margin: 0.2rem 0;
+				font-size: 0.9rem;
+			}
+
+			.admin-job-card__controls {
+				display: flex;
+				gap: 1.5rem;
+				flex-wrap: wrap;
+				margin-top: 1rem;
+				padding-top: 1rem;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.admin-badge {
+				display: inline-block;
+				padding: 0.2rem 0.6rem;
+				border-radius: 999px;
+				font-size: 0.8rem;
+				font-weight: 600;
+				white-space: nowrap;
+			}
+
+			.admin-badge--unassigned {
+				background: var(--color-sky-light);
+				color: var(--color-ink);
+			}
+
+			.admin-badge--assigned {
+				background: #eaf1fb;
+				color: #1a5fb4;
+			}
+
+			.admin-badge--en_route {
+				background: #fdf0dc;
+				color: #a4640a;
+			}
+
+			.admin-badge--in_progress {
+				background: #fdf0dc;
+				color: #a4640a;
+			}
+
+			.admin-badge--completed {
+				background: #e3f3e6;
+				color: #1e7a34;
+			}
+
+			.admin-result-message {
+				margin-top: 0.75rem;
+				font-weight: 600;
+				color: #1e7a34;
+				font-size: 0.9rem;
+			}
+
+			.admin-result-message--error {
+				color: #b3261e;
+			}
+		</style>
+	</body>
+</html>
