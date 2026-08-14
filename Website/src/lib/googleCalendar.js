@@ -171,6 +171,7 @@ export async function createBookingEvent({
 	description,
 	location,
 	attendeeEmail,
+	privateMetadata,
 	timeZone = DEFAULT_TIME_ZONE,
 }) {
 	const auth = getAuth();
@@ -189,6 +190,18 @@ export async function createBookingEvent({
 		location,
 		start: { dateTime: start, timeZone },
 		end: { dateTime: end, timeZone },
+		// `extendedProperties.private` (as opposed to `.shared`) is Google
+		// Calendar's own organizer-only visibility mechanism: the Calendar API
+		// only ever returns private extended properties to the same
+		// identity that created them (our service account) — never to anyone
+		// else who has viewer/editor access to the shared calendar, even
+		// though they can see the event's summary/description/time normally.
+		// That's exactly why this is the right place for anything staff-only,
+		// like a job's dollar amount: cleaners with calendar access (needed so
+		// they can see their own schedule) still can't see it, no matter what
+		// visibility Google Calendar's own sharing UI grants them. Used by the
+		// /admin/jobs List view — see AGENTS.md → "Jobs (formerly Dispatcher)".
+		...(privateMetadata ? { extendedProperties: { private: privateMetadata } } : {}),
 	};
 
 	if (attendeeEmail) {
@@ -208,6 +221,25 @@ export async function createBookingEvent({
 	}
 
 	const event = await calendar.events.insert({ calendarId, requestBody: baseEvent });
+	return event.data;
+}
+
+/**
+ * Reads a single event back, including its extendedProperties.private —
+ * used by update-job.js to authoritatively check a job's jobType/quotedTotal/
+ * depositAmount (rather than trusting whatever the admin UI's in-memory copy
+ * says) before deciding whether a "mark completed" action should trigger the
+ * remaining-balance invoicing reminder. See "Quote-based jobs & deposits" in
+ * AGENTS.md.
+ */
+export async function getBookingEvent({ eventId }) {
+	const auth = getAuth();
+	if (!auth) throw new Error("Google Calendar isn't configured yet.");
+
+	const calendar = google.calendar({ version: "v3", auth });
+	const calendarId = getCalendarId();
+
+	const event = await calendar.events.get({ calendarId, eventId });
 	return event.data;
 }
 

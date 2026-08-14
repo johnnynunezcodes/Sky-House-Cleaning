@@ -31,3 +31,17 @@ export const JOB_DURATION_MINUTES = {
 export function durationForType(type) {
 	return JOB_DURATION_MINUTES[type] || JOB_DURATION_MINUTES.standard;
 }
+
+// Services with no catalog price — calculatePrice() in pricing.js has no
+// branch for any of these, each one's own service page says pricing is
+// custom/quote-based (see AGENTS.md → "Quote-based jobs" for the full
+// research trail). They never appear in the public/phone booking flow's
+// pricing configurator; staff log them directly via /admin/book-quote
+// instead, with a manually entered quoted total and a required deposit.
+// Shared here (rather than duplicated) so the admin form, the API that
+// creates the job, and the confirm-deposit page all show the same labels.
+export const QUOTE_SERVICE_TYPES = {
+	commercial: "Office & Commercial Cleaning",
+	postConstruction: "Post-Construction Cleaning",
+	garageOrganization: "Garage Cleaning & Organization",
+};

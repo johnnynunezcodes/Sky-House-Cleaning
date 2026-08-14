@@ -118,3 +118,30 @@ export async function upsertJobAssignment(key, { eventId, visitDate, ...fields }
 			{ merge: true },
 		);
 }
+
+// ---- Job numbers ----------------------------------------------------------
+
+const COUNTERS_COLLECTION = "counters";
+const JOB_NUMBER_COUNTER_ID = "jobNumber";
+
+// Firestore has no native auto-increment column — this is the standard
+// workaround: a single counter doc, read-and-incremented inside a
+// transaction so two jobs created at the same instant (e.g. two webhook
+// events firing close together) can never end up with the same number.
+// Staff-facing job numbers start at 1, not 0.
+//
+// Only ever called at job-creation time — see the createBookingEvent() call
+// sites in stripe-webhook.js and create-quote-job.js. There's no retroactive
+// backfill: jobs that predate this feature simply have no number, same as
+// the amountPaid/jobType/clientName private-metadata fields added alongside
+// it (see googleCalendar.js's extendedProperties.private comment).
+export async function getNextJobNumber() {
+	const db = getDb();
+	const ref = db.collection(COUNTERS_COLLECTION).doc(JOB_NUMBER_COUNTER_ID);
+	return db.runTransaction(async (tx) => {
+		const doc = await tx.get(ref);
+		const next = (doc.exists ? doc.data().value || 0 : 0) + 1;
+		tx.set(ref, { value: next }, { merge: true });
+		return next;
+	});
+}

@@ -1,0 +1,394 @@
+---
+// Public — no admin auth, no login. This is the page a customer lands on
+// after staff text/email them a link from /admin/book-quote.astro (quote-
+// based jobs: commercial/office cleaning, garage cleaning & organization,
+// post-construction cleaning). Mirrors /confirm/[id].astro's pattern for
+// the same reason: the customer, not staff, needs to be the one reviewing
+// and confirming — a checkbox staff clicks on someone else's behalf proves
+// nothing. See src/lib/pendingDeposits.js.
+//
+// One real difference from /confirm/[id].astro: the JOB itself already
+// exists on the calendar by the time this page is reached (staff created it
+// immediately in /admin/book-quote, since there's no fixed catalog price to
+// protect the way calculatePrice() protects the online-bookable services).
+// What's still pending here is only the deposit payment — so unlike the
+// flat-rate flow, nothing about the appointment itself changes based on
+// what happens on this page.
+export const prerender = false;
+
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import { getPendingDeposit } from "../../lib/pendingDeposits.js";
+import { isConfigured as isFirebaseConfigured } from "../../lib/firebaseAdmin.js";
+import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
+
+const id = Astro.params.id;
+
+let pending = null;
+let errorMessage = null;
+
+if (!isFirebaseConfigured()) {
+	errorMessage = "This page isn't configured yet. Please call us to complete your deposit.";
+} else if (!id) {
+	errorMessage = "We couldn't find that request.";
+} else {
+	try {
+		pending = await getPendingDeposit(id);
+	} catch {
+		errorMessage = "We couldn't load your deposit request. Please try again or give us a call.";
+	}
+
+	if (!pending && !errorMessage) {
+		errorMessage = "We couldn't find that request. The link may be incorrect — please give us a call and we'll help.";
+	} else if (pending?.status === "paid") {
+		errorMessage = "This deposit has already been paid. If that wasn't you, please give us a call.";
+	} else if (pending?.expiresAt && new Date(pending.expiresAt) < new Date()) {
+		errorMessage = "This link has expired. Please give us a call and we'll send you a new one.";
+	}
+}
+
+function formatMoney(n) {
+	const value = Number(n) || 0;
+	return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const whenLabel = pending?.start
+	? new Date(pending.start).toLocaleString("en-US", {
+			timeZone: "America/Los_Angeles",
+			weekday: "long",
+			month: "long",
+			day: "numeric",
+			hour: "numeric",
+			minute: "2-digit",
+		})
+	: "";
+
+const serviceLabel = pending?.serviceType ? QUOTE_SERVICE_TYPES[pending.serviceType] || pending.serviceType : "";
+const customer = pending?.customer || {};
+const quotedTotal = pending?.quotedTotal || 0;
+const depositAmount = pending?.depositAmount || 0;
+const balanceDue = Math.max(quotedTotal - depositAmount, 0);
+---
+
+<Layout
+	title="Confirm Your Deposit | Sky House Cleaning"
+	description="Review and confirm your deposit for Sky House Cleaning."
+>
+	<PageHero
+		eyebrow="Almost There"
+		title="Confirm Your Deposit"
+		lede={
+			errorMessage
+				? undefined
+				: "Your appointment is already on our calendar. Review the quote below, then pay your deposit to secure it."
+		}
+	/>
+
+	<section class="section">
+		<div class="container">
+			{
+				errorMessage ? (
+					<div class="card confirm-card confirm-card--error">
+						<p>{errorMessage}</p>
+						<a href="tel:+18017592044" class="btn btn--primary">
+							Call (801) 759-2044
+						</a>
+					</div>
+				) : (
+					<div class="confirm-layout">
+						<div class="confirm-main">
+							<div class="card confirm-card">
+								<h3>Appointment</h3>
+								<p class="confirm-when">{whenLabel}</p>
+								<p class="confirm-service">{serviceLabel}</p>
+							</div>
+
+							<div class="card confirm-card">
+								<h3>Your Details</h3>
+								<ul class="confirm-details">
+									<li>
+										<strong>Name:</strong> {customer.name}
+									</li>
+									{customer.email && (
+										<li>
+											<strong>Email:</strong> {customer.email}
+										</li>
+									)}
+									<li>
+										<strong>Phone:</strong> {customer.phone}
+									</li>
+									<li>
+										<strong>Address:</strong> {customer.address}
+									</li>
+								</ul>
+								<p class="confirm-hint">
+									Something not right? Call us at <a href="tel:+18017592044">(801) 759-2044</a> before paying
+									and we'll fix it.
+								</p>
+							</div>
+
+							<div class="card confirm-card">
+								<form id="confirm-deposit-form" data-id={id}>
+									<div class="confirm-policy">
+										<label class="confirm-policy__checkbox">
+											<input type="checkbox" id="confirm-deposit-agree" />
+											<span>
+												I confirm the appointment details above are correct and authorize this deposit
+												charge to secure the job. The remaining balance of {formatMoney(balanceDue)} is
+												due once the work is complete.
+											</span>
+										</label>
+									</div>
+
+									<p class="confirm-form__error" id="confirm-deposit-error" hidden />
+
+									<button type="submit" class="btn btn--primary confirm-form__submit" id="confirm-deposit-submit">
+										Pay Deposit &amp; Confirm
+									</button>
+								</form>
+							</div>
+						</div>
+
+						<aside class="card confirm-summary">
+							<p class="confirm-summary__label">Quote Summary</p>
+							<ul class="confirm-summary__lines">
+								<li>
+									<span>Quoted total</span>
+									<span>{formatMoney(quotedTotal)}</span>
+								</li>
+								<li>
+									<span>Balance due later</span>
+									<span>{formatMoney(balanceDue)}</span>
+								</li>
+							</ul>
+							<div class="confirm-summary__total">
+								<span>Deposit due today</span>
+								<span>{formatMoney(depositAmount)}</span>
+							</div>
+						</aside>
+					</div>
+				)
+			}
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.confirm-card--error {
+		max-width: 640px;
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.confirm-card--error .btn {
+		margin-top: 1rem;
+	}
+
+	.confirm-layout {
+		display: grid;
+		grid-template-columns: 1.5fr 1fr;
+		gap: 2.5rem;
+		align-items: start;
+		max-width: 1100px;
+		margin: 0 auto;
+	}
+
+	.confirm-main {
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
+		min-width: 0;
+	}
+
+	.confirm-card {
+		padding: 2rem;
+	}
+
+	.confirm-card h3 {
+		margin-bottom: 0.75rem;
+	}
+
+	.confirm-when {
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 1.15rem;
+		color: var(--color-sky-dark);
+		margin: 0;
+	}
+
+	.confirm-service {
+		margin: 0.25rem 0 0;
+		color: var(--color-slate);
+	}
+
+	.confirm-details {
+		list-style: none;
+		margin: 0 0 1rem;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.95rem;
+		color: var(--color-ink);
+	}
+
+	.confirm-hint {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--color-slate);
+	}
+
+	.confirm-policy {
+		background: var(--color-sky-light);
+		border-radius: 10px;
+		padding: 1rem 1.1rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.confirm-policy__checkbox {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.6rem;
+		font-size: 0.9rem;
+		color: var(--color-slate);
+		cursor: pointer;
+	}
+
+	.confirm-policy__checkbox input {
+		width: auto;
+		margin-top: 0.2rem;
+		flex-shrink: 0;
+	}
+
+	.confirm-form__error {
+		margin: 0 0 1rem;
+		font-size: 0.85rem;
+		color: #b3261e;
+	}
+
+	.confirm-form__error[hidden] {
+		display: none;
+	}
+
+	.confirm-form__submit {
+		width: 100%;
+	}
+
+	.confirm-form__submit[disabled] {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.confirm-summary {
+		position: sticky;
+		top: 1.5rem;
+		min-width: 0;
+		padding: 2rem;
+	}
+
+	.confirm-summary__label {
+		margin: 0 0 1rem;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.8rem;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--color-sky-dark);
+	}
+
+	.confirm-summary__lines {
+		list-style: none;
+		margin: 0 0 1rem;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+	}
+
+	.confirm-summary__lines li {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		font-size: 0.9rem;
+		color: var(--color-slate);
+	}
+
+	.confirm-summary__total {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		padding-top: 1rem;
+		border-top: 1px solid var(--color-border);
+		font-family: var(--font-heading);
+		font-weight: 700;
+		font-size: 1.4rem;
+		color: var(--color-ink);
+	}
+
+	@media (max-width: 900px) {
+		.confirm-layout {
+			grid-template-columns: 1fr;
+		}
+
+		.confirm-summary {
+			position: static;
+		}
+	}
+
+	@media (max-width: 560px) {
+		.confirm-card {
+			padding: 1.5rem;
+		}
+	}
+</style>
+
+<script>
+	function initConfirmDepositPage() {
+		const form = document.getElementById("confirm-deposit-form");
+		if (!form || form.dataset.init === "true") return;
+		form.dataset.init = "true";
+
+		const id = form.dataset.id;
+		const agree = document.getElementById("confirm-deposit-agree");
+		const errorEl = document.getElementById("confirm-deposit-error");
+		const submitBtn = document.getElementById("confirm-deposit-submit");
+
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			errorEl.hidden = true;
+
+			if (!agree.checked) {
+				errorEl.textContent = "Please check the box above before continuing.";
+				errorEl.hidden = false;
+				agree.closest(".confirm-policy")?.scrollIntoView({ behavior: "smooth", block: "center" });
+				return;
+			}
+
+			submitBtn.disabled = true;
+			submitBtn.textContent = "Redirecting to payment…";
+
+			try {
+				const response = await fetch("/api/confirm-deposit/finalize", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ id, agreed: agree.checked }),
+				});
+				const data = await response.json();
+
+				if (!response.ok || !data.url) {
+					throw new Error(data.error || "Something went wrong starting checkout.");
+				}
+
+				window.location.href = data.url;
+			} catch (err) {
+				errorEl.textContent = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+				errorEl.hidden = false;
+				submitBtn.disabled = false;
+				submitBtn.textContent = "Pay Deposit & Confirm";
+			}
+		});
+	}
+
+	initConfirmDepositPage();
+	document.addEventListener("astro:page-load", initConfirmDepositPage);
+</script>

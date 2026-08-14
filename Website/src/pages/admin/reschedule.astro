@@ -17,6 +17,32 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 					afterward, just edit that one event directly in Google Calendar instead; don't use this tool.
 				</p>
 
+				<div class="card admin-browse-card">
+					<p id="browse-status" class="admin-status" hidden>Loading customers…</p>
+
+					<div class="admin-browse-select">
+						<label for="customer-select">Select a customer</label>
+						<select id="customer-select">
+							<option value="">Select a customer…</option>
+						</select>
+					</div>
+
+					<div class="admin-browse-calendar">
+						<div class="admin-calendar-nav">
+							<button type="button" id="cal-prev" class="btn btn--outline" aria-label="Previous month">←</button>
+							<span id="cal-label" class="admin-calendar-label"></span>
+							<button type="button" id="cal-next" class="btn btn--outline" aria-label="Next month">→</button>
+						</div>
+						<p class="admin-hint admin-hint--tight">Each chip is a customer's next scheduled visit — click one to pull up their plan.</p>
+						<div class="admin-calendar-weekdays">
+							<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+						</div>
+						<div class="admin-calendar-grid" id="cal-grid"></div>
+					</div>
+				</div>
+
+				<p class="admin-divider">or search by email</p>
+
 				<form id="search-form" class="book-form admin-search">
 					<div class="book-form__row book-form__row--full">
 						<label for="search-email">Customer email</label>
@@ -34,6 +60,15 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 			const searchForm = document.getElementById("search-form");
 			const searchStatus = document.getElementById("search-status");
 			const resultsEl = document.getElementById("results");
+
+			const customerSelect = document.getElementById("customer-select");
+			const browseStatus = document.getElementById("browse-status");
+			const calGrid = document.getElementById("cal-grid");
+			const calLabel = document.getElementById("cal-label");
+			const calPrevBtn = document.getElementById("cal-prev");
+			const calNextBtn = document.getElementById("cal-next");
+
+			const FREQUENCY_LABELS = { weekly: "Weekly", biweekly: "Bi-Weekly", monthly: "Monthly" };
 
 			function fmt(iso) {
 				if (!iso) return "N/A";
@@ -379,9 +414,168 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 					setStatus("Network error, please try again.", true);
 				}
 			});
+
+			// --- Browse-all-customers: dropdown + mini calendar --------------------
+			// Both are just alternate ways to select a customer, feeding into the
+			// exact same renderResults() the email search uses — once the full
+			// roster is fetched, selecting one from either control is instant, no
+			// second network round trip.
+
+			let allSubscriptions = [];
+			let calMonth = todayLocalIso().slice(0, 7) + "-01"; // "YYYY-MM-01"
+
+			function todayLocalIso() {
+				return new Intl.DateTimeFormat("en-CA", {
+					timeZone: "America/Los_Angeles",
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+				}).format(new Date());
+			}
+
+			function isoDateInTimeZone(iso) {
+				return new Intl.DateTimeFormat("en-CA", {
+					timeZone: "America/Los_Angeles",
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+				}).format(new Date(iso));
+			}
+
+			// Deliberately NOT `new Date(dateStr)` — that parses "YYYY-MM-DD" as
+			// UTC midnight, which can print as the previous day in a west-of-UTC
+			// browser (same fix used throughout admin/dispatch.astro).
+			function localDate(dateStr) {
+				return new Date(dateStr + "T00:00:00");
+			}
+
+			function daysInMonthCount(dateStr) {
+				const [y, m] = dateStr.split("-").map(Number);
+				return new Date(Date.UTC(y, m, 0)).getUTCDate();
+			}
+
+			function addMonths(dateStr, delta) {
+				const [y, m] = dateStr.split("-").map(Number);
+				const date = new Date(Date.UTC(y, m - 1 + delta, 1));
+				return date.toISOString().slice(0, 10);
+			}
+
+			function selectSubscription(sub) {
+				if (!sub) return;
+				customerSelect.value = sub.subscriptionId;
+				renderResults([sub]);
+				resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+
+			function buildCustomerSelect() {
+				const previousValue = customerSelect.value;
+				customerSelect.innerHTML = `<option value="">Select a customer…</option>`;
+				for (const sub of allSubscriptions) {
+					const opt = document.createElement("option");
+					opt.value = sub.subscriptionId;
+					const freq = FREQUENCY_LABELS[sub.frequency] || sub.frequency;
+					opt.textContent = `${sub.name || "(no name on file)"} — ${freq}${sub.customerEmail ? " · " + sub.customerEmail : ""}`;
+					customerSelect.appendChild(opt);
+				}
+				customerSelect.value = previousValue;
+			}
+
+			// Each subscription's `lastVisitStart` is its next scheduled
+			// occurrence (recurring plans reuse/move the same calendar event
+			// forward each cycle — see AGENTS.md → "Dispatcher" for why — so
+			// this is a plan's *only* meaningful upcoming date, not a history).
+			// Building the calendar straight from Stripe metadata like this,
+			// rather than reading actual Google Calendar events, sidesteps
+			// needing a customer/subscription link on the calendar event itself,
+			// which doesn't exist today.
+			function buildCalendar() {
+				calGrid.innerHTML = "";
+				calLabel.textContent = localDate(calMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+				const byDate = new Map();
+				for (const sub of allSubscriptions) {
+					if (!sub.lastVisitStart) continue;
+					const dateStr = isoDateInTimeZone(sub.lastVisitStart);
+					if (!dateStr.startsWith(calMonth.slice(0, 7))) continue;
+					if (!byDate.has(dateStr)) byDate.set(dateStr, []);
+					byDate.get(dateStr).push(sub);
+				}
+
+				const totalDays = daysInMonthCount(calMonth);
+				const firstDow = localDate(calMonth).getDay();
+				const today = todayLocalIso();
+
+				for (let i = 0; i < firstDow; i++) {
+					const pad = document.createElement("span");
+					pad.className = "admin-cal-pad";
+					calGrid.appendChild(pad);
+				}
+
+				for (let d = 1; d <= totalDays; d++) {
+					const dateStr = `${calMonth.slice(0, 8)}${String(d).padStart(2, "0")}`;
+					const subsToday = byDate.get(dateStr) || [];
+					const cell = document.createElement("div");
+					cell.className = "admin-cal-day" + (dateStr === today ? " is-today" : "");
+					cell.innerHTML = `<span class="admin-cal-day__num">${d}</span>`;
+					subsToday.forEach((sub) => {
+						const chip = document.createElement("button");
+						chip.type = "button";
+						chip.className = "admin-cal-chip";
+						chip.textContent = sub.name || "(no name)";
+						chip.addEventListener("click", () => selectSubscription(sub));
+						cell.appendChild(chip);
+					});
+					calGrid.appendChild(cell);
+				}
+			}
+
+			customerSelect.addEventListener("change", () => {
+				const sub = allSubscriptions.find((s) => s.subscriptionId === customerSelect.value);
+				if (sub) selectSubscription(sub);
+			});
+
+			calPrevBtn.addEventListener("click", () => {
+				calMonth = addMonths(calMonth, -1);
+				buildCalendar();
+			});
+			calNextBtn.addEventListener("click", () => {
+				calMonth = addMonths(calMonth, 1);
+				buildCalendar();
+			});
+
+			(async function loadAllSubscriptions() {
+				browseStatus.hidden = false;
+				browseStatus.textContent = "Loading customers…";
+				browseStatus.classList.remove("admin-status--error");
+				try {
+					const res = await fetch("/api/admin/list-subscriptions");
+					const data = await res.json();
+					if (!res.ok) {
+						browseStatus.hidden = false;
+						browseStatus.textContent = data.error || "Couldn't load customers.";
+						browseStatus.classList.add("admin-status--error");
+						return;
+					}
+					allSubscriptions = data.subscriptions || [];
+					buildCustomerSelect();
+					buildCalendar();
+					browseStatus.hidden = true;
+				} catch {
+					browseStatus.hidden = false;
+					browseStatus.textContent = "Network error loading customers.";
+					browseStatus.classList.add("admin-status--error");
+				}
+			})();
 		</script>
 
-		<style>
+		<style is:global>
+			/* is:global because this page builds its customer result cards (and
+			   now the browse calendar's day cells/chips) client-side via
+			   document.createElement — Astro's automatic style scoping only
+			   tags elements written directly in the page template, so a scoped
+			   <style> here wouldn't match any of that JS-built markup. Same
+			   root cause diagnosed and fixed on admin/dispatch.astro. Safe here
+			   for the same reason: this stylesheet only loads on this page. */
 			.admin-container {
 				max-width: 680px;
 				margin: 0 auto;
@@ -475,6 +669,136 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
 			.admin-result-message--error {
 				color: #b3261e;
+			}
+
+			.admin-browse-card {
+				padding: 1.5rem;
+				margin-bottom: 1rem;
+			}
+
+			.admin-browse-select {
+				display: flex;
+				flex-direction: column;
+				gap: 0.35rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-browse-select label {
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-browse-select select {
+				padding: 0.6rem 0.75rem;
+				border: 1px solid var(--color-border);
+				border-radius: 8px;
+				font-size: 0.95rem;
+				font-family: inherit;
+				background: var(--color-white);
+			}
+
+			.admin-calendar-nav {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 1rem;
+				margin-bottom: 0.5rem;
+			}
+
+			.admin-calendar-label {
+				font-family: var(--font-heading);
+				font-weight: 600;
+				color: var(--color-ink);
+				min-width: 10ch;
+				text-align: center;
+			}
+
+			.admin-hint--tight {
+				margin: 0 0 0.75rem;
+				font-size: 0.85rem;
+				text-align: center;
+			}
+
+			.admin-calendar-weekdays {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				margin-bottom: 0.4rem;
+			}
+
+			.admin-calendar-weekdays span {
+				text-align: center;
+				font-size: 0.72rem;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+				color: var(--color-slate-light);
+			}
+
+			.admin-calendar-grid {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				gap: 0.35rem;
+			}
+
+			.admin-cal-pad {
+				display: block;
+			}
+
+			.admin-cal-day {
+				display: flex;
+				flex-direction: column;
+				gap: 0.2rem;
+				min-height: 64px;
+				padding: 0.35rem;
+				border-radius: 8px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+			}
+
+			.admin-cal-day.is-today {
+				border-color: var(--color-sky);
+				box-shadow: 0 0 0 1px var(--color-sky);
+			}
+
+			.admin-cal-day__num {
+				font-family: var(--font-heading);
+				font-weight: 700;
+				font-size: 0.8rem;
+				color: var(--color-ink);
+			}
+
+			.admin-cal-chip {
+				width: 100%;
+				text-align: left;
+				border: none;
+				border-radius: 5px;
+				background: var(--color-sky-light);
+				color: var(--color-sky-dark);
+				padding: 0.15rem 0.35rem;
+				font-size: 0.68rem;
+				font-family: inherit;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				cursor: pointer;
+			}
+
+			.admin-cal-chip:hover {
+				filter: brightness(0.96);
+			}
+
+			.admin-divider {
+				text-align: center;
+				color: var(--color-slate-light);
+				font-size: 0.85rem;
+				margin: 0 0 1.5rem;
+			}
+
+			@media (max-width: 640px) {
+				.admin-cal-day {
+					min-height: 48px;
+				}
 			}
 		</style>
 </AdminLayout>

@@ -1,0 +1,550 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Sibling
+// to /admin/quote → /admin/book, but for the services that have no catalog
+// price at all: commercial/office cleaning, garage cleaning & organization,
+// post-construction cleaning (see src/data/booking.js's QUOTE_SERVICE_TYPES
+// comment for why — none of them appear in calculatePrice() or the public
+// pricing configurator, they're quote-based by nature).
+//
+// Unlike /admin/book.astro, this creates the calendar event immediately on
+// submit — there's no fixed catalog price to protect from a client-supplied
+// amount here, since the person typing in the quoted total is staff, in this
+// authenticated admin tool, not the customer. What's still gated behind the
+// customer's own action is the deposit: submitting this form only sends a
+// deposit request link (/confirm-deposit/[id]); nothing is ever charged
+// until the customer opens that themselves and pays. See
+// src/lib/pendingDeposits.js for the full reasoning.
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
+---
+
+<AdminLayout title="Quote-Based Job | Sky House Cleaning Staff Tools">
+			<div class="container admin-container">
+				<h1>Quote-Based Job</h1>
+				<p class="admin-hint">
+					For commercial/office cleaning, garage cleaning &amp; organization, and post-construction
+					cleaning — services priced by custom quote, not the online catalog. This puts the job on
+					the calendar right away and generates a link for the customer to pay their deposit. Nothing
+					is charged until they do.
+				</p>
+
+				<div class="quote-layout">
+					<div class="quote-main">
+						<form id="quote-job-form" class="quote-form">
+							<div class="quote-form__section">
+								<h3>Job details</h3>
+								<div class="quote-form__row quote-form__row--full">
+									<label for="qj-service">Service type</label>
+									<select id="qj-service" name="serviceType" required>
+										<option value="" disabled selected>Select a service…</option>
+										{Object.entries(QUOTE_SERVICE_TYPES).map(([value, label]) => <option value={value}>{label}</option>)}
+									</select>
+								</div>
+								<div class="quote-form__row">
+									<label for="qj-date">Date</label>
+									<input type="date" id="qj-date" name="date" required />
+								</div>
+								<div class="quote-form__row">
+									<label for="qj-time">Start time</label>
+									<input type="time" id="qj-time" name="time" required />
+								</div>
+								<div class="quote-form__row">
+									<label for="qj-hours">Estimated duration (hours)</label>
+									<input type="number" id="qj-hours" name="estimatedHours" min="0.5" step="0.5" placeholder="e.g. 3" required />
+								</div>
+							</div>
+
+							<div class="quote-form__section">
+								<h3>Customer</h3>
+								<div class="quote-form__row">
+									<label for="qj-name">Name / Business</label>
+									<input type="text" id="qj-name" name="name" required autocomplete="off" />
+								</div>
+								<div class="quote-form__row">
+									<label for="qj-phone">Phone</label>
+									<input type="tel" id="qj-phone" name="phone" required autocomplete="off" />
+								</div>
+								<div class="quote-form__row">
+									<label for="qj-email">Email <span class="quote-form__optional">(optional, needed to send the deposit link by email)</span></label>
+									<input type="email" id="qj-email" name="email" autocomplete="off" />
+								</div>
+								<div class="quote-form__row quote-form__row--full">
+									<label for="qj-address">Address</label>
+									<input type="text" id="qj-address" name="address" required autocomplete="off" />
+								</div>
+								<div class="quote-form__row quote-form__row--full">
+									<label for="qj-notes">Notes <span class="quote-form__optional">(optional)</span></label>
+									<textarea id="qj-notes" name="notes" rows="3" placeholder="Scope of work, access instructions, anything else"></textarea>
+								</div>
+							</div>
+
+							<div class="quote-form__section">
+								<h3>Quote &amp; deposit</h3>
+								<div class="quote-form__row">
+									<label for="qj-total">Quoted total ($)</label>
+									<input type="number" id="qj-total" name="quotedTotal" min="0" step="0.01" required />
+								</div>
+								<div class="quote-form__row quote-form__row--full">
+									<label>Deposit</label>
+									<div class="quote-deposit-type">
+										<label class="quote-radio">
+											<input type="radio" name="depositType" value="percentage" checked />
+											Percentage
+										</label>
+										<label class="quote-radio">
+											<input type="radio" name="depositType" value="fixed" />
+											Fixed amount
+										</label>
+									</div>
+								</div>
+								<div class="quote-form__row">
+									<label for="qj-deposit-value" id="qj-deposit-value-label">Deposit percentage</label>
+									<input type="number" id="qj-deposit-value" name="depositValue" min="0" step="1" placeholder="e.g. 30" required />
+								</div>
+							</div>
+
+							<p class="quote-form__error" id="quote-form-error" hidden></p>
+
+							<button type="submit" class="btn btn--primary quote-form__submit" id="quote-submit">
+								Create Job &amp; Send Deposit Request
+							</button>
+						</form>
+
+						<div class="quote-step admin-link-panel" id="quote-link-panel" hidden>
+							<h3>Job created, send this to the customer</h3>
+							<p class="quote-step__hint" id="quote-link-recap"></p>
+							<p class="quote-step__hint" id="quote-link-warning" hidden></p>
+
+							<div class="admin-link-row">
+								<input type="text" id="quote-confirm-link" class="admin-link-input" readonly />
+								<button type="button" class="btn btn--outline" id="quote-copy-link">Copy Link</button>
+								<button type="button" class="btn btn--outline" id="quote-copy-message">Copy Message</button>
+							</div>
+							<p class="admin-hint--tight">
+								This job is already on the calendar. Text or email this link so the customer can review
+								the quote and pay their deposit — nothing else is charged until they do.
+							</p>
+							<a href="#" target="_blank" rel="noopener" id="quote-open-link" class="btn btn--outline">Open Deposit Page</a>
+
+							<p class="admin-hint--tight quote-step__next">
+								<a href="/admin/book-quote">Log another quote-based job →</a> ·
+								<a href="/admin/jobs">View on the Jobs board →</a>
+							</p>
+						</div>
+					</div>
+
+					<aside class="quote-summary card" id="quote-summary">
+						<p class="quote-summary__label">Deposit Preview</p>
+						<div class="quote-summary__row">
+							<span>Quoted total</span>
+							<span id="qs-total">$0.00</span>
+						</div>
+						<div class="quote-summary__row">
+							<span id="qs-deposit-label">Deposit</span>
+							<span id="qs-deposit">$0.00</span>
+						</div>
+						<div class="quote-summary__row quote-summary__row--balance">
+							<span>Balance due later</span>
+							<span id="qs-balance">$0.00</span>
+						</div>
+						<p class="quote-summary__note">
+							Only the deposit is collected through the link you send. The remaining balance is
+							handled by you directly once the job is done.
+						</p>
+					</aside>
+				</div>
+			</div>
+
+		<style>
+			.admin-container {
+				max-width: 1100px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 2rem;
+			}
+
+			.admin-hint--tight {
+				margin: 0.75rem 0;
+				font-size: 0.85rem;
+				color: var(--color-slate);
+			}
+
+			.quote-layout {
+				display: grid;
+				grid-template-columns: 1.5fr 1fr;
+				gap: 2.5rem;
+				align-items: start;
+			}
+
+			.quote-main {
+				display: flex;
+				flex-direction: column;
+				gap: 2rem;
+				min-width: 0;
+			}
+
+			.quote-form,
+			.quote-step {
+				background: var(--color-white);
+				border-radius: var(--radius);
+				box-shadow: var(--shadow-soft);
+				padding: 2rem;
+			}
+
+			.quote-form__section {
+				margin-bottom: 1.75rem;
+				padding-bottom: 1.75rem;
+				border-bottom: 1px solid var(--color-border);
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 1.25rem 1.5rem;
+			}
+
+			.quote-form__section:last-of-type {
+				margin-bottom: 1.25rem;
+				padding-bottom: 0;
+				border-bottom: none;
+			}
+
+			.quote-form__section h3 {
+				grid-column: 1 / -1;
+				margin: 0 0 0.25rem;
+			}
+
+			.quote-form__row {
+				display: flex;
+				flex-direction: column;
+				gap: 0.4rem;
+			}
+
+			.quote-form__row--full {
+				grid-column: 1 / -1;
+			}
+
+			.quote-form label {
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.quote-form__optional {
+				font-weight: 400;
+				color: var(--color-slate-light);
+			}
+
+			.quote-form input,
+			.quote-form select,
+			.quote-form textarea {
+				width: 100%;
+				font-family: var(--font-body);
+				font-size: 0.95rem;
+				color: var(--color-ink);
+				background: var(--color-cream);
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+				padding: 0.7rem 0.9rem;
+				resize: vertical;
+			}
+
+			.quote-form input:focus,
+			.quote-form select:focus,
+			.quote-form textarea:focus {
+				outline: 2px solid var(--color-sky);
+				outline-offset: 1px;
+			}
+
+			.quote-deposit-type {
+				display: flex;
+				gap: 1.5rem;
+				padding-top: 0.3rem;
+			}
+
+			.quote-radio {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				font-weight: 500;
+				cursor: pointer;
+			}
+
+			.quote-radio input {
+				width: auto;
+			}
+
+			.quote-form__error {
+				margin: 0 0 1rem;
+				font-size: 0.85rem;
+				color: #b3261e;
+			}
+
+			.quote-form__error[hidden] {
+				display: none;
+			}
+
+			.quote-form__submit {
+				width: 100%;
+			}
+
+			.quote-form__submit[disabled] {
+				opacity: 0.6;
+				cursor: not-allowed;
+			}
+
+			.admin-link-panel {
+				border: 2px solid var(--color-sky);
+			}
+
+			.admin-link-row {
+				display: flex;
+				gap: 0.75rem;
+				margin-bottom: 1rem;
+			}
+
+			.admin-link-input {
+				flex: 1;
+				font-family: var(--font-body);
+				font-size: 0.9rem;
+				color: var(--color-ink);
+				background: var(--color-cream);
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+				padding: 0.7rem 0.9rem;
+			}
+
+			.quote-step__next {
+				margin-top: 1.25rem;
+			}
+
+			.quote-summary {
+				position: sticky;
+				top: 1.5rem;
+				min-width: 0;
+			}
+
+			.quote-summary__label {
+				margin: 0 0 1rem;
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.8rem;
+				letter-spacing: 0.05em;
+				text-transform: uppercase;
+				color: var(--color-sky-dark);
+			}
+
+			.quote-summary__row {
+				display: flex;
+				justify-content: space-between;
+				gap: 1rem;
+				font-size: 0.95rem;
+				color: var(--color-slate);
+				padding: 0.5rem 0;
+			}
+
+			.quote-summary__row--balance {
+				border-top: 1px solid var(--color-border);
+				margin-top: 0.5rem;
+				padding-top: 1rem;
+				font-family: var(--font-heading);
+				font-weight: 700;
+				font-size: 1.1rem;
+				color: var(--color-ink);
+			}
+
+			.quote-summary__note {
+				margin: 1rem 0 0;
+				font-size: 0.8rem;
+				color: var(--color-slate-light);
+			}
+
+			@media (max-width: 900px) {
+				.quote-layout {
+					grid-template-columns: 1fr;
+				}
+
+				.quote-summary {
+					position: static;
+				}
+			}
+
+			@media (max-width: 560px) {
+				.quote-form__section {
+					grid-template-columns: 1fr;
+				}
+
+				.quote-form,
+				.quote-step {
+					padding: 1.5rem;
+				}
+			}
+		</style>
+
+		<script>
+			function initQuoteJobPage() {
+				const form = document.getElementById("quote-job-form");
+				if (!form || form.dataset.init === "true") return;
+				form.dataset.init = "true";
+
+				const errorEl = document.getElementById("quote-form-error");
+				const submitBtn = document.getElementById("quote-submit");
+				const linkPanel = document.getElementById("quote-link-panel");
+				const linkRecap = document.getElementById("quote-link-recap");
+				const linkWarning = document.getElementById("quote-link-warning");
+				const linkInput = document.getElementById("quote-confirm-link");
+				const copyBtn = document.getElementById("quote-copy-link");
+				const copyMessageBtn = document.getElementById("quote-copy-message");
+				const openLink = document.getElementById("quote-open-link");
+
+				const totalInput = document.getElementById("qj-total");
+				const depositValueInput = document.getElementById("qj-deposit-value");
+				const depositValueLabel = document.getElementById("qj-deposit-value-label");
+				const depositTypeInputs = Array.from(document.querySelectorAll('input[name="depositType"]'));
+
+				const qsTotal = document.getElementById("qs-total");
+				const qsDepositLabel = document.getElementById("qs-deposit-label");
+				const qsDeposit = document.getElementById("qs-deposit");
+				const qsBalance = document.getElementById("qs-balance");
+
+				let lastCustomerName = "";
+
+				function formatMoney(n) {
+					const value = Number(n) || 0;
+					return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+				}
+
+				function currentDepositType() {
+					return depositTypeInputs.find((r) => r.checked)?.value || "percentage";
+				}
+
+				function updatePreview() {
+					const total = Number(totalInput.value) || 0;
+					const depositType = currentDepositType();
+					const rawValue = Number(depositValueInput.value) || 0;
+
+					depositValueLabel.textContent = depositType === "percentage" ? "Deposit percentage" : "Deposit amount ($)";
+					depositValueInput.placeholder = depositType === "percentage" ? "e.g. 30" : "e.g. 250";
+					qsDepositLabel.textContent = depositType === "percentage" ? `Deposit (${rawValue || 0}%)` : "Deposit";
+
+					const deposit =
+						depositType === "percentage"
+							? Math.round(total * (rawValue / 100) * 100) / 100
+							: Math.min(Math.round(rawValue * 100) / 100, total);
+
+					qsTotal.textContent = formatMoney(total);
+					qsDeposit.textContent = formatMoney(deposit);
+					qsBalance.textContent = formatMoney(Math.max(total - deposit, 0));
+				}
+
+				totalInput.addEventListener("input", updatePreview);
+				depositValueInput.addEventListener("input", updatePreview);
+				depositTypeInputs.forEach((r) => r.addEventListener("change", updatePreview));
+				updatePreview();
+
+				form.addEventListener("submit", async (event) => {
+					event.preventDefault();
+					errorEl.hidden = true;
+
+					submitBtn.disabled = true;
+					submitBtn.textContent = "Creating job…";
+
+					const formData = new FormData(form);
+					const payload = {
+						serviceType: formData.get("serviceType"),
+						customer: {
+							name: formData.get("name"),
+							phone: formData.get("phone"),
+							email: formData.get("email"),
+							address: formData.get("address"),
+						},
+						date: formData.get("date"),
+						time: formData.get("time"),
+						estimatedHours: formData.get("estimatedHours"),
+						quotedTotal: formData.get("quotedTotal"),
+						depositType: formData.get("depositType"),
+						depositValue: formData.get("depositValue"),
+						notes: formData.get("notes"),
+					};
+
+					try {
+						const response = await fetch("/api/admin/create-quote-job", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify(payload),
+						});
+						const data = await response.json();
+
+						if (!response.ok || !data.confirmUrl) {
+							throw new Error(data.error || "Something went wrong creating this job.");
+						}
+
+						lastCustomerName = (payload.customer.name || "").trim();
+						linkRecap.textContent = `Job #${data.jobNumber || "—"} · ${lastCustomerName || "This customer"} · deposit link ready below.`;
+						if (data.warning) {
+							linkWarning.textContent = data.warning;
+							linkWarning.hidden = false;
+						} else {
+							linkWarning.hidden = true;
+						}
+						linkInput.value = data.confirmUrl;
+						openLink.href = data.confirmUrl;
+						linkPanel.hidden = false;
+						linkPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+						form.reset();
+						updatePreview();
+						submitBtn.disabled = false;
+						submitBtn.textContent = "Create Job & Send Deposit Request";
+					} catch (err) {
+						errorEl.textContent = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+						errorEl.hidden = false;
+						submitBtn.disabled = false;
+						submitBtn.textContent = "Create Job & Send Deposit Request";
+					}
+				});
+
+				async function copyText(text) {
+					try {
+						await navigator.clipboard.writeText(text);
+					} catch {
+						const scratch = document.createElement("textarea");
+						scratch.value = text;
+						scratch.style.position = "fixed";
+						scratch.style.opacity = "0";
+						document.body.appendChild(scratch);
+						scratch.select();
+						document.execCommand("copy");
+						document.body.removeChild(scratch);
+					}
+				}
+
+				function flashCopied(button) {
+					const original = button.textContent;
+					button.textContent = "Copied!";
+					setTimeout(() => {
+						button.textContent = original;
+					}, 1500);
+				}
+
+				copyBtn?.addEventListener("click", async () => {
+					await copyText(linkInput.value);
+					flashCopied(copyBtn);
+				});
+
+				copyMessageBtn?.addEventListener("click", async () => {
+					const greetingName = lastCustomerName || "there";
+					const message = `Hi ${greetingName}, here's your secure link to review your quote and pay your deposit for Sky House Cleaning: ${linkInput.value}`;
+					await copyText(message);
+					flashCopied(copyMessageBtn);
+				});
+			}
+
+			initQuoteJobPage();
+			document.addEventListener("astro:page-load", initQuoteJobPage);
+		</script>
+</AdminLayout>

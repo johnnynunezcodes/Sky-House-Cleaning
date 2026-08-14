@@ -22,7 +22,24 @@ import {
 import { nextVisitWindow } from "../../lib/pricing.js";
 import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
 import { markPendingBookingConverted } from "../../lib/pendingBookings.js";
+import { markPendingDepositPaid } from "../../lib/pendingDeposits.js";
+import { getNextJobNumber, upsertJobAssignment } from "../../lib/dispatch.js";
 import { isConfigured as isFirebaseConfigured } from "../../lib/firebaseAdmin.js";
+
+// Best-effort — a job number is a nice-to-have staff-facing label, not
+// something any billing/scheduling logic depends on. If Firestore hiccups
+// getting the next number, the job still gets created and charged normally,
+// it just won't have a number (same "N/A"-style graceful degradation as
+// every other private-metadata field here).
+async function nextJobNumberOrBlank() {
+	if (!isFirebaseConfigured()) return "";
+	try {
+		return String(await getNextJobNumber());
+	} catch (err) {
+		console.error("Failed to assign job number:", err?.message);
+		return "";
+	}
+}
 
 function describeService(type, frequency, vehicles) {
 	if (type === "deep") return "Deep Cleaning";
@@ -93,6 +110,37 @@ export async function POST({ request }) {
 			}
 		}
 
+		// A deposit on a quote-based job (/admin/book-quote.astro) — the job
+		// itself already exists on the calendar (created immediately at
+		// quote-job-creation time, see create-quote-job.js), so unlike the
+		// catalog-booking branch below, this never creates a calendar event.
+		// It only flips the deposit from "pending" to "paid" in the two
+		// places that track it: the pendingDeposit doc itself, and the job's
+		// own jobAssignments overlay doc (so /admin/jobs can show a live
+		// "Deposit paid" indicator without a second read).
+		if (metadata.depositId && isFirebaseConfigured()) {
+			try {
+				await markPendingDepositPaid(metadata.depositId, { stripeSessionId: session.id });
+			} catch (err) {
+				console.error("Failed to mark pendingDeposit paid:", err?.message);
+			}
+			if (metadata.jobKey) {
+				try {
+					// upsertJobAssignment() writes eventId/visitDate as explicit
+					// fields (see dispatch.js) — Firestore rejects `undefined`
+					// values, so these have to be re-derived from the key rather
+					// than omitted. jobKey is always `${eventId}::${visitDate}`
+					// (see jobKey() in dispatch.js), so splitting on "::" recovers
+					// both; this just re-writes the same values already on the
+					// doc from create-quote-job.js's initial upsert.
+					const [eventId, visitDate] = metadata.jobKey.split("::");
+					await upsertJobAssignment(metadata.jobKey, { eventId, visitDate, depositStatus: "paid" });
+				} catch (err) {
+					console.error("Failed to update job's deposit status:", err?.message);
+				}
+			}
+		}
+
 		if (isCalendarConfigured() && metadata.slotStart && metadata.slotEnd) {
 			const service = describeService(metadata.type, metadata.frequency, metadata.vehicles);
 			const amountPaid = session.amount_total != null ? (session.amount_total / 100).toFixed(2) : null;
@@ -112,6 +160,7 @@ export async function POST({ request }) {
 			].filter(Boolean);
 
 			try {
+				const jobNumber = await nextJobNumberOrBlank();
 				const createdEvent = await createBookingEvent({
 					start: metadata.slotStart,
 					end: metadata.slotEnd,
@@ -119,6 +168,17 @@ export async function POST({ request }) {
 					description: descriptionLines.join("\n"),
 					location: metadata.address || undefined,
 					attendeeEmail: email,
+					// Staff-only structured fields for the /admin/jobs List view
+					// (Job #, Total $, Job Type columns) — see the
+					// extendedProperties.private comment in googleCalendar.js for why
+					// this is never visible to cleaners even if they're given
+					// calendar access.
+					privateMetadata: {
+						jobNumber,
+						amountPaid: amountPaid || "",
+						jobType: session.mode === "subscription" ? "recurring" : "one_time",
+						clientName: metadata.name || "",
+					},
 				});
 
 				// For subscriptions, remember which calendar event is the "current"
@@ -281,6 +341,7 @@ export async function POST({ request }) {
 								// ignore — proceed without the freshness check
 							}
 
+							const jobNumber = await nextJobNumberOrBlank();
 							const createdEvent = await createBookingEvent({
 								start: nextWindow.start,
 								end: nextWindow.end,
@@ -288,6 +349,15 @@ export async function POST({ request }) {
 								description: descriptionLines.join("\n"),
 								location: metadata.address || undefined,
 								attendeeEmail: email,
+								// Same staff-only fields as the checkout.session.completed
+								// path above — every renewal is by definition "recurring",
+								// and this invoice's own amount_paid is this cycle's total.
+								privateMetadata: {
+									jobNumber,
+									amountPaid: invoice.amount_paid != null ? (invoice.amount_paid / 100).toFixed(2) : "",
+									jobType: "recurring",
+									clientName: metadata.name || "",
+								},
 							});
 
 							// Advance the stored "last visit" (and which calendar event is

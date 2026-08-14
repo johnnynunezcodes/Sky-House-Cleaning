@@ -34,7 +34,12 @@ export async function GET({ url }) {
 	}
 
 	const dateStr = url.searchParams.get("date") || isoDateInTimeZone(new Date());
-	const days = Math.max(1, Math.min(31, parseInt(url.searchParams.get("days") || "1", 10) || 1));
+	// Capped at 120 (was 31, back when Month view — the widest existing
+	// caller — was the only thing that needed more than a week). The
+	// /admin/jobs List view now asks for a ~90-day rolling window (30 days
+	// back, 60 forward) to compute its "past 30 days" / "next 30 days"
+	// overview stats in one read.
+	const days = Math.max(1, Math.min(120, parseInt(url.searchParams.get("days") || "1", 10) || 1));
 
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
 		return json({ error: "Invalid date." }, 400);
@@ -50,6 +55,14 @@ export async function GET({ url }) {
 			const start = event.start?.dateTime || event.start?.date;
 			const end = event.end?.dateTime || event.end?.date;
 			const visitDate = isoDateInTimeZone(new Date(start));
+			// Staff-only fields (amountPaid, jobType, clientName) live in
+			// extendedProperties.private, set at booking time by
+			// stripe-webhook.js — see the comment on createBookingEvent() in
+			// googleCalendar.js for why that's the right place for anything
+			// that shouldn't be visible to cleaners even with calendar access.
+			// Events created before this existed simply won't have these —
+			// callers should treat empty string as "not known," not an error.
+			const priv = event.extendedProperties?.private || {};
 			return {
 				eventId: event.id,
 				jobKey: jobKey(event.id, visitDate),
@@ -59,6 +72,20 @@ export async function GET({ url }) {
 				summary: event.summary || "",
 				description: event.description || "",
 				location: event.location || "",
+				clientName: priv.clientName || "",
+				amountPaid: priv.amountPaid || "",
+				jobType: priv.jobType || "",
+				jobNumber: priv.jobNumber || "",
+				// Only set for quote-based jobs (jobType "quote_based") —
+				// quotedTotal/depositAmount are what staff entered at
+				// job-creation time (create-quote-job.js), fixed once and never
+				// updated after. What DOES change over time — depositStatus
+				// ("pending" -> "paid") — deliberately isn't here: it lives in
+				// the Firestore jobAssignments overlay instead (merged in
+				// below), same "static facts on the calendar event, mutable
+				// state in Firestore" split the rest of this file already uses.
+				quotedTotal: priv.quotedTotal || "",
+				depositAmount: priv.depositAmount || "",
 			};
 		});
 
