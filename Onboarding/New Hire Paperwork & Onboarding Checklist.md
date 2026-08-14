@@ -27,7 +27,7 @@ Documents need to be originals (or certified copies), not photocopies.
 - [ ] **I-9** — Employment Eligibility Verification (we'll walk through this together on day one)
 - [ ] **W-4** — federal tax withholding elections
 - [ ] **DE 4** — California state tax withholding elections
-- [ ] **Direct deposit form** (bring a voided check or your bank's routing/account number, or opt for paper checks)
+- [ ] **Direct deposit setup** — enter your bank's routing and account number directly when you complete your onboarding online; no need to bring anything in person for this one. Prefer paper checks instead? Just let us know.
 - [ ] **Emergency contact information**
 - [ ] **Signed acknowledgment** that you've received and reviewed the [Cleaning Standards Manual](Cleaning%20Standards%20Manual.md), [Service Checklists](Service%20Checklists.md), [Approved Cleaning Supplies](Approved%20Cleaning%20Supplies.md), and [Dress Code](Dress%20Code.md)
 - [ ] **Wage Theft Prevention Act notice** — we'll provide this; it spells out your pay rate, payday, and other required details in writing

@@ -6,19 +6,15 @@ Our focus is on exceptional quality, reliability, and a seamless customer experi
 
 ## External Files
 
-To keep this file small, detailed reference material lives in separate files within this project folder instead of being pasted in here. Every external file must be linked below with a one-line description, so it's always found in future conversations.
+To keep this file small, detailed reference material lives in separate directories within this project folder instead of being pasted in here. Every directory must be linked below with a one-line description, so it's always found in future conversations. Individual markdown files are NOT linked here — each directory has its own `Appendix.md` (or `README.md` for Website) that indexes the files inside it with descriptions. That's the file to open for the specifics.
 
-- [Pricing Matrix](Pricing/Pricing%20Matrix.md) — full pricing table by square footage and service type (one-time, weekly, bi-weekly, monthly, deep clean, move-in/out).
-- [Hourly Rate Analysis (Internal)](Pricing/Hourly%20Rate%20Analysis%20%28Internal%29.md) — private note estimating what we effectively charge per hour of job time, by service and home size. For Johnny's eyes only — not published on the website, never reference this when writing customer-facing copy.
-- [Crew Size Planning Guide (Internal)](Pricing/Crew%20Size%20Planning%20Guide%20%28Internal%29.md) — private note estimating elapsed job time with 1–5 cleaners dispatched, by service and home size, to help decide crew size per job. For Johnny's eyes only — not published on the website, never reference this when writing customer-facing copy.
-- [First Cleaning Savings](Pricing/First%20Cleaning%20Savings.md) — chart showing how much a recurring member saves at each home size by not being charged a mandatory first-visit deep clean fee (which many competitors charge). Not yet on the website — a candidate to eventually share with customers, but should be trimmed/reworded per Verbal Branding before it's ever sent to one.
-- [Services Overview](Services/Overview.md) — index of all services offered, linking out to individual service detail files.
-- [Verbal Branding](Branding/Verbal%20Branding.md) — voice, tone, and messaging guidelines. Always reference this file whenever writing any copy for me (services, marketing, pricing pages, anything customer-facing).
-- [Images Overview](Images/Images.md) — index of where logos and job photos live in this project.
-- [Policies Overview](Policies/Overview.md) — index of per-service booking policies, shown to customers at checkout via a required agreement checkbox.
+- [Pricing](Pricing/Appendix.md) — pricing tables plus internal-only notes on effective hourly rate and crew-size planning.
+- [Services](Services/Appendix.md) — index of all services offered, linking out to individual service detail files.
+- [Branding](Branding/Appendix.md) — voice/tone guidelines and other brand copy. Always check before writing any customer-facing copy.
+- [Images](Images/Appendix.md) — index of where logos and job photos live in this project.
+- [Policies](Policies/Appendix.md) — index of per-service booking policies, shown to customers at checkout via a required agreement checkbox.
+- [Standards](Standards/Appendix.md) — what we look for in the cleaning products we use and why it matters to us.
+- [Onboarding](Onboarding/Appendix.md) — new-hire onboarding materials (W-2 employee model): setting up as a CA employer, new-hire paperwork, pay structure, cleaning standards, service checklists, approved supplies, and dress code.
 - [Website](Website/README.md) — the Astro project for the marketing website (source code, dev setup, project notes). This is a separate codebase with its own `CLAUDE.md` for coding-specific instructions.
-- [Cleaning Product Standards](Standards/Cleaning%20Product%20Standards.md) — what we look for in the cleaning products we use (safety ratings, eco-friendly formulas, vegan/cruelty-free, gentle but effective) and why it matters to us.
-- [Hero Video Description](Branding/Hero%20Video%20Description.md) — YouTube description copy for a company-overview video (what we do, services offered, service area). Not website copy — for the video's platform listing only.
-- [Onboarding Overview](Onboarding/Overview.md) — index of new-hire onboarding materials (W-2 employee model): setting up as a CA employer, new-hire paperwork, pay structure, cleaning standards, service checklists, approved supplies, and dress code. Includes a polished PDF packet meant to be emailed to new hires. Older contractor-model docs are kept on hold, not deleted.
 
-When you add a new file to this project, add a link for it here (with a one-line description) so I know to reference it.
+When you add a new directory to this project, add a link for it here (with a one-line description). When you add or update a markdown file inside an existing directory, don't touch this list — instead update that directory's own `Appendix.md` (link and description, or a corrected description if the file's content/purpose changed).

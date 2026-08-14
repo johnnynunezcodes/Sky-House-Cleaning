@@ -12,3 +12,5 @@ Booking policies, by service — shown to customers at checkout (a required "I a
 **Still needed:**
 - Interior Car Detailing
 - Professional Garage Cleaning and Organization
+
+When you add or update a markdown file in this directory, add or update its link and description here.

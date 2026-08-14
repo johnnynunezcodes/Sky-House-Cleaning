@@ -21,3 +21,5 @@ Sky House Cleaning offers:
 
 ### Add-On Services
 See [Add-Ons](Add-Ons.md) for the full list, broken out by which service/frequency each one is available for, with pricing.
+
+When you add or update a markdown file in this directory, add or update its link and description here.

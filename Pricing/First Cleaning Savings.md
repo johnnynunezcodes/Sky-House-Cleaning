@@ -1,6 +1,6 @@
 # First Cleaning Savings — No Mandatory Deep Clean Fee
 
-A lot of cleaning companies require a mandatory deep cleaning for a new recurring customer's first visit (to get the home "caught up"), billed at deep-clean pricing, before the membership drops to its normal recurring rate starting visit two. Sky House Cleaning doesn't do this — a new Weekly, Bi-Weekly, or Monthly member is billed at their normal recurring rate from visit one, [per the Square Footage and Home Condition terms in each membership's policy](../Policies/Overview.md).
+A lot of cleaning companies require a mandatory deep cleaning for a new recurring customer's first visit (to get the home "caught up"), billed at deep-clean pricing, before the membership drops to its normal recurring rate starting visit two. Sky House Cleaning doesn't do this — a new Weekly, Bi-Weekly, or Monthly member is billed at their normal recurring rate from visit one, [per the Square Footage and Home Condition terms in each membership's policy](../Policies/Appendix.md).
 
 **This is a one-time savings, not a recurring discount.** It's the gap between what a customer's very first cleaning would have cost under a mandatory-deep-clean model and what they actually pay for that first visit. Every visit after that is priced the same either way — the savings only happens once, at signup, because that first deep clean fee never gets charged.
 

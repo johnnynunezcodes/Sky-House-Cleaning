@@ -30,9 +30,9 @@ The Pricing page's `PricingConfigurator` now flows into a full booking pipeline:
 ## Content & Branding
 When building out pages and copy, pull from the business reference files one level up:
 - [Verbal Branding](../Branding/Verbal%20Branding.md) — voice and tone guidelines, always check before writing site copy
-- [Services Overview](../Services/Overview.md) — service list and descriptions
+- [Services Appendix](../Services/Appendix.md) — service list and descriptions
 - [Pricing Matrix](../Pricing/Pricing%20Matrix.md) — pricing table
-- [Images Overview](../Images/Images.md) — logos and photos
+- [Images Appendix](../Images/Appendix.md) — logos and photos
 
 ## Notes
 See [AGENTS.md](AGENTS.md) (aliased as `CLAUDE.md`) for agent-specific rules: no npm commands (build is handled by Vercel, dev server is already running locally) and no git commands (handled manually).

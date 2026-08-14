@@ -24,7 +24,7 @@ As W-2 hourly employees, a few California rules aren't optional and need to be b
 - **Rest breaks:** a paid 10-minute break for every 4 hours worked — this is paid time, not a discount off the hourly total.
 - **Meal breaks:** an unpaid 30-minute break required for any shift over 5 hours, and it needs to actually happen, not just be offered.
 
-Practically: a job that runs long enough to trigger overtime costs 1.5x labor for those hours, and a route packed too tight to fit in breaks creates real liability (an extra hour of pay owed per missed break, per day). Worth factoring both into how big a home or job list you assign someone in a single day, not just into the pay rate itself.
+Practically, this cuts two ways. Overtime is a cost, not a legal risk: if a job runs long enough to trigger it, you simply owe 1.5x (or 2x) pay for those hours. Missed breaks are the real liability: if a route is packed so tight that a rest or meal break can't actually happen, California treats that as a violation and you owe a penalty on top of the pay, an extra hour of wages per missed break, per day. Worth factoring both into how big a home or job list you assign someone in a single day, not just into the pay rate itself.
 
 ## A Few Other Things to Keep in Mind
 

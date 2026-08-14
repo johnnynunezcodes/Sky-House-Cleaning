@@ -64,12 +64,15 @@ Everything above, plus:
 ## Interior Car Detailing
 
 ### Interior Detailing
-- [ ] Full vacuum of seats, carpets, and trunk
-- [ ] Wipe down all interior surfaces, including the dash, console, and door panels
-- [ ] Clean interior glass and mirrors
-- [ ] Spot-treat stains on fabric seats and upholstery
-- [ ] Wipe down leather and vinyl surfaces
+- [ ] If the vehicle has a lot of personal items inside, bag everything you need to pull out to clean, then put it all back once you're done — as close as you can remember to exactly where it was
+- [ ] Full vacuum of seats, carpets, and trunk using a shop vac (skip the truck bed unless the client has specifically asked for it)
+- [ ] Wipe down all interior surfaces, including the dash, console, and door panels — for anything that needs heavier-duty cleaning, use the all-purpose cleaner first, then finish with Armor All; if a surface doesn't need the stronger cleaner, go straight to Armor All instead
+- [ ] Clean interior and exterior glass and mirrors
+- [ ] Spot-treat stains on fabric seats and upholstery — saturate the area with all-purpose cleaner, let it sit for a few minutes, lightly brush it, then vacuum it up
+- [ ] Wipe down leather and vinyl surfaces using Armor All car cleaner
 - [ ] Clean cup holders, vents, and other tight spots
+- [ ] Remove pet hair with the pet hair removal glove, using your hand and fingers on tighter or more detailed spots
+- [ ] Clean floor mats — pull them out, saturate with all-purpose cleaner, brush, then rinse or wipe dry with a rag. If a pressure washer is available on-site, use that to spray them off instead. Either way, make sure they're fully dry before putting them back in the vehicle
 
 ## Office & Commercial Cleaning
 

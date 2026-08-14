@@ -1,3 +1,5 @@
+
+
 # Setting Up W-2 Employees in California — Internal Guide (Johnny's Eyes Only)
 
 A practical walkthrough for getting Sky House Cleaning set up to legally hire and pay W-2 employees in California. This isn't legal advice — I'm not a lawyer or accountant, and a few of these steps are worth a quick confirmation from one, especially the payroll and insurance setup. But this should get you 90% of the way to knowing what needs to happen and in what order.

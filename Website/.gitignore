@@ -17,6 +17,14 @@ pnpm-debug.log*
 .env
 .env.production
 
+# Firebase/Google service account key files — if one ever gets dropped in
+# the project folder temporarily (e.g. to hand its values to Claude for
+# .env), this makes sure it can never be committed by accident even if it's
+# not deleted right away.
+*firebase-adminsdk*.json
+*service-account*.json
+serviceAccountKey.json
+
 # macOS-specific files
 .DS_Store
 

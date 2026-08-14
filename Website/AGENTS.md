@@ -156,6 +156,23 @@ Customers are charged **on the day of each actual cleaning**, not on the day the
 
 **6. Set up (or re-verify) Google Search Console for `skyhousecleaning.com`, and request indexing.** This repo replaced an older, pre-Astro version of the site (the git history starts 2026-08-07 — this whole codebase is only a couple days old at time of writing), and Google is still showing cached data from that old site in search results: a truncated homepage title, a stale meta description, and sitelinks ("About Us," "Reviews," "Contact Us") pointing at dead `/blank`, `/blank-2`, `/blank-4` URLs — a naming pattern typical of Squarespace's auto-generated slugs for untitled pages, which is almost certainly what the old site was built on. None of this is a bug in the current code — every page's `<title>`/meta description here is correct and complete. `vercel.json` now 301-redirects those three known stale URLs to their real replacements (`/about`, `/reviews`, `/contact`) so they resolve instead of 404ing, and `public/sitemap.xml` + `public/robots.txt` now exist so Google has an accurate, current map of every real page to crawl. What's left needs Search Console access, which no agent has: go to https://search.google.com/search-console, verify the property if it isn't already, submit `https://www.skyhousecleaning.com/sitemap.xml` under Sitemaps, and use "Request Indexing" (URL Inspection tool) on `/`, `/about`, `/reviews`, and `/contact` to speed up the recrawl. Also worth checking `site:skyhousecleaning.com` in a Google search for any other stale `/blank-N` URLs beyond the three already redirected, and adding more redirects to `vercel.json` if found. Also double-check the Google Business Profile's website link points at `https://www.skyhousecleaning.com` and not an old URL.
 
+## CRM (Firebase/Firestore)
+
+Internal CRM + dispatcher, built on Firebase, living under `/admin` alongside the existing staff tools (same Basic Auth gate from `middleware.js` — no separate login for this yet, that's coming with the dispatcher's crew-facing view). Firestore project: `sky-house-cleaning`, created 2026-08-14.
+
+**Architecture:** `src/lib/firebaseAdmin.js` holds a lazily-initialized Firebase Admin SDK singleton (service-account auth, same shape as the Google Calendar service account above — see `getApp()`'s comment for why it's guarded with `getApps()` rather than a simple boolean). `src/lib/crm.js` wraps it with the actual data access (`listClients`, `createClient`, `listDeals`, `markDealWon`, etc.) so admin pages never touch Firestore collection/field names directly.
+
+**Data model (v1 — Contacts + Deals only):**
+- `clients` collection (contacts): name, phone, email, address, accessNotes, petNotes, stripeCustomerId, `lifecycleStage` (`lead` → `active_client` → `past_client`), leadSource.
+- `deals` collection (lead pipeline): contactId, title, serviceType, `stage` (`new_inquiry` → `quote_sent` → `follow_up` → `won`/`lost`), estimatedValue, expectedCloseDate, lostReason, notes. Marking a deal `won` (via `markDealWon`) automatically flips the linked client's lifecycle stage to `active_client` — that's intentional, don't update deal stage directly for a win, use the helper.
+- Deferred to the dispatcher phase: a `jobs` collection, an `activities` timeline collection, and a `companies` collection (for commercial/office accounts). Not built yet — don't assume they exist.
+
+**One-time setup, done 2026-08-14:**
+   - Firebase project `sky-house-cleaning` created under the `skyhousecleaning.com` Google Workspace organization, Spark (free) plan.
+   - Web app registered (no Firebase Hosting — staying on Vercel), config values are in `.env` as the `PUBLIC_FIREBASE_*` vars (safe to expose, not secret).
+   - **Still pending:** Firestore Database creation (production mode, us-west1/us-west4) and enabling the Email/Password sign-in provider under Authentication (needed for the dispatcher's per-cleaner logins, not the CRM). Also still pending: generating the service-account private key (Project settings → Service accounts → Generate new private key) and filling in `FIREBASE_SERVICE_ACCOUNT_CLIENT_EMAIL` / `FIREBASE_SERVICE_ACCOUNT_PRIVATE_KEY` in `.env` — `firebaseAdmin.js` throws a clear error on any Firestore call until those are set.
+   - `firebase-admin` is in `package.json` but hasn't been installed yet (this environment's npm registry access is blocked) — needs a real `npm install` wherever this actually gets built/deployed.
+
 ## Summary
 
 Just edit the files. Don't install, build, run, or push anything.
