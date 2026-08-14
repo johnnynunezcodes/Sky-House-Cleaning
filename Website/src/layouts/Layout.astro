@@ -89,7 +89,14 @@ const businessSchema = {
 		<meta property="og:description" content={description} />
 		<meta property="og:type" content="website" />
 		<meta property="og:url" content={Astro.url.href} />
-		<meta property="og:image" content="https://www.skyhousecleaning.com/images/logo-full.png" />
+		<!-- White-background version, not the transparent logo-full.png — a
+		     transparent PNG here just shows whatever background color the
+		     link-preview surface uses (e.g. iMessage's dark bubble in dark
+		     mode), which looked off. Source: Images/Logos/"Logo w:white
+		     background.png" in the project vault, copied in as
+		     logo-full-white-bg.png (renamed to drop the colon, which isn't
+		     safe in a URL/filename). -->
+		<meta property="og:image" content="https://www.skyhousecleaning.com/images/logo-full-white-bg.png" />
 		<meta name="twitter:card" content="summary_large_image" />
 		<title>{title}</title>
 		<script type="application/ld+json" set:html={JSON.stringify(businessSchema)} />
