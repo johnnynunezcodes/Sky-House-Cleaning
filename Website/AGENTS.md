@@ -10,9 +10,9 @@ Do not run `npm install`, `npm run dev`, `npm run build`, `npm run preview`, or 
 - The dev server (`npm run dev`) is already running locally on my machine. You don't need to start it.
 - If you want to sanity-check a change, do it by reading the files (syntax, structure, matching patterns already used elsewhere in the codebase) — not by running a command.
 
-## Never run git commands
+## Git
 
-Do not run `git add`, `git commit`, `git push`, `git status`, or any other git command in this project. I handle git myself.
+Claude handles git for this project — add, commit (with clear descriptive messages), and push to `origin/main` as work is completed. No need to ask before committing/pushing normal in-progress work.
 
 ## Booking & payments architecture
 
