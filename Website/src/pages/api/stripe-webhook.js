@@ -23,6 +23,7 @@ import { nextVisitWindow } from "../../lib/pricing.js";
 import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
 import { markPendingBookingConverted } from "../../lib/pendingBookings.js";
 import { markPendingDepositPaid } from "../../lib/pendingDeposits.js";
+import { markInvoicePaid } from "../../lib/invoices.js";
 import { getNextJobNumber, upsertJobAssignment } from "../../lib/dispatch.js";
 import { isConfigured as isFirebaseConfigured } from "../../lib/firebaseAdmin.js";
 
@@ -138,6 +139,19 @@ export async function POST({ request }) {
 				} catch (err) {
 					console.error("Failed to update job's deposit status:", err?.message);
 				}
+			}
+		}
+
+		// A customer paying off an invoice from /pay/[id].astro (staff sent it
+		// from /admin/invoices). Unlike the deposit branch above, there's no
+		// calendar event or job status to touch here — the job is already
+		// completed by the time an invoice exists (see update-job.js), this is
+		// just the very last step: marking the balance actually collected.
+		if (metadata.invoiceId && isFirebaseConfigured()) {
+			try {
+				await markInvoicePaid(metadata.invoiceId, { stripeSessionId: session.id });
+			} catch (err) {
+				console.error("Failed to mark invoice paid:", err?.message);
 			}
 		}
 

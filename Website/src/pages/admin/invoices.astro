@@ -1,0 +1,554 @@
+---
+// Staff-only — gated by HTTP Basic Auth in src/middleware.js. Tracks the
+// remaining balance owed on quote-based jobs after their deposit is paid
+// and the work is done (see src/lib/invoices.js and AGENTS.md → Invoices).
+// Most invoices here are created automatically by update-job.js the moment
+// a quote-based job with a paid deposit is marked completed — this page is
+// where staff review the auto-filled amount, send the customer a pay link,
+// and track what's still outstanding.
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Invoices | Sky House Cleaning Staff Tools">
+	<div class="container admin-container">
+		<h1>Invoices</h1>
+		<p class="admin-hint">
+			Balances owed on completed quote-based jobs (commercial cleaning, garage organization,
+			post-construction). Most of these appear here automatically once a job with a paid deposit is
+			marked <strong>Completed</strong> on the Jobs board — review the amount, then send the customer
+			a pay link.
+		</p>
+
+		<p id="load-status" class="admin-status">Loading…</p>
+		<p id="page-message" class="admin-result-message" hidden></p>
+
+		<div class="admin-overview-grid">
+			<div class="card admin-overview-card">
+				<p class="admin-overview-card__label">Drafts</p>
+				<p class="admin-overview-card__sub">Not sent yet</p>
+				<p class="admin-overview-card__value" id="stat-draft-count">0</p>
+			</div>
+			<div class="card admin-overview-card">
+				<p class="admin-overview-card__label">Awaiting Payment</p>
+				<p class="admin-overview-card__sub">Sent, not yet due</p>
+				<p class="admin-overview-card__value" id="stat-sent-count">0</p>
+				<p class="admin-overview-card__meta" id="stat-sent-total">$0.00</p>
+			</div>
+			<div class="card admin-overview-card admin-overview-card--warn">
+				<p class="admin-overview-card__label">Overdue</p>
+				<p class="admin-overview-card__sub">Past due date, unpaid</p>
+				<p class="admin-overview-card__value" id="stat-overdue-count">0</p>
+				<p class="admin-overview-card__meta" id="stat-overdue-total">$0.00</p>
+			</div>
+			<div class="card admin-overview-card">
+				<p class="admin-overview-card__label">Paid This Month</p>
+				<p class="admin-overview-card__sub">Collected</p>
+				<p class="admin-overview-card__value" id="stat-paid-total">$0.00</p>
+			</div>
+		</div>
+
+		<div class="admin-list-toolbar">
+			<div class="admin-filters" role="group" aria-label="Filter invoices">
+				<button type="button" class="admin-filter is-active" data-status="">All</button>
+				<button type="button" class="admin-filter" data-status="draft">Draft</button>
+				<button type="button" class="admin-filter" data-status="sent">Sent</button>
+				<button type="button" class="admin-filter" data-status="overdue">Overdue</button>
+				<button type="button" class="admin-filter" data-status="paid">Paid</button>
+				<button type="button" class="admin-filter" data-status="void">Void</button>
+			</div>
+		</div>
+
+		<div class="admin-table-wrap">
+			<table class="admin-table">
+				<thead>
+					<tr>
+						<th>Job #</th>
+						<th>Client</th>
+						<th>Service</th>
+						<th>Amount</th>
+						<th>Status</th>
+						<th>Due</th>
+						<th>Actions</th>
+					</tr>
+				</thead>
+				<tbody id="invoices-table-body"></tbody>
+			</table>
+		</div>
+	</div>
+
+	<script>
+		const loadStatus = document.getElementById("load-status");
+		const pageMessage = document.getElementById("page-message");
+		const tableBody = document.getElementById("invoices-table-body");
+		const filterButtons = document.querySelectorAll(".admin-filter");
+
+		const SERVICE_LABELS = {
+			commercial: "Office & Commercial Cleaning",
+			postConstruction: "Post-Construction Cleaning",
+			garageOrganization: "Garage Cleaning & Organization",
+		};
+
+		const STATUS_LABELS = {
+			draft: "Draft",
+			sent: "Sent",
+			overdue: "Overdue",
+			paid: "Paid",
+			void: "Void",
+		};
+
+		let currentFilter = "";
+		let allInvoices = [];
+
+		function escapeHtml(str) {
+			const div = document.createElement("div");
+			div.textContent = str ?? "";
+			return div.innerHTML;
+		}
+
+		function fmtMoney(n) {
+			const value = Number(n) || 0;
+			return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+		}
+
+		function fmtDate(iso) {
+			if (!iso) return "—";
+			return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+		}
+
+		function showPageMessage(text, isError = false) {
+			pageMessage.hidden = false;
+			pageMessage.textContent = text;
+			pageMessage.classList.toggle("admin-result-message--error", isError);
+		}
+
+		async function copyToClipboard(text) {
+			try {
+				await navigator.clipboard.writeText(text);
+				return true;
+			} catch {
+				return false;
+			}
+		}
+
+		async function loadInvoices() {
+			loadStatus.hidden = false;
+			loadStatus.textContent = "Loading…";
+			try {
+				const res = await fetch("/api/admin/invoices/list");
+				const data = await res.json();
+				if (!res.ok) {
+					loadStatus.textContent = data.error || "Couldn't load invoices.";
+					loadStatus.classList.add("admin-status--error");
+					return;
+				}
+				loadStatus.hidden = true;
+				allInvoices = data.invoices || [];
+				renderStats();
+				renderTable();
+			} catch {
+				loadStatus.textContent = "Network error, please try again.";
+				loadStatus.classList.add("admin-status--error");
+			}
+		}
+
+		function renderStats() {
+			const draft = allInvoices.filter((i) => i.effectiveStatus === "draft");
+			const sent = allInvoices.filter((i) => i.effectiveStatus === "sent");
+			const overdue = allInvoices.filter((i) => i.effectiveStatus === "overdue");
+			const now = new Date();
+			const paidThisMonth = allInvoices.filter((i) => {
+				if (i.status !== "paid" || !i.paidAt) return false;
+				const paidDate = new Date(i.paidAt._seconds ? i.paidAt._seconds * 1000 : i.paidAt);
+				return paidDate.getMonth() === now.getMonth() && paidDate.getFullYear() === now.getFullYear();
+			});
+
+			document.getElementById("stat-draft-count").textContent = String(draft.length);
+			document.getElementById("stat-sent-count").textContent = String(sent.length);
+			document.getElementById("stat-sent-total").textContent = fmtMoney(sent.reduce((sum, i) => sum + (Number(i.amount) || 0), 0));
+			document.getElementById("stat-overdue-count").textContent = String(overdue.length);
+			document.getElementById("stat-overdue-total").textContent = fmtMoney(
+				overdue.reduce((sum, i) => sum + (Number(i.amount) || 0), 0),
+			);
+			document.getElementById("stat-paid-total").textContent = fmtMoney(
+				paidThisMonth.reduce((sum, i) => sum + (Number(i.amount) || 0), 0),
+			);
+		}
+
+		function renderTable() {
+			tableBody.innerHTML = "";
+			const rows = currentFilter ? allInvoices.filter((i) => i.effectiveStatus === currentFilter) : allInvoices;
+
+			if (!rows.length) {
+				const tr = document.createElement("tr");
+				tr.innerHTML = `<td colspan="7" class="admin-table__empty">No invoices here.</td>`;
+				tableBody.appendChild(tr);
+				return;
+			}
+
+			rows.forEach((invoice) => tableBody.appendChild(invoiceRow(invoice)));
+		}
+
+		function invoiceRow(invoice) {
+			const tr = document.createElement("tr");
+			const serviceLabel = SERVICE_LABELS[invoice.serviceType] || invoice.serviceType || "—";
+			const status = invoice.effectiveStatus;
+
+			tr.innerHTML = `
+				<td>${invoice.jobNumber ? "#" + escapeHtml(invoice.jobNumber) : "—"}</td>
+				<td>${escapeHtml(invoice.clientName) || "—"}</td>
+				<td>${escapeHtml(serviceLabel)}</td>
+				<td>${fmtMoney(invoice.amount)}</td>
+				<td><span class="admin-badge admin-badge--${status}">${STATUS_LABELS[status] || status}</span></td>
+				<td>${status === "paid" ? "—" : fmtDate(invoice.dueAt)}</td>
+				<td class="admin-invoice-actions"></td>
+			`;
+
+			const actionsCell = tr.querySelector(".admin-invoice-actions");
+
+			if (status === "paid") {
+				const label = document.createElement("span");
+				label.className = "admin-table__sub admin-table__sub--paid";
+				label.textContent = `Paid${invoice.paymentMethod === "manual" ? " (manual)" : ""}`;
+				actionsCell.appendChild(label);
+				return tr;
+			}
+			if (status === "void") {
+				const label = document.createElement("span");
+				label.className = "admin-table__sub";
+				label.textContent = "Voided";
+				actionsCell.appendChild(label);
+				return tr;
+			}
+
+			const editBtn = document.createElement("button");
+			editBtn.type = "button";
+			editBtn.className = "btn btn--outline admin-btn--small";
+			editBtn.textContent = "Edit Amount";
+			editBtn.addEventListener("click", async () => {
+				const next = prompt(`New amount for ${invoice.clientName || "this invoice"}:`, invoice.amount);
+				if (next == null) return;
+				const amount = Number(next);
+				if (!amount || amount <= 0) {
+					showPageMessage("Please enter a valid amount.", true);
+					return;
+				}
+				try {
+					const res = await fetch("/api/admin/invoices/update", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ id: invoice.id, amount }),
+					});
+					const data = await res.json();
+					if (!res.ok) return showPageMessage(data.error || "Something went wrong.", true);
+					showPageMessage("Amount updated.");
+					await loadInvoices();
+				} catch {
+					showPageMessage("Network error, please try again.", true);
+				}
+			});
+			actionsCell.appendChild(editBtn);
+
+			const sendBtn = document.createElement("button");
+			sendBtn.type = "button";
+			sendBtn.className = "btn btn--outline admin-btn--small";
+			sendBtn.textContent = status === "draft" ? "Send" : "Copy Link";
+			sendBtn.addEventListener("click", async () => {
+				sendBtn.disabled = true;
+				try {
+					if (status === "draft") {
+						const res = await fetch("/api/admin/invoices/send", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ id: invoice.id }),
+						});
+						const data = await res.json();
+						if (!res.ok) return showPageMessage(data.error || "Something went wrong.", true);
+						const copied = await copyToClipboard(data.payUrl);
+						showPageMessage(copied ? `Link copied: ${data.payUrl}` : `Send this link: ${data.payUrl}`);
+						await loadInvoices();
+					} else {
+						const origin = window.location.origin;
+						const payUrl = `${origin}/pay/${invoice.id}`;
+						const copied = await copyToClipboard(payUrl);
+						showPageMessage(copied ? `Link copied: ${payUrl}` : `Pay link: ${payUrl}`);
+					}
+				} catch {
+					showPageMessage("Network error, please try again.", true);
+				} finally {
+					sendBtn.disabled = false;
+				}
+			});
+			actionsCell.appendChild(sendBtn);
+
+			const paidBtn = document.createElement("button");
+			paidBtn.type = "button";
+			paidBtn.className = "btn btn--outline admin-btn--small";
+			paidBtn.textContent = "Mark Paid";
+			paidBtn.addEventListener("click", async () => {
+				if (!confirm(`Mark this invoice paid by hand (check/cash/phone card)?`)) return;
+				paidBtn.disabled = true;
+				try {
+					const res = await fetch("/api/admin/invoices/mark-paid", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ id: invoice.id }),
+					});
+					const data = await res.json();
+					if (!res.ok) return showPageMessage(data.error || "Something went wrong.", true);
+					showPageMessage("Marked paid.");
+					await loadInvoices();
+				} catch {
+					showPageMessage("Network error, please try again.", true);
+				} finally {
+					paidBtn.disabled = false;
+				}
+			});
+			actionsCell.appendChild(paidBtn);
+
+			const voidBtn = document.createElement("button");
+			voidBtn.type = "button";
+			voidBtn.className = "btn btn--outline admin-btn--small admin-btn--danger";
+			voidBtn.textContent = "Void";
+			voidBtn.addEventListener("click", async () => {
+				if (!confirm(`Void this invoice? This can't be undone.`)) return;
+				voidBtn.disabled = true;
+				try {
+					const res = await fetch("/api/admin/invoices/update", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ id: invoice.id, status: "void" }),
+					});
+					const data = await res.json();
+					if (!res.ok) return showPageMessage(data.error || "Something went wrong.", true);
+					showPageMessage("Invoice voided.");
+					await loadInvoices();
+				} catch {
+					showPageMessage("Network error, please try again.", true);
+				} finally {
+					voidBtn.disabled = false;
+				}
+			});
+			actionsCell.appendChild(voidBtn);
+
+			return tr;
+		}
+
+		filterButtons.forEach((btn) => {
+			btn.addEventListener("click", () => {
+				filterButtons.forEach((b) => b.classList.remove("is-active"));
+				btn.classList.add("is-active");
+				currentFilter = btn.dataset.status;
+				renderTable();
+			});
+		});
+
+		loadInvoices();
+	</script>
+
+	<style is:global>
+		/* is:global — see AGENTS.md: rows here are built via
+		   document.createElement, which Astro's scoped-CSS attribute-tagging
+		   never reaches, so a scoped <style> would silently fail to match them
+		   (same reasoning as jobs.astro/reschedule.astro). */
+		.admin-container {
+			max-width: 1100px;
+			margin: 0 auto;
+			padding-block: 3rem;
+		}
+
+		.admin-hint {
+			color: var(--color-slate);
+			margin-bottom: 1.5rem;
+		}
+
+		.admin-status {
+			margin-bottom: 1rem;
+		}
+
+		.admin-status--error {
+			color: #b3261e;
+		}
+
+		.admin-result-message {
+			margin-bottom: 1.25rem;
+			font-weight: 600;
+			color: #1e7a34;
+			font-size: 0.9rem;
+			word-break: break-all;
+		}
+
+		.admin-result-message--error {
+			color: #b3261e;
+		}
+
+		.admin-overview-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+			gap: 0.75rem;
+			margin-bottom: 1.25rem;
+		}
+
+		.admin-overview-card {
+			padding: 1rem 1.1rem;
+		}
+
+		.admin-overview-card--warn {
+			border-color: #f3c8c5;
+			background: #fdeceb;
+		}
+
+		.admin-overview-card__label {
+			margin: 0;
+			font-weight: 600;
+			font-size: 0.85rem;
+			color: var(--color-ink);
+		}
+
+		.admin-overview-card__sub {
+			margin: 0.1rem 0 0.5rem;
+			font-size: 0.75rem;
+			color: var(--color-slate-light);
+		}
+
+		.admin-overview-card__value {
+			margin: 0;
+			font-family: var(--font-heading);
+			font-weight: 700;
+			font-size: 1.7rem;
+			color: var(--color-ink);
+		}
+
+		.admin-overview-card__meta {
+			margin: 0.15rem 0 0;
+			font-size: 0.85rem;
+			color: var(--color-slate);
+		}
+
+		.admin-list-toolbar {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			justify-content: space-between;
+			gap: 0.75rem;
+			margin-bottom: 1rem;
+		}
+
+		.admin-filters {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.admin-filter {
+			padding: 0.4rem 0.9rem;
+			border-radius: 999px;
+			border: 1px solid var(--color-border);
+			background: var(--color-white);
+			font-size: 0.85rem;
+			font-weight: 600;
+			color: var(--color-slate);
+			cursor: pointer;
+		}
+
+		.admin-filter.is-active {
+			background: var(--color-ink);
+			border-color: var(--color-ink);
+			color: var(--color-white);
+		}
+
+		.admin-table-wrap {
+			overflow-x: auto;
+			border: 1px solid var(--color-border);
+			border-radius: 10px;
+		}
+
+		.admin-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.88rem;
+		}
+
+		.admin-table th,
+		.admin-table td {
+			text-align: left;
+			padding: 0.65rem 1rem;
+			border-bottom: 1px solid var(--color-border);
+		}
+
+		.admin-table th {
+			background: var(--color-sky-light);
+			font-weight: 600;
+			font-size: 0.78rem;
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+			color: var(--color-slate);
+		}
+
+		.admin-table__empty {
+			text-align: center;
+			color: var(--color-slate-light);
+			padding: 2rem 1rem;
+		}
+
+		.admin-table__sub {
+			font-size: 0.8rem;
+			color: var(--color-slate-light);
+		}
+
+		.admin-table__sub--paid {
+			color: #1e7a34;
+			font-weight: 600;
+		}
+
+		.admin-invoice-actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.4rem;
+		}
+
+		.admin-btn--small {
+			font-size: 0.78rem;
+			padding: 0.35rem 0.7rem;
+		}
+
+		.admin-btn--danger {
+			color: #b3261e;
+			border-color: #f3c8c5;
+		}
+
+		.admin-badge {
+			display: inline-block;
+			padding: 0.2rem 0.6rem;
+			border-radius: 999px;
+			font-size: 0.8rem;
+			font-weight: 600;
+		}
+
+		.admin-badge--draft {
+			background: var(--color-sky-light);
+			color: var(--color-ink);
+		}
+
+		.admin-badge--sent {
+			background: #eaf1fb;
+			color: #1a5fb4;
+		}
+
+		.admin-badge--overdue {
+			background: #fdeceb;
+			color: #b3261e;
+		}
+
+		.admin-badge--paid {
+			background: #e3f3e6;
+			color: #1e7a34;
+		}
+
+		.admin-badge--void {
+			background: #ececec;
+			color: var(--color-slate);
+		}
+	</style>
+</AdminLayout>

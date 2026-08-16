@@ -66,6 +66,22 @@ export async function getPendingDeposit(id) {
 	return { id: doc.id, ...doc.data() };
 }
 
+// Used by update-job.js when a quote-based job is marked completed: the
+// calendar event's own extendedProperties.private only carries clientName
+// (see create-quote-job.js), not phone/email/address, but the pendingDeposit
+// doc created alongside it already has the full `customer` object — cheaper
+// to look that back up by jobKey than to add more fields to the calendar
+// event's private metadata just for this one read. There's always at most
+// one pendingDeposit per jobKey (one deposit per quote-based job), so the
+// first match is the only match.
+export async function getPendingDepositByJobKey(jobKey) {
+	const db = getDb();
+	const snapshot = await db.collection(COLLECTION).where("jobKey", "==", jobKey).limit(1).get();
+	if (snapshot.empty) return null;
+	const doc = snapshot.docs[0];
+	return { id: doc.id, ...doc.data() };
+}
+
 export async function markPendingDepositPaid(id, { stripeSessionId } = {}) {
 	const db = getDb();
 	await db

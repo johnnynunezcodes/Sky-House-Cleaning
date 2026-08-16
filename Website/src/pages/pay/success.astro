@@ -1,0 +1,80 @@
+---
+// Server-rendered to verify the Stripe session and show real details rather
+// than just trusting the redirect happened — same pattern as
+// /confirm-deposit/success.astro (deposits are always mode: "payment", and
+// so is an invoice payment).
+export const prerender = false;
+
+import Stripe from "stripe";
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+
+const sessionId = Astro.url.searchParams.get("session_id");
+const secretKey = import.meta.env.STRIPE_SECRET_KEY;
+
+let session = null;
+let errorMessage = null;
+
+if (!sessionId) {
+	errorMessage = "We couldn't find your payment details.";
+} else if (!secretKey) {
+	errorMessage = "Payments aren't fully configured yet.";
+} else {
+	const stripe = new Stripe(secretKey, { apiVersion: "2024-06-20" });
+	try {
+		session = await stripe.checkout.sessions.retrieve(sessionId);
+	} catch {
+		errorMessage = "We couldn't verify your payment. If you were charged, don't worry, we'll be in touch.";
+	}
+}
+
+const amountPaid = session?.amount_total != null ? (session.amount_total / 100).toFixed(2) : null;
+const email = session?.customer_details?.email || session?.customer_email;
+---
+
+<Layout title="Payment Received | Sky House Cleaning" description="Your invoice payment to Sky House Cleaning has been received.">
+	<PageHero
+		eyebrow="Thank You"
+		title={errorMessage ? "Thanks!" : "Payment Received"}
+		lede={
+			errorMessage ||
+			`We've received your payment${amountPaid ? ` of $${amountPaid}` : ""}${
+				email ? ` and a receipt is on its way to ${email}` : ""
+			}. Thanks for your business!`
+		}
+	/>
+
+	<section class="section">
+		<div class="container">
+			<div class="card success-card">
+				<p>
+					If anything looks off, just give us a call at <a href="tel:+18017592044">(801) 759-2044</a> and
+					we'll take care of it.
+				</p>
+				<div class="success-card__actions">
+					<a href="/" class="btn btn--primary">Back to Home</a>
+				</div>
+			</div>
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.success-card {
+		max-width: 640px;
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.success-card__actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.75rem;
+		margin-top: 1rem;
+	}
+
+	.success-card__actions .btn {
+		margin-top: 0;
+	}
+</style>

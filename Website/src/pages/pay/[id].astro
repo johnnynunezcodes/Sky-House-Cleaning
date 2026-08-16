@@ -1,0 +1,227 @@
+---
+// Public — no admin auth. This is the page a customer lands on after staff
+// send them an invoice link from /admin/invoices (the "Send" action —
+// src/pages/api/admin/invoices/send.js). Simpler than
+// /confirm-deposit/[id].astro's page: there's no new policy to agree to
+// here, the customer already agreed to the job and its price when they
+// booked — this page is purely "here's what you still owe, pay it."
+export const prerender = false;
+
+import Layout from "../../layouts/Layout.astro";
+import PageHero from "../../components/PageHero.astro";
+import { getInvoice } from "../../lib/invoices.js";
+import { isConfigured as isFirebaseConfigured } from "../../lib/firebaseAdmin.js";
+import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
+
+const id = Astro.params.id;
+
+let invoice = null;
+let errorMessage = null;
+let alreadyPaid = false;
+
+if (!isFirebaseConfigured()) {
+	errorMessage = "This page isn't configured yet. Please call us to pay your invoice.";
+} else if (!id) {
+	errorMessage = "We couldn't find that invoice.";
+} else {
+	try {
+		invoice = await getInvoice(id);
+	} catch {
+		errorMessage = "We couldn't load your invoice. Please try again or give us a call.";
+	}
+
+	if (!invoice && !errorMessage) {
+		errorMessage = "We couldn't find that invoice. The link may be incorrect — please give us a call and we'll help.";
+	} else if (invoice?.status === "void") {
+		errorMessage = "This invoice is no longer valid. Please give us a call if you have questions.";
+	} else if (invoice?.status === "paid") {
+		alreadyPaid = true;
+	}
+}
+
+function formatMoney(n) {
+	const value = Number(n) || 0;
+	return "$" + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const serviceLabel = invoice?.serviceType ? QUOTE_SERVICE_TYPES[invoice.serviceType] || invoice.serviceType : "";
+const dueLabel = invoice?.dueAt
+	? new Date(invoice.dueAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+	: "";
+---
+
+<Layout title="Pay Your Invoice | Sky House Cleaning" description="Pay your outstanding balance with Sky House Cleaning.">
+	<PageHero
+		eyebrow={alreadyPaid ? "All Set" : "Invoice"}
+		title={alreadyPaid ? "Already Paid" : errorMessage ? "Invoice" : "Pay Your Invoice"}
+		lede={
+			alreadyPaid
+				? "This invoice has already been paid — thank you!"
+				: errorMessage || "Review your balance below, then pay securely by card."
+		}
+	/>
+
+	<section class="section">
+		<div class="container">
+			{
+				errorMessage || alreadyPaid ? (
+					<div class="card pay-card pay-card--center">
+						{alreadyPaid && <p>{formatMoney(invoice.amount)} paid in full. We appreciate your business!</p>}
+						<a href="tel:+18017592044" class="btn btn--primary">
+							Call (801) 759-2044
+						</a>
+					</div>
+				) : (
+					<div class="pay-layout">
+						<div class="card pay-card">
+							<h3>Invoice{invoice.jobNumber ? ` #${invoice.jobNumber}` : ""}</h3>
+							{serviceLabel && <p class="pay-service">{serviceLabel}</p>}
+							{invoice.clientName && <p class="pay-meta">{invoice.clientName}</p>}
+							{dueLabel && <p class="pay-meta">Due {dueLabel}</p>}
+							{invoice.notes && <p class="pay-meta pay-notes">{invoice.notes}</p>}
+
+							<div class="pay-amount">
+								<span>Amount due</span>
+								<span>{formatMoney(invoice.amount)}</span>
+							</div>
+
+							<form id="pay-form" data-id={id}>
+								<p class="pay-form__error" id="pay-error" hidden />
+								<button type="submit" class="btn btn--primary pay-form__submit" id="pay-submit">
+									Pay Now
+								</button>
+							</form>
+
+							<p class="pay-hint">
+								Questions about this invoice? Call us at <a href="tel:+18017592044">(801) 759-2044</a> before
+								paying and we'll help.
+							</p>
+						</div>
+					</div>
+				)
+			}
+		</div>
+	</section>
+</Layout>
+
+<style>
+	.pay-card--center {
+		max-width: 640px;
+		margin: 0 auto;
+		text-align: center;
+	}
+
+	.pay-card--center .btn {
+		margin-top: 1rem;
+	}
+
+	.pay-layout {
+		max-width: 560px;
+		margin: 0 auto;
+	}
+
+	.pay-card {
+		padding: 2rem;
+	}
+
+	.pay-card h3 {
+		margin-bottom: 0.5rem;
+	}
+
+	.pay-service {
+		margin: 0;
+		color: var(--color-sky-dark);
+		font-weight: 600;
+	}
+
+	.pay-meta {
+		margin: 0.25rem 0;
+		color: var(--color-slate);
+		font-size: 0.9rem;
+	}
+
+	.pay-notes {
+		font-style: italic;
+	}
+
+	.pay-amount {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		margin: 1.5rem 0;
+		padding: 1.25rem 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+		font-family: var(--font-heading);
+		font-weight: 700;
+		font-size: 1.4rem;
+		color: var(--color-ink);
+	}
+
+	.pay-form__error {
+		margin: 0 0 1rem;
+		font-size: 0.85rem;
+		color: #b3261e;
+	}
+
+	.pay-form__error[hidden] {
+		display: none;
+	}
+
+	.pay-form__submit {
+		width: 100%;
+	}
+
+	.pay-form__submit[disabled] {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.pay-hint {
+		margin: 1rem 0 0;
+		font-size: 0.85rem;
+		color: var(--color-slate);
+	}
+</style>
+
+<script>
+	function initPayPage() {
+		const form = document.getElementById("pay-form");
+		if (!form || form.dataset.init === "true") return;
+		form.dataset.init = "true";
+
+		const id = form.dataset.id;
+		const errorEl = document.getElementById("pay-error");
+		const submitBtn = document.getElementById("pay-submit");
+
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			errorEl.hidden = true;
+			submitBtn.disabled = true;
+			submitBtn.textContent = "Redirecting to payment…";
+
+			try {
+				const response = await fetch("/api/pay/create-session", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ id }),
+				});
+				const data = await response.json();
+
+				if (!response.ok || !data.url) {
+					throw new Error(data.error || "Something went wrong starting checkout.");
+				}
+
+				window.location.href = data.url;
+			} catch (err) {
+				errorEl.textContent = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+				errorEl.hidden = false;
+				submitBtn.disabled = false;
+				submitBtn.textContent = "Pay Now";
+			}
+		});
+	}
+
+	initPayPage();
+	document.addEventListener("astro:page-load", initPayPage);
+</script>

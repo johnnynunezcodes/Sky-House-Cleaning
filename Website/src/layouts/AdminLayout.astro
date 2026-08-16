@@ -31,6 +31,7 @@ const ICONS = {
 	deals: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>`,
 	dispatch: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="13" height="10"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="6" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>`,
 	quoteJob: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M12 17v-6M9.8 12.8c0-.9.9-1.3 2.2-1.3s2.2.5 2.2 1.2-.9 1.1-2.2 1.3-2.2.6-2.2 1.4.9 1.3 2.2 1.3 2.2-.4 2.2-1.3"/></svg>`,
+	invoices: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>`,
 };
 
 const navGroups = [
@@ -61,7 +62,7 @@ const navGroups = [
 		label: "CRM",
 		items: [
 			{ label: "Contacts", href: "/admin/crm/contacts", icon: ICONS.contacts },
-			{ label: "Deals", href: "/admin/crm/deals", icon: ICONS.deals },
+			{ label: "Requests & Quotes", href: "/admin/crm/deals", icon: ICONS.deals },
 		],
 	},
 ];
@@ -70,7 +71,10 @@ const navGroups = [
 // grouped sections as flat links, same indentation as a group label rather
 // than a nested item — Dispatch today, easy to promote into its own group
 // later (e.g. once a separate Cleaners page exists).
-const flatLinks = [{ label: "Jobs", href: "/admin/jobs", icon: ICONS.dispatch }];
+const flatLinks = [
+	{ label: "Jobs", href: "/admin/jobs", icon: ICONS.dispatch },
+	{ label: "Invoices", href: "/admin/invoices", icon: ICONS.invoices },
+];
 
 function isItemActive(item: { href: string; activeMatch?: (path: string) => boolean }) {
 	return item.activeMatch ? item.activeMatch(currentPath) : currentPath === item.href;
@@ -136,6 +140,9 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 									{item.href === "/admin/jobs" && (
 										<span class="admin-nav-badge" id="dispatch-unassigned-badge" hidden />
 									)}
+									{item.href === "/admin/invoices" && (
+										<span class="admin-nav-badge" id="invoices-overdue-badge" hidden />
+									)}
 								</a>
 							))
 						}
@@ -180,8 +187,29 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				}
 			}
 
+			// Same lightweight, best-effort pattern as loadDispatchBadge() above —
+			// counts invoices whose due date has already passed and are still
+			// unpaid, since that's the one status that genuinely needs someone's
+			// attention (a fresh "sent" or "draft" invoice isn't urgent yet).
+			async function loadInvoicesBadge() {
+				const badge = document.getElementById("invoices-overdue-badge");
+				if (!badge) return;
+				try {
+					const res = await fetch(`/api/admin/invoices/list?status=sent`);
+					if (!res.ok) return;
+					const data = await res.json();
+					const overdue = (data.invoices || []).filter((i) => i.effectiveStatus === "overdue").length;
+					badge.textContent = String(overdue);
+					badge.hidden = overdue === 0;
+				} catch {
+					// Non-fatal — sidebar just shows no badge.
+				}
+			}
+
 			loadDispatchBadge();
+			loadInvoicesBadge();
 			document.addEventListener("astro:page-load", loadDispatchBadge);
+			document.addEventListener("astro:page-load", loadInvoicesBadge);
 		</script>
 
 		<style>

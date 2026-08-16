@@ -7,6 +7,8 @@ import { upsertJobAssignment, getJobAssignments, JOB_STATUSES } from "../../../.
 import { isConfigured } from "../../../../lib/firebaseAdmin.js";
 import { getBookingEvent, createReminderEvent, isConfigured as isCalendarConfigured } from "../../../../lib/googleCalendar.js";
 import { QUOTE_SERVICE_TYPES } from "../../../../data/booking.js";
+import { createInvoice } from "../../../../lib/invoices.js";
+import { getPendingDepositByJobKey } from "../../../../lib/pendingDeposits.js";
 
 export async function POST({ request }) {
 	if (!isConfigured()) {
@@ -86,6 +88,33 @@ export async function POST({ request }) {
 							// minimum-commitment reminder — the status change itself
 							// still saves below even if this notification fails.
 							console.error("Failed to create invoice-balance reminder event:", err?.message);
+						}
+
+						// Alongside the calendar nudge above, create the actual invoice
+						// record that shows up on /admin/invoices — as a "draft" so staff
+						// can double-check/adjust the amount (e.g. actual hours ran over
+						// the estimate) before sending the customer a pay link. Gated by
+						// the same outer `!alreadyReminded` check as the reminder above,
+						// so re-saving an already-completed job never creates a duplicate.
+						try {
+							const depositRecord = await getPendingDepositByJobKey(jobKey).catch(() => null);
+							const customer = depositRecord?.customer || {};
+							await createInvoice({
+								jobKey,
+								eventId,
+								visitDate,
+								jobNumber: priv.jobNumber || "",
+								clientName: priv.clientName || customer.name || "",
+								clientEmail: customer.email || "",
+								clientPhone: customer.phone || "",
+								serviceType: priv.serviceType || "",
+								amount: remaining,
+							});
+						} catch (err) {
+							// Non-fatal for the same reason as the reminder above — a
+							// missing invoice record can always be created by hand from
+							// /admin/invoices afterward.
+							console.error("Failed to auto-create invoice:", err?.message);
 						}
 					}
 				}

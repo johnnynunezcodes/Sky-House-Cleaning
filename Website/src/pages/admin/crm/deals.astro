@@ -7,19 +7,20 @@ export const prerender = false;
 import AdminLayout from "../../../layouts/AdminLayout.astro";
 ---
 
-<AdminLayout title="CRM: Deals | Sky House Cleaning Staff Tools">
+<AdminLayout title="Requests & Quotes | Sky House Cleaning Staff Tools">
 			<div class="container admin-container">
-				<h1>CRM: Deals</h1>
+				<h1>Requests &amp; Quotes</h1>
 				<p class="admin-hint">
-					Everyone who's inquired but hasn't booked yet. Marking a deal <strong>Won</strong>
-					automatically flips the linked contact to an active client — nothing else to update by
-					hand.
+					Everyone who's inquired but hasn't booked yet, from first contact through a sent quote.
+					A new inquiry lands in <strong>Requests</strong>; once you've priced it, move it to
+					<strong>Quotes</strong>. Marking one <strong>Won</strong> automatically flips the linked
+					contact to an active client — nothing else to update by hand.
 				</p>
 
 				<p id="load-status" class="admin-status">Loading…</p>
 
 				<details class="card admin-add-card">
-					<summary class="admin-add-summary">+ Add a deal</summary>
+					<summary class="admin-add-summary">+ Add a request</summary>
 					<form id="add-form" class="admin-form">
 						<div class="admin-form__grid">
 							<div class="admin-form__row admin-form__row--full">
@@ -101,15 +102,24 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 			const newContactFields = document.getElementById("new-contact-fields");
 			const filterButtons = document.querySelectorAll(".admin-filter");
 
+			// Display labels only — the underlying stage values (new_inquiry,
+			// quote_sent, follow_up, won, lost) stay as-is in the data model and
+			// API, so nothing downstream (create-deal.js, update-deal.js,
+			// win-deal.js) needed to change for this page to read/feel like a
+			// Jobber-style Requests → Quotes pipeline.
 			const STAGE_LABELS = {
-				new_inquiry: "New Inquiry",
-				quote_sent: "Quote Sent",
+				new_inquiry: "Requests",
+				quote_sent: "Quotes",
 				follow_up: "Follow-Up",
 				won: "Won",
 				lost: "Lost",
 			};
 			const OPEN_STAGE_ORDER = ["new_inquiry", "quote_sent", "follow_up"];
 			const NEXT_STAGE = { new_inquiry: "quote_sent", quote_sent: "follow_up" };
+			// Separate from STAGE_LABELS (column headers) so a button reads
+			// naturally as an action ("Move to Quotes") rather than reusing the
+			// destination column's bare noun ("Mark Quotes").
+			const ADVANCE_LABELS = { quote_sent: "Move to Quotes", follow_up: "Move to Follow-Up" };
 
 			let currentView = "open";
 			let allClients = [];
@@ -195,7 +205,7 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 					${deal.notes ? `<p class="admin-card__meta admin-card__notes">${escapeHtml(deal.notes)}</p>` : ""}
 					${deal.stage === "lost" && deal.lostReason ? `<p class="admin-card__meta admin-card__notes">Lost reason: ${escapeHtml(deal.lostReason)}</p>` : ""}
 					<div class="admin-deal-actions">
-						${advanceStage ? `<button type="button" class="btn btn--outline admin-advance">Mark ${STAGE_LABELS[advanceStage]}</button>` : ""}
+						${advanceStage ? `<button type="button" class="btn btn--outline admin-advance">${ADVANCE_LABELS[advanceStage]}</button>` : ""}
 						${deal.stage !== "won" && deal.stage !== "lost" ? `<button type="button" class="btn btn--outline admin-win">Mark Won</button>` : ""}
 						${deal.stage !== "won" && deal.stage !== "lost" ? `<button type="button" class="btn btn--outline admin-lost">Mark Lost</button>` : ""}
 						${deal.contactId ? `<a href="/admin/quote?contactId=${encodeURIComponent(deal.contactId)}" class="btn btn--outline">Convert to Booking</a>` : ""}
