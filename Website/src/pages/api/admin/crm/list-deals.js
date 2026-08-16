@@ -24,6 +24,10 @@ export async function GET({ url }) {
 				contactName: contact?.name || "(contact not found)",
 				contactPhone: contact?.phone || "",
 				contactEmail: contact?.email || "",
+				// Added for /admin/book-quote.astro's ?dealId= prefill (a Request's
+				// "Send a Quote" action) — every other consumer of this endpoint
+				// just ignores the extra field.
+				contactAddress: contact?.address || "",
 			};
 		});
 

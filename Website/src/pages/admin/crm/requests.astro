@@ -1,0 +1,574 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Requests:
+// the front door for a new inbound lead, split out of the old combined
+// Deals board into its own page — see AGENTS.md → "Requests & Quotes" for
+// why, including the Jobber research that informed this split. Backed by
+// the SAME `deals` Firestore collection/API as before (src/lib/crm.js),
+// just scoped to stage === "new_inquiry" — no new collection needed for
+// this half of the split.
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Requests | Sky House Cleaning Staff Tools">
+			<div class="container admin-container">
+				<h1>Requests</h1>
+				<p class="admin-hint">
+					Capture a new inquiry, get a general sense of the price, and — for jobs that need a real
+					look before quoting — schedule a site visit with a cleaner to check it out. Once you're
+					ready to price it, move it to <a href="/admin/crm/quotes">Quotes</a>.
+				</p>
+
+				<p id="load-status" class="admin-status">Loading…</p>
+
+				<details class="card admin-add-card">
+					<summary class="admin-add-summary">+ Add a request</summary>
+					<form id="add-form" class="admin-form">
+						<div class="admin-form__grid">
+							<div class="admin-form__row admin-form__row--full">
+								<label for="add-contactId">Contact</label>
+								<select id="add-contactId" name="contactId">
+									<option value="">+ New contact…</option>
+								</select>
+							</div>
+							<div id="new-contact-fields" class="admin-form__row admin-form__row--full admin-form__subgrid">
+								<div class="admin-form__row">
+									<label for="add-newContactName">New contact name *</label>
+									<input type="text" id="add-newContactName" name="newContactName" />
+								</div>
+								<div class="admin-form__row">
+									<label for="add-newContactPhone">Phone</label>
+									<input type="tel" id="add-newContactPhone" name="newContactPhone" />
+								</div>
+								<div class="admin-form__row">
+									<label for="add-newContactEmail">Email</label>
+									<input type="email" id="add-newContactEmail" name="newContactEmail" />
+								</div>
+								<div class="admin-form__row">
+									<label for="add-newContactLeadSource">Lead source</label>
+									<input type="text" id="add-newContactLeadSource" name="newContactLeadSource" placeholder="Referral, Google, Facebook…" />
+								</div>
+							</div>
+							<div class="admin-form__row admin-form__row--full">
+								<label for="add-title">Request title *</label>
+								<input type="text" id="add-title" name="title" required placeholder="e.g. Jane Doe, Weekly Cleaning or Acme Corp, Office Cleaning" />
+							</div>
+							<div class="admin-form__row">
+								<label for="add-serviceType">Service type</label>
+								<select id="add-serviceType" name="serviceType">
+									<option value="">Not sure yet</option>
+									<option value="One-Time Cleaning">One-Time Cleaning</option>
+									<option value="Recurring Cleaning">Recurring Cleaning</option>
+									<option value="Deep Cleaning">Deep Cleaning</option>
+									<option value="Move-In / Move-Out Cleaning">Move-In / Move-Out Cleaning</option>
+									<option value="Garage Cleaning & Organization">Garage Cleaning &amp; Organization</option>
+									<option value="Interior Car Detailing">Interior Car Detailing</option>
+									<option value="Airbnb Cleaning">Airbnb Cleaning</option>
+									<option value="Office & Commercial Cleaning">Office &amp; Commercial Cleaning</option>
+									<option value="Post-Construction Cleaning">Post-Construction Cleaning</option>
+								</select>
+							</div>
+							<div class="admin-form__row">
+								<label for="add-estimatedValue">Rough estimate ($)</label>
+								<input type="number" id="add-estimatedValue" name="estimatedValue" min="0" step="1" />
+							</div>
+							<div class="admin-form__row admin-form__row--full">
+								<label for="add-notes">Notes</label>
+								<input type="text" id="add-notes" name="notes" />
+							</div>
+						</div>
+						<button type="submit" class="btn btn--primary">Add Request</button>
+						<p class="admin-result-message" hidden></p>
+					</form>
+				</details>
+
+				<div id="board"></div>
+			</div>
+
+			<div class="admin-modal-backdrop" id="assess-modal-backdrop" hidden>
+				<div class="admin-modal card" id="assess-modal" role="dialog" aria-modal="true" aria-labelledby="assess-modal-title">
+					<div class="admin-modal__header">
+						<h3 id="assess-modal-title">Schedule Assessment</h3>
+						<button type="button" class="admin-modal__close" id="assess-modal-close" aria-label="Close">✕</button>
+					</div>
+					<div class="admin-modal__body">
+						<div class="admin-form__row">
+							<label for="assess-date">Date</label>
+							<input type="date" id="assess-date" />
+						</div>
+						<div class="admin-form__row">
+							<label for="assess-time">Start time</label>
+							<input type="time" id="assess-time" />
+						</div>
+						<div class="admin-form__row">
+							<label for="assess-cleaners">Cleaner(s)</label>
+							<select multiple id="assess-cleaners" class="admin-assign-select"></select>
+						</div>
+					</div>
+					<p class="admin-result-message" id="assess-modal-message" hidden></p>
+					<button type="button" class="btn btn--primary" id="assess-modal-save">Book It</button>
+				</div>
+			</div>
+
+		<script>
+			const loadStatus = document.getElementById("load-status");
+			const board = document.getElementById("board");
+			const addForm = document.getElementById("add-form");
+			const contactSelect = document.getElementById("add-contactId");
+			const newContactFields = document.getElementById("new-contact-fields");
+
+			const assessModalBackdrop = document.getElementById("assess-modal-backdrop");
+			const assessModal = document.getElementById("assess-modal");
+			const assessDate = document.getElementById("assess-date");
+			const assessTime = document.getElementById("assess-time");
+			const assessCleaners = document.getElementById("assess-cleaners");
+			const assessMessage = document.getElementById("assess-modal-message");
+			const assessSaveBtn = document.getElementById("assess-modal-save");
+			let assessingDealId = null;
+			let allCleaners = [];
+
+			function escapeHtml(str) {
+				const div = document.createElement("div");
+				div.textContent = str ?? "";
+				return div.innerHTML;
+			}
+
+			function fmtValue(n) {
+				if (n == null || n === "") return "";
+				return `$${Number(n).toLocaleString()}`;
+			}
+
+			async function loadClients() {
+				try {
+					const res = await fetch("/api/admin/crm/list-clients");
+					const data = await res.json();
+					if (res.ok) {
+						contactSelect.innerHTML =
+							`<option value="">+ New contact…</option>` +
+							(data.clients || [])
+								.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}${c.phone ? " · " + escapeHtml(c.phone) : ""}</option>`)
+								.join("");
+					}
+				} catch {
+					// Non-fatal — the "+ New contact…" option still works fine.
+				}
+			}
+
+			async function loadCleaners() {
+				try {
+					const res = await fetch("/api/admin/dispatch/list-cleaners");
+					const data = await res.json();
+					if (res.ok) allCleaners = (data.cleaners || []).filter((c) => c.active);
+				} catch {
+					// Non-fatal — the assessment can still be booked without a cleaner.
+				}
+			}
+
+			contactSelect.addEventListener("change", () => {
+				newContactFields.hidden = contactSelect.value !== "";
+			});
+
+			async function loadRequests() {
+				loadStatus.hidden = false;
+				loadStatus.textContent = "Loading…";
+				board.innerHTML = "";
+				try {
+					const res = await fetch(`/api/admin/crm/list-deals?stage=new_inquiry`);
+					const data = await res.json();
+					if (!res.ok) {
+						loadStatus.textContent = data.error || "Couldn't load requests.";
+						loadStatus.classList.add("admin-status--error");
+						return;
+					}
+					loadStatus.hidden = true;
+					renderList(data.deals || []);
+				} catch {
+					loadStatus.textContent = "Network error, please try again.";
+					loadStatus.classList.add("admin-status--error");
+				}
+			}
+
+			function requestCard(deal) {
+				const card = document.createElement("div");
+				card.className = "card admin-deal-card";
+				const assessment = deal.assessment || {};
+				card.innerHTML = `
+					<h4>${escapeHtml(deal.title) || "(untitled request)"}</h4>
+					<p class="admin-card__meta">${escapeHtml(deal.contactName)}${deal.contactPhone ? " · " + escapeHtml(deal.contactPhone) : ""}</p>
+					${deal.serviceType ? `<p class="admin-card__meta">${escapeHtml(deal.serviceType)}</p>` : ""}
+					${deal.estimatedValue != null && deal.estimatedValue !== "" ? `<p class="admin-card__meta">Rough estimate: ${fmtValue(deal.estimatedValue)}</p>` : ""}
+					${deal.notes ? `<p class="admin-card__meta admin-card__notes">${escapeHtml(deal.notes)}</p>` : ""}
+					${assessment.scheduled ? `<p class="admin-card__meta admin-card__meta--assessment">📋 Assessment ${assessment.completed ? "completed" : "scheduled"} — ${escapeHtml(assessment.visitDate || "")}</p>` : ""}
+					<div class="admin-deal-actions">
+						<button type="button" class="btn btn--outline admin-assess">${assessment.scheduled ? "Reschedule Assessment" : "Schedule Assessment"}</button>
+						<button type="button" class="btn btn--outline admin-advance">Move to Quotes</button>
+						<button type="button" class="btn btn--outline admin-lost">Mark Lost</button>
+					</div>
+					<p class="admin-result-message" hidden></p>
+				`;
+
+				const messageEl = card.querySelector(".admin-result-message");
+				function showMessage(text, isError = false) {
+					messageEl.hidden = false;
+					messageEl.textContent = text;
+					messageEl.classList.toggle("admin-result-message--error", isError);
+				}
+
+				card.querySelector(".admin-assess").addEventListener("click", () => openAssessModal(deal));
+
+				card.querySelector(".admin-advance").addEventListener("click", async (e) => {
+					const btn = e.currentTarget;
+					btn.disabled = true;
+					try {
+						const res = await fetch("/api/admin/crm/update-deal", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ id: deal.id, stage: "quote_sent" }),
+						});
+						const data = await res.json();
+						if (!res.ok) return showMessage(data.error || "Something went wrong.", true);
+						await loadRequests();
+					} catch {
+						showMessage("Network error, please try again.", true);
+					} finally {
+						btn.disabled = false;
+					}
+				});
+
+				card.querySelector(".admin-lost").addEventListener("click", async (e) => {
+					const reason = prompt(`Why is "${deal.title}" lost? (optional)`) || "";
+					const btn = e.currentTarget;
+					btn.disabled = true;
+					try {
+						const res = await fetch("/api/admin/crm/update-deal", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ id: deal.id, stage: "lost", lostReason: reason }),
+						});
+						const data = await res.json();
+						if (!res.ok) return showMessage(data.error || "Something went wrong.", true);
+						await loadRequests();
+					} catch {
+						showMessage("Network error, please try again.", true);
+					} finally {
+						btn.disabled = false;
+					}
+				});
+
+				return card;
+			}
+
+			function renderList(deals) {
+				if (!deals.length) {
+					board.innerHTML = `<p class="admin-status">No open requests. Add one above.</p>`;
+					return;
+				}
+				board.innerHTML = "";
+				for (const deal of deals) board.appendChild(requestCard(deal));
+			}
+
+			function openAssessModal(deal) {
+				assessingDealId = deal.id;
+				assessMessage.hidden = true;
+				assessDate.value = deal.assessment?.visitDate || "";
+				assessTime.value = "";
+				assessCleaners.innerHTML = allCleaners
+					.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+					.join("");
+				for (const opt of assessCleaners.options) {
+					opt.selected = (deal.assessment?.cleanerIds || []).includes(opt.value);
+				}
+				assessModalBackdrop.hidden = false;
+			}
+
+			function closeAssessModal() {
+				assessModalBackdrop.hidden = true;
+				assessingDealId = null;
+			}
+
+			document.getElementById("assess-modal-close").addEventListener("click", closeAssessModal);
+			assessModalBackdrop.addEventListener("click", (e) => {
+				if (e.target === assessModalBackdrop) closeAssessModal();
+			});
+
+			assessSaveBtn.addEventListener("click", async () => {
+				if (!assessingDealId) return;
+				if (!assessDate.value || !assessTime.value) {
+					assessMessage.hidden = false;
+					assessMessage.textContent = "Please pick a date and time.";
+					assessMessage.classList.add("admin-result-message--error");
+					return;
+				}
+				const cleanerIds = Array.from(assessCleaners.selectedOptions).map((o) => o.value);
+				assessSaveBtn.disabled = true;
+				try {
+					const res = await fetch("/api/admin/crm/schedule-assessment", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ dealId: assessingDealId, date: assessDate.value, time: assessTime.value, cleanerIds }),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						assessMessage.hidden = false;
+						assessMessage.textContent = data.error || "Something went wrong.";
+						assessMessage.classList.add("admin-result-message--error");
+						return;
+					}
+					closeAssessModal();
+					await loadRequests();
+				} catch {
+					assessMessage.hidden = false;
+					assessMessage.textContent = "Network error, please try again.";
+					assessMessage.classList.add("admin-result-message--error");
+				} finally {
+					assessSaveBtn.disabled = false;
+				}
+			});
+
+			addForm.addEventListener("submit", async (e) => {
+				e.preventDefault();
+				const messageEl = addForm.querySelector(".admin-result-message");
+				const submitBtn = addForm.querySelector("button[type=submit]");
+				const formData = new FormData(addForm);
+				const raw = Object.fromEntries(formData.entries());
+
+				const payload = {
+					title: raw.title,
+					serviceType: raw.serviceType,
+					estimatedValue: raw.estimatedValue,
+					notes: raw.notes,
+				};
+				if (raw.contactId) {
+					payload.contactId = raw.contactId;
+				} else {
+					payload.newContact = {
+						name: raw.newContactName,
+						phone: raw.newContactPhone,
+						email: raw.newContactEmail,
+						leadSource: raw.newContactLeadSource,
+					};
+				}
+
+				submitBtn.disabled = true;
+				messageEl.hidden = true;
+				try {
+					const res = await fetch("/api/admin/crm/create-deal", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(payload),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						messageEl.hidden = false;
+						messageEl.textContent = data.error || "Something went wrong.";
+						messageEl.classList.add("admin-result-message--error");
+						return;
+					}
+					addForm.reset();
+					newContactFields.hidden = false;
+					messageEl.hidden = false;
+					messageEl.classList.remove("admin-result-message--error");
+					messageEl.textContent = "Request added.";
+					await loadClients();
+					await loadRequests();
+				} catch {
+					messageEl.hidden = false;
+					messageEl.textContent = "Network error, please try again.";
+					messageEl.classList.add("admin-result-message--error");
+				} finally {
+					submitBtn.disabled = false;
+				}
+			});
+
+			loadClients();
+			loadCleaners();
+			loadRequests();
+		</script>
+
+		<style is:global>
+			/* is:global — this page builds cards/modal content via
+			   document.createElement/innerHTML, which Astro's scoped-CSS
+			   attribute-tagging never reaches. Same reasoning as jobs.astro. */
+			.admin-container {
+				max-width: 980px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-status {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status--error {
+				color: #b3261e;
+			}
+
+			.admin-add-card {
+				margin-bottom: 1.5rem;
+				padding: 1.25rem 1.5rem;
+			}
+
+			.admin-add-summary {
+				cursor: pointer;
+				font-weight: 600;
+				color: var(--color-ink);
+			}
+
+			.admin-add-card form {
+				margin-top: 1.25rem;
+			}
+
+			.admin-form__grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 1rem 1.5rem;
+				margin-bottom: 1.25rem;
+			}
+
+			.admin-form__subgrid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 1rem 1.5rem;
+				padding: 1rem;
+				background: var(--color-sky-light);
+				border-radius: 8px;
+			}
+
+			.admin-form__row {
+				display: flex;
+				flex-direction: column;
+				gap: 0.35rem;
+			}
+
+			.admin-form__row--full {
+				grid-column: 1 / -1;
+			}
+
+			.admin-form__row label {
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-form__row input,
+			.admin-form__row select {
+				padding: 0.6rem 0.75rem;
+				border: 1px solid var(--color-border);
+				border-radius: 8px;
+				font-size: 0.95rem;
+				font-family: inherit;
+			}
+
+			.admin-assign-select {
+				min-height: 90px;
+			}
+
+			@media (max-width: 640px) {
+				.admin-form__grid,
+				.admin-form__subgrid {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.admin-deal-card {
+				margin-bottom: 1rem;
+				padding: 1.1rem 1.25rem;
+			}
+
+			.admin-deal-card h4 {
+				margin: 0 0 0.35rem;
+			}
+
+			.admin-card__meta {
+				color: var(--color-slate);
+				margin: 0.25rem 0;
+				font-size: 0.9rem;
+			}
+
+			.admin-card__meta--assessment {
+				color: #1a5fb4;
+				font-weight: 600;
+			}
+
+			.admin-card__notes {
+				font-style: italic;
+			}
+
+			.admin-deal-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				margin-top: 0.85rem;
+			}
+
+			.admin-deal-actions .btn {
+				font-size: 0.85rem;
+				padding: 0.45rem 0.85rem;
+			}
+
+			.admin-result-message {
+				margin-top: 0.75rem;
+				font-weight: 600;
+				color: #1e7a34;
+				font-size: 0.9rem;
+			}
+
+			.admin-result-message--error {
+				color: #b3261e;
+			}
+
+			.admin-modal-backdrop {
+				position: fixed;
+				inset: 0;
+				background: rgba(28, 43, 69, 0.45);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				z-index: 80;
+				padding: 1.5rem;
+			}
+
+			.admin-modal-backdrop[hidden] {
+				display: none;
+			}
+
+			.admin-modal {
+				max-width: 420px;
+				width: 100%;
+				padding: 1.5rem;
+			}
+
+			.admin-modal__header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 1rem;
+			}
+
+			.admin-modal__header h3 {
+				margin: 0;
+			}
+
+			.admin-modal__close {
+				background: none;
+				border: none;
+				font-size: 1.1rem;
+				color: var(--color-slate);
+				cursor: pointer;
+				padding: 0.25rem;
+			}
+
+			.admin-modal__body {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+				margin-bottom: 1rem;
+			}
+		</style>
+</AdminLayout>

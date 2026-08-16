@@ -1,58 +1,54 @@
 ---
-// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Sibling
-// to /admin/quote → /admin/book, but for the services that have no catalog
-// price at all: commercial/office cleaning, garage cleaning & organization,
-// post-construction cleaning (see src/data/booking.js's QUOTE_SERVICE_TYPES
-// comment for why — none of them appear in calculatePrice() or the public
-// pricing configurator, they're quote-based by nature).
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. For the
+// services that have no catalog price at all: commercial/office cleaning,
+// garage cleaning & organization, post-construction cleaning (see
+// src/data/booking.js's QUOTE_SERVICE_TYPES comment for why — none of them
+// appear in calculatePrice() or the public pricing configurator, they're
+// quote-based by nature).
 //
-// Unlike /admin/book.astro, this creates the calendar event immediately on
-// submit — there's no fixed catalog price to protect from a client-supplied
-// amount here, since the person typing in the quoted total is staff, in this
-// authenticated admin tool, not the customer. What's still gated behind the
-// customer's own action is the deposit: submitting this form only sends a
-// deposit request link (/confirm-deposit/[id]); nothing is ever charged
-// until the customer opens that themselves and pays. See
-// src/lib/pendingDeposits.js for the full reasoning.
+// This is the "send a quote" step ONLY — no calendar event is created here.
+// Submitting the form creates a `quotes` record (src/lib/quotes.js) and
+// hands back a link for the customer to review the price and pay their
+// deposit (/confirm-quote/[id]). Only once they've done that does the quote
+// become "accepted"; a real job only exists once staff pick an actual
+// date/time afterward from /admin/crm/quotes (see
+// /api/admin/quotes/schedule.js). This two-step split — quote first, job
+// second — mirrors how Jobber itself separates Quotes from Jobs, and avoids
+// ever holding a calendar slot for a price nobody's agreed to yet. See
+// AGENTS.md → "Requests & Quotes" for the full reasoning, including why this
+// replaced the old one-step "create job + send deposit link" flow.
+//
+// Reached either directly, or from a Request on /admin/crm/requests via
+// "Send a Quote" (?dealId=...), which prefills the customer/service fields
+// from that request's linked contact.
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 ---
 
-<AdminLayout title="Quote-Based Job | Sky House Cleaning Staff Tools">
+<AdminLayout title="Send a Quote | Sky House Cleaning Staff Tools">
 			<div class="container admin-container">
-				<h1>Quote-Based Job</h1>
+				<h1>Send a Quote</h1>
 				<p class="admin-hint">
 					For commercial/office cleaning, garage cleaning &amp; organization, and post-construction
-					cleaning — services priced by custom quote, not the online catalog. This puts the job on
-					the calendar right away and generates a link for the customer to pay their deposit. Nothing
-					is charged until they do.
+					cleaning — services priced by custom quote, not the online catalog. This sends the
+					customer a link to review the price and pay their deposit. Nothing is put on the calendar
+					and nothing is charged until they accept — once they do, schedule the actual job date/time
+					from <a href="/admin/crm/quotes">Quotes</a>.
 				</p>
 
 				<div class="quote-layout">
-					<div class="quote-main">
+					<div class="quote-main" id="quote-form-root" data-service-types={JSON.stringify(QUOTE_SERVICE_TYPES)}>
 						<form id="quote-job-form" class="quote-form">
 							<div class="quote-form__section">
-								<h3>Job details</h3>
+								<h3>Service</h3>
 								<div class="quote-form__row quote-form__row--full">
 									<label for="qj-service">Service type</label>
 									<select id="qj-service" name="serviceType" required>
 										<option value="" disabled selected>Select a service…</option>
 										{Object.entries(QUOTE_SERVICE_TYPES).map(([value, label]) => <option value={value}>{label}</option>)}
 									</select>
-								</div>
-								<div class="quote-form__row">
-									<label for="qj-date">Date</label>
-									<input type="date" id="qj-date" name="date" required />
-								</div>
-								<div class="quote-form__row">
-									<label for="qj-time">Start time</label>
-									<input type="time" id="qj-time" name="time" required />
-								</div>
-								<div class="quote-form__row">
-									<label for="qj-hours">Estimated duration (hours)</label>
-									<input type="number" id="qj-hours" name="estimatedHours" min="0.5" step="0.5" placeholder="e.g. 3" required />
 								</div>
 							</div>
 
@@ -108,14 +104,13 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 							<p class="quote-form__error" id="quote-form-error" hidden></p>
 
 							<button type="submit" class="btn btn--primary quote-form__submit" id="quote-submit">
-								Create Job &amp; Send Deposit Request
+								Send Quote
 							</button>
 						</form>
 
 						<div class="quote-step admin-link-panel" id="quote-link-panel" hidden>
-							<h3>Job created, send this to the customer</h3>
+							<h3>Quote sent, share this link</h3>
 							<p class="quote-step__hint" id="quote-link-recap"></p>
-							<p class="quote-step__hint" id="quote-link-warning" hidden></p>
 
 							<div class="admin-link-row">
 								<input type="text" id="quote-confirm-link" class="admin-link-input" readonly />
@@ -123,14 +118,16 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 								<button type="button" class="btn btn--outline" id="quote-copy-message">Copy Message</button>
 							</div>
 							<p class="admin-hint--tight">
-								This job is already on the calendar. Text or email this link so the customer can review
-								the quote and pay their deposit — nothing else is charged until they do.
+								Nothing is on the calendar yet. Text or email this link so the customer can review the
+								price and pay their deposit — once they do, come back to
+								<a href="/admin/crm/quotes">Quotes</a> to pick the actual date/time and put it on the
+								calendar.
 							</p>
-							<a href="#" target="_blank" rel="noopener" id="quote-open-link" class="btn btn--outline">Open Deposit Page</a>
+							<a href="#" target="_blank" rel="noopener" id="quote-open-link" class="btn btn--outline">Open Quote Page</a>
 
 							<p class="admin-hint--tight quote-step__next">
-								<a href="/admin/book-quote">Log another quote-based job →</a> ·
-								<a href="/admin/jobs">View on the Jobs board →</a>
+								<a href="/admin/book-quote">Send another quote →</a> ·
+								<a href="/admin/crm/quotes">View all Quotes →</a>
 							</p>
 						</div>
 					</div>
@@ -391,11 +388,14 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				if (!form || form.dataset.init === "true") return;
 				form.dataset.init = "true";
 
+				const root = document.getElementById("quote-form-root");
+				const serviceTypes = JSON.parse(root?.dataset.serviceTypes || "{}");
+				const dealId = new URLSearchParams(window.location.search).get("dealId") || "";
+
 				const errorEl = document.getElementById("quote-form-error");
 				const submitBtn = document.getElementById("quote-submit");
 				const linkPanel = document.getElementById("quote-link-panel");
 				const linkRecap = document.getElementById("quote-link-recap");
-				const linkWarning = document.getElementById("quote-link-warning");
 				const linkInput = document.getElementById("quote-confirm-link");
 				const copyBtn = document.getElementById("quote-copy-link");
 				const copyMessageBtn = document.getElementById("quote-copy-message");
@@ -446,15 +446,38 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				depositTypeInputs.forEach((r) => r.addEventListener("change", updatePreview));
 				updatePreview();
 
+				// Prefill from a Request (/admin/crm/requests' "Send a Quote" button
+				// passes ?dealId=...) — reuses list-deals.js's existing enrichment
+				// rather than adding a new single-deal endpoint just for this.
+				if (dealId) {
+					fetch("/api/admin/crm/list-deals")
+						.then((res) => res.json())
+						.then((data) => {
+							const deal = (data.deals || []).find((d) => d.id === dealId);
+							if (!deal) return;
+							const serviceKey = Object.keys(serviceTypes).find((key) => serviceTypes[key] === deal.serviceType);
+							if (serviceKey) document.getElementById("qj-service").value = serviceKey;
+							document.getElementById("qj-name").value = deal.contactName || "";
+							document.getElementById("qj-phone").value = deal.contactPhone || "";
+							document.getElementById("qj-email").value = deal.contactEmail || "";
+							document.getElementById("qj-address").value = deal.contactAddress || "";
+							document.getElementById("qj-notes").value = deal.notes || "";
+						})
+						.catch(() => {
+							// Non-fatal — staff can just fill the form in by hand.
+						});
+				}
+
 				form.addEventListener("submit", async (event) => {
 					event.preventDefault();
 					errorEl.hidden = true;
 
 					submitBtn.disabled = true;
-					submitBtn.textContent = "Creating job…";
+					submitBtn.textContent = "Sending…";
 
 					const formData = new FormData(form);
 					const payload = {
+						dealId,
 						serviceType: formData.get("serviceType"),
 						customer: {
 							name: formData.get("name"),
@@ -462,9 +485,6 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 							email: formData.get("email"),
 							address: formData.get("address"),
 						},
-						date: formData.get("date"),
-						time: formData.get("time"),
-						estimatedHours: formData.get("estimatedHours"),
 						quotedTotal: formData.get("quotedTotal"),
 						depositType: formData.get("depositType"),
 						depositValue: formData.get("depositValue"),
@@ -472,7 +492,7 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 					};
 
 					try {
-						const response = await fetch("/api/admin/create-quote-job", {
+						const response = await fetch("/api/admin/quotes/create", {
 							method: "POST",
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify(payload),
@@ -480,17 +500,11 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 						const data = await response.json();
 
 						if (!response.ok || !data.confirmUrl) {
-							throw new Error(data.error || "Something went wrong creating this job.");
+							throw new Error(data.error || "Something went wrong sending this quote.");
 						}
 
 						lastCustomerName = (payload.customer.name || "").trim();
-						linkRecap.textContent = `Job #${data.jobNumber || "—"} · ${lastCustomerName || "This customer"} · deposit link ready below.`;
-						if (data.warning) {
-							linkWarning.textContent = data.warning;
-							linkWarning.hidden = false;
-						} else {
-							linkWarning.hidden = true;
-						}
+						linkRecap.textContent = `${lastCustomerName || "This customer"} · quote link ready below.`;
 						linkInput.value = data.confirmUrl;
 						openLink.href = data.confirmUrl;
 						linkPanel.hidden = false;
@@ -499,12 +513,12 @@ import { QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 						form.reset();
 						updatePreview();
 						submitBtn.disabled = false;
-						submitBtn.textContent = "Create Job & Send Deposit Request";
+						submitBtn.textContent = "Send Quote";
 					} catch (err) {
 						errorEl.textContent = err instanceof Error ? err.message : "Something went wrong. Please try again.";
 						errorEl.hidden = false;
 						submitBtn.disabled = false;
-						submitBtn.textContent = "Create Job & Send Deposit Request";
+						submitBtn.textContent = "Send Quote";
 					}
 				});
 

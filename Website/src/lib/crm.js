@@ -92,6 +92,12 @@ export async function createDeal(fields) {
 		expectedCloseDate: null,
 		lostReason: "",
 		notes: "",
+		// Site-visit booking for the Requests page (see AGENTS.md → "Requests &
+		// Quotes"). `scheduled`/`completed` are two separate booleans rather
+		// than a single status string so a request can go straight from "no
+		// assessment" to "converted" without ever touching this object at all —
+		// most catalog-priced requests never need one.
+		assessment: { scheduled: false, completed: false, eventId: "", visitDate: "", cleanerIds: [] },
 		...fields,
 		createdAt: now,
 		updatedAt: now,

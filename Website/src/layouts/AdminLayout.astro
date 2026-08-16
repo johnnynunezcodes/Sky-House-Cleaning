@@ -43,16 +43,11 @@ const navGroups = [
 				href: "/admin/quote",
 				icon: ICONS.newBooking,
 				// Deliberately NOT a plain startsWith("/admin/book") check — that
-				// would also match /admin/book-quote (a separate flow with its
-				// own nav item below), since "/admin/book-quote" also starts with
-				// the string "/admin/book".
+				// would also match /admin/book-quote (folded into the Quotes nav
+				// item below), since "/admin/book-quote" also starts with the
+				// string "/admin/book".
 				activeMatch: (path: string) =>
 					path.startsWith("/admin/quote") || path === "/admin/book" || path.startsWith("/admin/book/"),
-			},
-			{
-				label: "Quote-Based Job",
-				href: "/admin/book-quote",
-				icon: ICONS.quoteJob,
 			},
 			{ label: "Manage Plans", href: "/admin/reschedule", icon: ICONS.managePlans },
 			{ label: "Minimum Commitments", href: "/admin/minimum-commitments", icon: ICONS.minimumCommitments },
@@ -62,7 +57,18 @@ const navGroups = [
 		label: "CRM",
 		items: [
 			{ label: "Contacts", href: "/admin/crm/contacts", icon: ICONS.contacts },
-			{ label: "Requests & Quotes", href: "/admin/crm/deals", icon: ICONS.deals },
+			{ label: "Requests", href: "/admin/crm/requests", icon: ICONS.deals },
+			{
+				label: "Quotes",
+				href: "/admin/crm/quotes",
+				icon: ICONS.quoteJob,
+				// Sending a formal quote (/admin/book-quote) is a sub-flow of this
+				// page now — reached via the "Send Formal Quote" button on a deal
+				// card, or directly for a quote with no linked deal — so it stays
+				// highlighted as part of Quotes rather than getting its own nav
+				// entry (which it had before this Requests/Quotes split).
+				activeMatch: (path: string) => path.startsWith("/admin/crm/quotes") || path.startsWith("/admin/book-quote"),
+			},
 		],
 	},
 ];

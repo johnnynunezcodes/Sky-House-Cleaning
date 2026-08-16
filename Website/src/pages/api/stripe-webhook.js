@@ -24,6 +24,7 @@ import { MINIMUM_COMMITMENT } from "../../lib/policies.js";
 import { markPendingBookingConverted } from "../../lib/pendingBookings.js";
 import { markPendingDepositPaid } from "../../lib/pendingDeposits.js";
 import { markInvoicePaid } from "../../lib/invoices.js";
+import { markQuoteAccepted } from "../../lib/quotes.js";
 import { getNextJobNumber, upsertJobAssignment } from "../../lib/dispatch.js";
 import { isConfigured as isFirebaseConfigured } from "../../lib/firebaseAdmin.js";
 
@@ -139,6 +140,22 @@ export async function POST({ request }) {
 				} catch (err) {
 					console.error("Failed to update job's deposit status:", err?.message);
 				}
+			}
+		}
+
+		// A customer accepting a formal quote and paying its deposit from
+		// /confirm-quote/[id].astro (staff sent it from /admin/book-quote — see
+		// AGENTS.md → "Requests & Quotes"). Deliberately does NOT create a
+		// calendar event here, unlike the old pendingDeposit-based flow this
+		// replaced — no date/time exists yet. It only flips the quote to
+		// "accepted"; staff pick an actual date from /admin/crm/quotes
+		// afterward (see /api/admin/quotes/schedule.js), which is what
+		// actually creates the job.
+		if (metadata.quoteId && isFirebaseConfigured()) {
+			try {
+				await markQuoteAccepted(metadata.quoteId, { stripeSessionId: session.id });
+			} catch (err) {
+				console.error("Failed to mark quote accepted:", err?.message);
 			}
 		}
 

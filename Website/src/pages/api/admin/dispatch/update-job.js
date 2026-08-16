@@ -8,7 +8,7 @@ import { isConfigured } from "../../../../lib/firebaseAdmin.js";
 import { getBookingEvent, createReminderEvent, isConfigured as isCalendarConfigured } from "../../../../lib/googleCalendar.js";
 import { QUOTE_SERVICE_TYPES } from "../../../../data/booking.js";
 import { createInvoice } from "../../../../lib/invoices.js";
-import { getPendingDepositByJobKey } from "../../../../lib/pendingDeposits.js";
+import { getQuoteByJobKey } from "../../../../lib/quotes.js";
 
 export async function POST({ request }) {
 	if (!isConfigured()) {
@@ -97,8 +97,8 @@ export async function POST({ request }) {
 						// the same outer `!alreadyReminded` check as the reminder above,
 						// so re-saving an already-completed job never creates a duplicate.
 						try {
-							const depositRecord = await getPendingDepositByJobKey(jobKey).catch(() => null);
-							const customer = depositRecord?.customer || {};
+							const quoteRecord = await getQuoteByJobKey(jobKey).catch(() => null);
+							const customer = quoteRecord?.customer || {};
 							await createInvoice({
 								jobKey,
 								eventId,

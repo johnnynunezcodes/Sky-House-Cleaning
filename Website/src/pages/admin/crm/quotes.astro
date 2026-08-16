@@ -1,0 +1,535 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Quotes:
+// split out of the old combined Deals board — see AGENTS.md → "Requests &
+// Quotes" for the full "why." Two data sources on one page:
+//   1. Deals still in the quote_sent/follow_up stages (src/lib/crm.js) —
+//      the informal pipeline, unchanged since the old deals.astro.
+//   2. Formal quotes (src/lib/quotes.js) — real priced quotes sent to a
+//      customer via /admin/book-quote, which the customer accepts + pays a
+//      deposit on before staff schedule the actual job here.
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { QUOTE_SERVICE_TYPES } from "../../../data/booking.js";
+---
+
+<AdminLayout title="Quotes | Sky House Cleaning Staff Tools">
+			<div class="container admin-container" data-service-types={JSON.stringify(QUOTE_SERVICE_TYPES)} id="quotes-root">
+				<h1>Quotes</h1>
+				<p class="admin-hint">
+					Priced work waiting on a decision or a date. Deals move here from
+					<a href="/admin/crm/requests">Requests</a> once you know roughly what to charge — send a
+					formal, customer-facing quote for custom-priced jobs, or convert straight to a booking for
+					anything on the standard price list. Once a customer accepts a formal quote and pays the
+					deposit, schedule the real job right here.
+				</p>
+
+				<p id="load-status" class="admin-status">Loading…</p>
+
+				<section class="admin-section">
+					<h2 class="admin-section__title">Formal Quotes</h2>
+					<div class="admin-filters" role="group" aria-label="Filter formal quotes">
+						<button type="button" class="admin-filter is-active" data-qstatus="">All</button>
+						<button type="button" class="admin-filter" data-qstatus="pending">Awaiting Customer</button>
+						<button type="button" class="admin-filter" data-qstatus="accepted">Accepted — Needs Scheduling</button>
+						<button type="button" class="admin-filter" data-qstatus="scheduled">Scheduled</button>
+						<button type="button" class="admin-filter" data-qstatus="declined">Declined / Expired</button>
+					</div>
+					<div id="quotes-board"></div>
+				</section>
+
+				<section class="admin-section">
+					<h2 class="admin-section__title">Deal Pipeline</h2>
+					<p class="admin-hint admin-hint--tight">
+						Deals in Quotes or Follow-Up stage. Send a formal quote for custom-priced jobs, or
+						convert straight to a booking for standard-priced services.
+					</p>
+					<div id="deals-board"></div>
+				</section>
+			</div>
+
+			<div class="admin-modal-backdrop" id="sched-modal-backdrop" hidden>
+				<div class="admin-modal card" id="sched-modal" role="dialog" aria-modal="true" aria-labelledby="sched-modal-title">
+					<div class="admin-modal__header">
+						<h3 id="sched-modal-title">Schedule Job</h3>
+						<button type="button" class="admin-modal__close" id="sched-modal-close" aria-label="Close">✕</button>
+					</div>
+					<div class="admin-modal__body">
+						<div class="admin-form__row">
+							<label for="sched-date">Date</label>
+							<input type="date" id="sched-date" />
+						</div>
+						<div class="admin-form__row">
+							<label for="sched-time">Start time</label>
+							<input type="time" id="sched-time" />
+						</div>
+						<div class="admin-form__row">
+							<label for="sched-hours">Estimated duration (hours)</label>
+							<input type="number" id="sched-hours" min="0.5" step="0.5" />
+						</div>
+					</div>
+					<p class="admin-result-message" id="sched-modal-message" hidden></p>
+					<button type="button" class="btn btn--primary" id="sched-modal-save">Create Job</button>
+				</div>
+			</div>
+
+		<script>
+			const root = document.getElementById("quotes-root");
+			const SERVICE_LABELS = JSON.parse(root.dataset.serviceTypes || "{}");
+
+			const loadStatus = document.getElementById("load-status");
+			const quotesBoard = document.getElementById("quotes-board");
+			const dealsBoard = document.getElementById("deals-board");
+			const quoteFilterButtons = document.querySelectorAll(".admin-filter[data-qstatus]");
+
+			const QUOTE_STATUS_LABELS = {
+				pending: "Awaiting Customer",
+				accepted: "Accepted — Needs Scheduling",
+				scheduled: "Scheduled",
+				declined: "Declined",
+				expired: "Expired",
+			};
+
+			const DEAL_STAGE_LABELS = { quote_sent: "Quotes", follow_up: "Follow-Up" };
+			const NEXT_STAGE = { quote_sent: "follow_up" };
+			const ADVANCE_LABELS = { follow_up: "Move to Follow-Up" };
+
+			let currentQuoteStatus = "";
+
+			const schedModalBackdrop = document.getElementById("sched-modal-backdrop");
+			const schedDate = document.getElementById("sched-date");
+			const schedTime = document.getElementById("sched-time");
+			const schedHours = document.getElementById("sched-hours");
+			const schedMessage = document.getElementById("sched-modal-message");
+			const schedSaveBtn = document.getElementById("sched-modal-save");
+			let schedulingQuoteId = null;
+
+			function escapeHtml(str) {
+				const div = document.createElement("div");
+				div.textContent = str ?? "";
+				return div.innerHTML;
+			}
+
+			function fmtValue(n) {
+				if (n == null || n === "") return "";
+				return `$${Number(n).toLocaleString()}`;
+			}
+
+			function fmtDate(iso) {
+				if (!iso) return "";
+				const [y, m, d] = iso.split("-").map(Number);
+				if (!y || !m || !d) return iso;
+				return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+			}
+
+			async function loadAll() {
+				loadStatus.hidden = false;
+				loadStatus.textContent = "Loading…";
+				try {
+					await Promise.all([loadQuotes(), loadDeals()]);
+					loadStatus.hidden = true;
+				} catch {
+					loadStatus.textContent = "Network error, please try again.";
+					loadStatus.classList.add("admin-status--error");
+				}
+			}
+
+			async function loadQuotes() {
+				const qs = currentQuoteStatus ? `?status=${encodeURIComponent(currentQuoteStatus)}` : "";
+				const res = await fetch(`/api/admin/quotes/list${qs}`);
+				const data = await res.json();
+				if (!res.ok) {
+					quotesBoard.innerHTML = `<p class="admin-status admin-status--error">${escapeHtml(data.error || "Couldn't load quotes.")}</p>`;
+					return;
+				}
+				renderQuotes(data.quotes || []);
+			}
+
+			function quoteCard(quote) {
+				const card = document.createElement("div");
+				card.className = "card admin-deal-card";
+				const customer = quote.customer || {};
+				const serviceLabel = SERVICE_LABELS[quote.serviceType] || quote.serviceType || "Quote";
+				const confirmUrl = `/confirm-quote/${quote.id}`;
+				card.innerHTML = `
+					<h4>${escapeHtml(customer.name) || "(no name)"} — ${escapeHtml(serviceLabel)}</h4>
+					<p class="admin-card__meta">${escapeHtml(customer.phone || "")}${customer.email ? " · " + escapeHtml(customer.email) : ""}</p>
+					<p class="admin-card__meta">Quoted total: ${fmtValue(quote.quotedTotal)} · Deposit: ${fmtValue(quote.depositAmount)}</p>
+					<p class="admin-card__meta admin-card__meta--status">${QUOTE_STATUS_LABELS[quote.status] || quote.status}</p>
+					${quote.status === "scheduled" && quote.visitDate ? `<p class="admin-card__meta">Scheduled: ${fmtDate(quote.visitDate)}</p>` : ""}
+					${quote.notes ? `<p class="admin-card__meta admin-card__notes">${escapeHtml(quote.notes)}</p>` : ""}
+					<div class="admin-deal-actions">
+						${quote.status === "pending" ? `<button type="button" class="btn btn--outline admin-copy-link" data-url="${confirmUrl}">Copy Customer Link</button>` : ""}
+						${quote.status === "accepted" ? `<button type="button" class="btn btn--primary admin-schedule">Schedule Job</button>` : ""}
+					</div>
+					<p class="admin-result-message" hidden></p>
+				`;
+
+				const copyBtn = card.querySelector(".admin-copy-link");
+				if (copyBtn) {
+					copyBtn.addEventListener("click", async () => {
+						const url = `${window.location.origin}${copyBtn.dataset.url}`;
+						try {
+							await navigator.clipboard.writeText(url);
+							copyBtn.textContent = "Copied!";
+							setTimeout(() => (copyBtn.textContent = "Copy Customer Link"), 1500);
+						} catch {
+							prompt("Copy this link:", url);
+						}
+					});
+				}
+
+				const scheduleBtn = card.querySelector(".admin-schedule");
+				if (scheduleBtn) {
+					scheduleBtn.addEventListener("click", () => openSchedModal(quote));
+				}
+
+				return card;
+			}
+
+			function renderQuotes(quotes) {
+				if (!quotes.length) {
+					quotesBoard.innerHTML = `<p class="admin-status">No formal quotes here.</p>`;
+					return;
+				}
+				quotesBoard.innerHTML = "";
+				for (const quote of quotes) quotesBoard.appendChild(quoteCard(quote));
+			}
+
+			function openSchedModal(quote) {
+				schedulingQuoteId = quote.id;
+				schedMessage.hidden = true;
+				schedDate.value = "";
+				schedTime.value = "";
+				schedHours.value = "";
+				schedModalBackdrop.hidden = false;
+			}
+
+			function closeSchedModal() {
+				schedModalBackdrop.hidden = true;
+				schedulingQuoteId = null;
+			}
+
+			document.getElementById("sched-modal-close").addEventListener("click", closeSchedModal);
+			schedModalBackdrop.addEventListener("click", (e) => {
+				if (e.target === schedModalBackdrop) closeSchedModal();
+			});
+
+			schedSaveBtn.addEventListener("click", async () => {
+				if (!schedulingQuoteId) return;
+				if (!schedDate.value || !schedTime.value || !schedHours.value) {
+					schedMessage.hidden = false;
+					schedMessage.textContent = "Please fill in date, time, and estimated duration.";
+					schedMessage.classList.add("admin-result-message--error");
+					return;
+				}
+				schedSaveBtn.disabled = true;
+				try {
+					const res = await fetch("/api/admin/quotes/schedule", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							id: schedulingQuoteId,
+							date: schedDate.value,
+							time: schedTime.value,
+							estimatedHours: schedHours.value,
+						}),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						schedMessage.hidden = false;
+						schedMessage.textContent = data.error || "Something went wrong.";
+						schedMessage.classList.add("admin-result-message--error");
+						return;
+					}
+					closeSchedModal();
+					if (data.warning) alert(data.warning);
+					await loadQuotes();
+				} catch {
+					schedMessage.hidden = false;
+					schedMessage.textContent = "Network error, please try again.";
+					schedMessage.classList.add("admin-result-message--error");
+				} finally {
+					schedSaveBtn.disabled = false;
+				}
+			});
+
+			async function loadDeals() {
+				const res = await fetch(`/api/admin/crm/list-deals`);
+				const data = await res.json();
+				if (!res.ok) {
+					dealsBoard.innerHTML = `<p class="admin-status admin-status--error">${escapeHtml(data.error || "Couldn't load deals.")}</p>`;
+					return;
+				}
+				const deals = (data.deals || []).filter((d) => d.stage === "quote_sent" || d.stage === "follow_up");
+				renderDeals(deals);
+			}
+
+			function dealCard(deal) {
+				const card = document.createElement("div");
+				card.className = "card admin-deal-card";
+				const advanceStage = NEXT_STAGE[deal.stage];
+				card.innerHTML = `
+					<h4>${escapeHtml(deal.title) || "(untitled deal)"}</h4>
+					<p class="admin-card__meta">${escapeHtml(deal.contactName)}${deal.contactPhone ? " · " + escapeHtml(deal.contactPhone) : ""}</p>
+					${deal.serviceType ? `<p class="admin-card__meta">${escapeHtml(deal.serviceType)}</p>` : ""}
+					<p class="admin-card__meta">${DEAL_STAGE_LABELS[deal.stage]}${deal.estimatedValue != null && deal.estimatedValue !== "" ? " · " + fmtValue(deal.estimatedValue) : ""}</p>
+					${deal.notes ? `<p class="admin-card__meta admin-card__notes">${escapeHtml(deal.notes)}</p>` : ""}
+					<div class="admin-deal-actions">
+						${deal.id ? `<a href="/admin/book-quote?dealId=${encodeURIComponent(deal.id)}" class="btn btn--primary">Send Formal Quote</a>` : ""}
+						${deal.contactId ? `<a href="/admin/quote?contactId=${encodeURIComponent(deal.contactId)}" class="btn btn--outline">Convert to Booking</a>` : ""}
+						${advanceStage ? `<button type="button" class="btn btn--outline admin-advance">${ADVANCE_LABELS[advanceStage]}</button>` : ""}
+						<button type="button" class="btn btn--outline admin-win">Mark Won</button>
+						<button type="button" class="btn btn--outline admin-lost">Mark Lost</button>
+					</div>
+					<p class="admin-result-message" hidden></p>
+				`;
+
+				const messageEl = card.querySelector(".admin-result-message");
+				function showMessage(text, isError = false) {
+					messageEl.hidden = false;
+					messageEl.textContent = text;
+					messageEl.classList.toggle("admin-result-message--error", isError);
+				}
+
+				const advanceBtn = card.querySelector(".admin-advance");
+				if (advanceBtn) {
+					advanceBtn.addEventListener("click", async () => {
+						advanceBtn.disabled = true;
+						try {
+							const res = await fetch("/api/admin/crm/update-deal", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ id: deal.id, stage: advanceStage }),
+							});
+							const data = await res.json();
+							if (!res.ok) return showMessage(data.error || "Something went wrong.", true);
+							await loadDeals();
+						} catch {
+							showMessage("Network error, please try again.", true);
+						} finally {
+							advanceBtn.disabled = false;
+						}
+					});
+				}
+
+				card.querySelector(".admin-win").addEventListener("click", async (e) => {
+					if (!confirm(`Mark "${deal.title}" as Won? This also activates ${deal.contactName} as a client.`)) return;
+					const btn = e.currentTarget;
+					btn.disabled = true;
+					try {
+						const res = await fetch("/api/admin/crm/win-deal", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ id: deal.id }),
+						});
+						const data = await res.json();
+						if (!res.ok) return showMessage(data.error || "Something went wrong.", true);
+						await loadDeals();
+					} catch {
+						showMessage("Network error, please try again.", true);
+					} finally {
+						btn.disabled = false;
+					}
+				});
+
+				card.querySelector(".admin-lost").addEventListener("click", async (e) => {
+					const reason = prompt(`Why is "${deal.title}" lost? (optional)`) || "";
+					const btn = e.currentTarget;
+					btn.disabled = true;
+					try {
+						const res = await fetch("/api/admin/crm/update-deal", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ id: deal.id, stage: "lost", lostReason: reason }),
+						});
+						const data = await res.json();
+						if (!res.ok) return showMessage(data.error || "Something went wrong.", true);
+						await loadDeals();
+					} catch {
+						showMessage("Network error, please try again.", true);
+					} finally {
+						btn.disabled = false;
+					}
+				});
+
+				return card;
+			}
+
+			function renderDeals(deals) {
+				if (!deals.length) {
+					dealsBoard.innerHTML = `<p class="admin-status">No deals in Quotes or Follow-Up right now.</p>`;
+					return;
+				}
+				dealsBoard.innerHTML = "";
+				for (const deal of deals) dealsBoard.appendChild(dealCard(deal));
+			}
+
+			quoteFilterButtons.forEach((btn) => {
+				btn.addEventListener("click", () => {
+					quoteFilterButtons.forEach((b) => b.classList.remove("is-active"));
+					btn.classList.add("is-active");
+					currentQuoteStatus = btn.dataset.qstatus;
+					loadQuotes();
+				});
+			});
+
+			loadAll();
+		</script>
+
+		<style is:global>
+			/* is:global — this page builds cards/modal content via
+			   document.createElement/innerHTML, which Astro's scoped-CSS
+			   attribute-tagging never reaches. Same reasoning as jobs.astro. */
+			.admin-container {
+				max-width: 980px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-hint--tight {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status--error {
+				color: #b3261e;
+			}
+
+			.admin-section {
+				margin-bottom: 2.5rem;
+			}
+
+			.admin-section__title {
+				font-size: 1.1rem;
+				margin: 0 0 1rem;
+			}
+
+			.admin-filters {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-filter {
+				padding: 0.4rem 0.9rem;
+				border-radius: 999px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				font-size: 0.85rem;
+				font-weight: 600;
+				color: var(--color-slate);
+				cursor: pointer;
+			}
+
+			.admin-filter.is-active {
+				background: var(--color-ink);
+				border-color: var(--color-ink);
+				color: var(--color-white);
+			}
+
+			.admin-deal-card {
+				margin-bottom: 1rem;
+				padding: 1.1rem 1.25rem;
+			}
+
+			.admin-deal-card h4 {
+				margin: 0 0 0.35rem;
+			}
+
+			.admin-card__meta {
+				color: var(--color-slate);
+				margin: 0.25rem 0;
+				font-size: 0.9rem;
+			}
+
+			.admin-card__meta--status {
+				color: #1a5fb4;
+				font-weight: 600;
+			}
+
+			.admin-card__notes {
+				font-style: italic;
+			}
+
+			.admin-deal-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				margin-top: 0.85rem;
+			}
+
+			.admin-deal-actions .btn {
+				font-size: 0.85rem;
+				padding: 0.45rem 0.85rem;
+			}
+
+			.admin-result-message {
+				margin-top: 0.75rem;
+				font-weight: 600;
+				color: #1e7a34;
+				font-size: 0.9rem;
+			}
+
+			.admin-result-message--error {
+				color: #b3261e;
+			}
+
+			.admin-modal-backdrop {
+				position: fixed;
+				inset: 0;
+				background: rgba(28, 43, 69, 0.45);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				z-index: 80;
+				padding: 1.5rem;
+			}
+
+			.admin-modal-backdrop[hidden] {
+				display: none;
+			}
+
+			.admin-modal {
+				max-width: 420px;
+				width: 100%;
+				padding: 1.5rem;
+			}
+
+			.admin-modal__header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				margin-bottom: 1rem;
+			}
+
+			.admin-modal__header h3 {
+				margin: 0;
+			}
+
+			.admin-modal__close {
+				background: none;
+				border: none;
+				font-size: 1.1rem;
+				color: var(--color-slate);
+				cursor: pointer;
+				padding: 0.25rem;
+			}
+
+			.admin-modal__body {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+				margin-bottom: 1rem;
+			}
+		</style>
+</AdminLayout>
