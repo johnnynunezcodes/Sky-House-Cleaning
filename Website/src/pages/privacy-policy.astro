@@ -5,74 +5,128 @@ import PolicyLayout from "../layouts/PolicyLayout.astro";
 <PolicyLayout
 	title="Privacy Policy"
 	eyebrow="Privacy Policy"
-	updated="August 11, 2026"
+	updated="August 14, 2026"
 	description="How Sky House Cleaning collects, uses, and protects your personal information."
 >
 	<p>
 		Sky House Cleaning ("we," "us," or "our") respects your privacy. This policy explains what
-		information we collect, how we use it, and the choices you have, whether you're booking a
-		service, browsing our website, or reaching out with a question.
+		information we collect, how we use it, who we share it with, and the choices you have —
+		whether you're booking a residential or commercial service, browsing our website, requesting
+		a quote, or reaching out with a question. It applies to our website and to the booking,
+		scheduling, and customer-management tools we use to run the business.
 	</p>
 
 	<h2>Information We Collect</h2>
-	<p>When you book a service or contact us, we collect the information you provide directly, such as:</p>
+	<p>When you book a service, request a quote, or contact us, we collect the information you provide directly, such as:</p>
 	<ul>
 		<li>Your name, email address, and phone number</li>
-		<li>Your home or service address</li>
-		<li>Vehicle details, if you're booking car detailing (year, make, model, color)</li>
-		<li>Entry/access instructions, pet information, and any other notes you share about your appointment</li>
+		<li>Your home, business, or job-site address</li>
+		<li>Vehicle details, if you're booking interior car detailing (year, make, model, color)</li>
+		<li>Entry/access instructions, gate or alarm codes, electrical access notes, pet information, and any other notes you share about your appointment</li>
+		<li>
+			For commercial cleaning, post-construction cleaning, and garage cleaning &amp; organization —
+			services we quote individually rather than price online — the scope details, quoted total,
+			and any notes exchanged while putting the quote together
+		</li>
+		<li>Any messages, notes, or details you give us over the phone, by email, or through the website</li>
 	</ul>
 	<p>
 		We do not collect or store your full payment card details. Payment is handled directly by
-		Stripe, our payment processor (see "Third-Party Services" below).
+		Stripe, our payment processor (see "Third-Party Services" below). If you sign up for a
+		recurring cleaning plan or membership, Stripe securely retains a payment method on file so we
+		can bill each cleaning automatically — we never see or store the card number ourselves.
 	</p>
 
 	<h2>How We Use Your Information</h2>
 	<p>We use the information you provide to:</p>
 	<ul>
-		<li>Schedule, confirm, and perform the cleaning or detailing service you've booked</li>
-		<li>Process payment for services</li>
-		<li>Communicate with you about your appointment, including reminders and follow-ups</li>
-		<li>Respond to questions or requests you send us</li>
+		<li>Schedule, confirm, reschedule, and perform the cleaning, detailing, organization, or commercial service you've booked</li>
+		<li>Calculate and collect payment, including recurring membership billing and deposits on quote-based jobs</li>
+		<li>Assign the job to a cleaner or crew and give them what they need to complete it (name, address, access notes, timing)</li>
+		<li>Communicate with you about your appointment — confirmations, reminders, invoices, and follow-ups</li>
+		<li>Keep internal records of your service history so we can serve you consistently over time</li>
+		<li>Respond to questions, quote requests, or other messages you send us</li>
 	</ul>
-	<p>We don't sell your personal information, and we don't use it for advertising.</p>
+	<p>We don't sell your personal information, and we don't use it for advertising or share it with data brokers.</p>
+
+	<h2>Who Within Our Business Sees Your Information</h2>
+	<p>
+		We limit what each part of our team can see to what they actually need to do their job:
+	</p>
+	<ul>
+		<li>
+			<strong>Cleaners and crews</strong> assigned to your job can see the job's schedule, address,
+			access notes, and any service notes — what they need to get the work done. They do not have
+			access to payment amounts, quoted totals, or deposit information for the job, regardless of
+			what calendar access they're given.
+		</li>
+		<li>
+			<strong>Office/admin staff</strong> (currently just the owner) can see the full customer
+			record — contact details, service history, pricing, and payment status — to run scheduling,
+			billing, and customer service.
+		</li>
+	</ul>
 
 	<h2>Third-Party Services</h2>
-	<p>We rely on a few outside services to run our booking and payment process:</p>
+	<p>We rely on a handful of outside services to run our booking, scheduling, and customer-management process. Each has its own privacy practices governing how it handles data, and we encourage you to review them if you'd like more detail:</p>
 	<ul>
-		<li><strong>Stripe</strong>: processes payments securely. We don't see or store your full card number.</li>
-		<li><strong>Google Calendar</strong>: used to schedule and manage appointment times.</li>
+		<li><strong>Stripe</strong>: processes payments and, for recurring plans, stores your payment method securely to bill future cleanings. We don't see or store your full card number. See <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer">Stripe's privacy policy</a>.</li>
+		<li><strong>Google Calendar</strong>: used to schedule and manage appointment times. If you provide an email address, Google Calendar may send you calendar invites and update emails directly for your appointment.</li>
+		<li><strong>Google Firebase / Google Cloud (Firestore)</strong>: our internal customer-record and job-dispatch database, used to store contact information, service history, and job assignment status.</li>
+		<li><strong>Google Places API / Google Business Profile</strong>: powers the customer reviews shown on our Reviews page, pulled from our public Google Business listing. This doesn't involve your personal information unless you've already chosen to leave a public review on Google.</li>
 		<li><strong>Google Fonts</strong>: loads the typefaces used on this site directly from Google's servers.</li>
+		<li><strong>Vercel</strong>: our website hosting provider, which processes standard web-server logs (see "Cookies &amp; Tracking" below).</li>
 	</ul>
 	<p>
-		Each of these services has its own privacy practices governing how they handle data, and we
-		encourage you to review their policies if you'd like more detail.
+		We don't use any of these services to sell your data or to build advertising profiles about you.
 	</p>
 
 	<h2>Cookies &amp; Tracking</h2>
 	<p>
 		We don't currently use analytics or advertising cookies on this site. Our website host may
 		log basic technical information (like IP address and browser type) as part of standard web
-		hosting, which we don't use to identify or track individual visitors.
+		hosting, which we don't use to identify or track individual visitors. Because we don't engage
+		in this kind of tracking, our site does not currently respond differently to "Do Not Track"
+		browser signals — there's no tracking to turn off.
 	</p>
 
 	<h2>Data Retention</h2>
 	<p>
 		We keep your information for as long as needed to provide our services, maintain our
-		business records, and meet any legal or tax obligations.
+		business, accounting, and tax records, and resolve any disputes. If you ask us to delete your
+		information (see "Your Rights" below), we'll do so except where we're required or permitted
+		to keep it — for example, records tied to a completed payment, which we may need to retain for
+		tax and accounting purposes.
 	</p>
 
 	<h2>Security</h2>
 	<p>
-		We take reasonable steps to protect your information, but no method of storage or
-		transmission over the internet is completely secure.
+		We take reasonable steps to protect your information, including relying on established
+		providers (Stripe, Google) that maintain their own security programs for the payment and
+		calendar data they process on our behalf, and limiting internal access to what each team
+		member needs. That said, no method of storage or transmission over the internet is
+		completely secure, and we can't guarantee absolute security.
 	</p>
 
 	<h2>Your Rights</h2>
 	<p>
-		You can reach out any time to ask what information we have about you, request a
-		correction, or ask us to delete it. California residents may have additional rights under
-		state privacy law. To make a request, contact us using the information below.
+		You can reach out any time to ask what information we have about you, request a correction,
+		or ask us to delete it, and we'll honor that request except where we're legally required or
+		permitted to keep certain records (see "Data Retention" above). California residents may have
+		additional rights under state privacy law, including the right to know what personal
+		information we've collected, request its deletion, and not be discriminated against for
+		exercising these rights. We don't sell or "share" personal information as those terms are
+		defined under California law, so there's nothing to opt out of on that front. To make a
+		request, contact us using the information below — we may need to verify your identity first.
+	</p>
+
+	<h2>Employees &amp; Job Applicants</h2>
+	<p>
+		This policy describes how we handle information from customers and website visitors. If
+		you're a Sky House Cleaning employee or job applicant, the personal information we collect
+		as part of hiring and employment (for example, through new-hire paperwork) is governed by
+		separate employment policies and notices provided to you directly, not by this website
+		privacy policy.
 	</p>
 
 	<h2>Children's Privacy</h2>
@@ -80,8 +134,9 @@ import PolicyLayout from "../layouts/PolicyLayout.astro";
 
 	<h2>Changes to This Policy</h2>
 	<p>
-		We may update this policy from time to time. The "last updated" date at the top will
-		reflect the most recent changes.
+		We may update this policy from time to time as our services or tools change. The "last
+		updated" date at the top will reflect the most recent changes. If changes are significant,
+		we'll take reasonable steps to make that clear, such as noting it on this page.
 	</p>
 
 	<h2>Contact Us</h2>
