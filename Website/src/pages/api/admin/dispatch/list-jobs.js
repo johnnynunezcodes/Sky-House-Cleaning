@@ -73,6 +73,15 @@ export async function GET({ url }) {
 				description: event.description || "",
 				location: event.location || "",
 				clientName: priv.clientName || "",
+				// Not from private metadata — this is a real Google Calendar
+				// attendee (set via `attendeeEmail` in createBookingEvent(), see
+				// stripe-webhook.js), so it's available retroactively on every
+				// recurring job ever booked, not just ones created after some new
+				// field was added. Added for the Jobber-parity "Action Required"
+				// on-hold feature (AGENTS.md → "Jobs") — the modal's "Put on
+				// hold" button uses this to find the client's Stripe subscription
+				// by email, the same lookup /admin/reschedule already does.
+				clientEmail: event.attendees?.[0]?.email || "",
 				amountPaid: priv.amountPaid || "",
 				jobType: priv.jobType || "",
 				jobNumber: priv.jobNumber || "",

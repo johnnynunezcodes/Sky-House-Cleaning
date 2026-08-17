@@ -43,6 +43,9 @@ export async function POST({ request }) {
 	if (typeof body.cleanerConfirmed === "boolean") {
 		fields.cleanerConfirmed = body.cleanerConfirmed;
 	}
+	if (typeof body.archived === "boolean") {
+		fields.archived = body.archived;
+	}
 
 	// Only relevant on the actual transition INTO "completed" — read the
 	// current doc first so re-saving an already-completed job (or toggling

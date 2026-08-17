@@ -79,7 +79,18 @@ export async function updateCleaner(cleanerId, fields) {
 // per-cleaner login exists, a cleaner tapping "Accept" in their own mobile
 // view can just set this same field directly — nothing about this field or
 // its callers needs to change, only who's allowed to flip it.
-const DEFAULT_ASSIGNMENT = { assignedCleanerIds: [], status: "unassigned", dispatchNotes: "", cleanerConfirmed: false };
+// `archived` — added for the Jobber-parity Jobs redesign (see AGENTS.md →
+// "Jobs (formerly Dispatcher)"). Purely a visibility flag ("done with this,
+// stop showing it by default") — doesn't touch billing or the calendar
+// event itself, unlike the separate on-hold/Action-Required concept below,
+// which pauses a whole recurring plan rather than hiding a single visit.
+const DEFAULT_ASSIGNMENT = {
+	assignedCleanerIds: [],
+	status: "unassigned",
+	dispatchNotes: "",
+	cleanerConfirmed: false,
+	archived: false,
+};
 
 // Batch-fetches assignment docs for a set of job keys in one round trip
 // (Firestore's `getAll` rather than N individual reads), returning a Map

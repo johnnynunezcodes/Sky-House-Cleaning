@@ -34,11 +34,17 @@
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
-import { WORKING_HOURS } from "../../data/booking.js";
+import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 ---
 
 <AdminLayout title="Jobs | Sky House Cleaning Staff Tools">
-			<div class="container admin-container" id="jobs-page" data-working-hours-start={WORKING_HOURS.start} data-working-hours-end={WORKING_HOURS.end}>
+			<div
+				class="container admin-container"
+				id="jobs-page"
+				data-working-hours-start={WORKING_HOURS.start}
+				data-working-hours-end={WORKING_HOURS.end}
+				data-quote-service-types={JSON.stringify(QUOTE_SERVICE_TYPES)}
+			>
 				<h1>Jobs</h1>
 				<p class="admin-hint">
 					Every real job on the calendar, with who's assigned, their status, and whether the
@@ -85,7 +91,32 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				<p id="load-status" class="admin-status">Loading…</p>
 
 				<div id="list-view" class="admin-list-view">
-					<div class="admin-overview-grid">
+					<div class="admin-overview-row">
+						<div class="card admin-overview-list-card">
+							<p class="admin-overview-card__label">Overview</p>
+							<ul class="admin-overview-list" id="overview-list">
+								<li class="admin-overview-list__item" data-filter="late" tabindex="0" role="button">
+									<span>Late</span>
+									<span class="admin-overview-list__count" id="stat-late-count">0</span>
+								</li>
+								<li class="admin-overview-list__item" data-filter="requires_invoicing" tabindex="0" role="button">
+									<span>Requires Invoicing</span>
+									<span class="admin-overview-list__count" id="stat-invoicing-count">0</span>
+								</li>
+								<li class="admin-overview-list__item" data-filter="action_required" tabindex="0" role="button">
+									<span>Action Required</span>
+									<span class="admin-overview-list__count" id="stat-action-count">0</span>
+								</li>
+								<li class="admin-overview-list__item" data-filter="unscheduled" tabindex="0" role="button">
+									<span>Unscheduled</span>
+									<span class="admin-overview-list__count" id="stat-unscheduled-count">0</span>
+								</li>
+								<li class="admin-overview-list__item" data-filter="unassigned" tabindex="0" role="button">
+									<span>Needs a Cleaner</span>
+									<span class="admin-overview-list__count" id="stat-unassigned-count">0</span>
+								</li>
+							</ul>
+						</div>
 						<div class="card admin-overview-card">
 							<p class="admin-overview-card__label">Recent Visits</p>
 							<p class="admin-overview-card__sub">Past 30 days</p>
@@ -98,30 +129,29 @@ import { WORKING_HOURS } from "../../data/booking.js";
 							<p class="admin-overview-card__value" id="stat-upcoming-count">0</p>
 							<p class="admin-overview-card__meta" id="stat-upcoming-total">$0.00</p>
 						</div>
-						<div class="card admin-overview-card">
-							<p class="admin-overview-card__label">Needs a Cleaner</p>
-							<p class="admin-overview-card__sub">Today or later</p>
-							<p class="admin-overview-card__value" id="stat-unassigned-count">0</p>
-						</div>
-						<div class="card admin-overview-card admin-overview-card--warn">
-							<p class="admin-overview-card__label">Past Due</p>
-							<p class="admin-overview-card__sub">Not marked completed</p>
-							<p class="admin-overview-card__value" id="stat-pastdue-count">0</p>
-						</div>
 					</div>
 
 					<div class="admin-list-toolbar">
 						<div class="admin-list-filters">
 							<select id="list-status-filter">
 								<option value="all">Status: All</option>
-								<option value="today">Today</option>
-								<option value="upcoming">Upcoming</option>
-								<option value="past_due">Past Due</option>
-								<option value="unassigned">Unassigned</option>
-								<option value="assigned">Assigned</option>
-								<option value="en_route">En route</option>
-								<option value="in_progress">In progress</option>
-								<option value="completed">Completed</option>
+								<optgroup label="Job status">
+									<option value="active">Active</option>
+									<option value="today">Today</option>
+									<option value="upcoming">Upcoming</option>
+									<option value="late">Late</option>
+									<option value="unscheduled">Unscheduled</option>
+									<option value="action_required">Action Required</option>
+									<option value="requires_invoicing">Requires Invoicing</option>
+									<option value="archived">Archived</option>
+								</optgroup>
+								<optgroup label="Cleaner status">
+									<option value="unassigned">Unassigned</option>
+									<option value="assigned">Assigned</option>
+									<option value="en_route">En route</option>
+									<option value="in_progress">In progress</option>
+									<option value="completed">Completed</option>
+								</optgroup>
 							</select>
 							<select id="list-type-filter">
 								<option value="all">Job Type: All</option>
@@ -135,7 +165,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 					<p id="list-results-count" class="admin-hint admin-hint--tight"></p>
 
-					<div class="admin-table-wrap">
+					<div class="admin-table-wrap" id="jobs-table-wrap">
 						<table class="admin-table admin-jobs-table">
 							<thead>
 								<tr>
@@ -149,6 +179,21 @@ import { WORKING_HOURS } from "../../data/booking.js";
 								</tr>
 							</thead>
 							<tbody id="list-table-body"></tbody>
+						</table>
+					</div>
+
+					<div class="admin-table-wrap" id="action-required-panel" hidden>
+						<table class="admin-table admin-jobs-table">
+							<thead>
+								<tr>
+									<th>Client</th>
+									<th>Phone</th>
+									<th>Plan</th>
+									<th>Status</th>
+									<th></th>
+								</tr>
+							</thead>
+							<tbody id="action-required-table-body"></tbody>
 						</table>
 					</div>
 				</div>
@@ -200,6 +245,10 @@ import { WORKING_HOURS } from "../../data/booking.js";
 							<label for="job-modal-notes">Dispatch notes</label>
 							<textarea id="job-modal-notes" rows="2" placeholder="Anything the team should know"></textarea>
 						</div>
+						<div class="admin-modal__extra-actions">
+							<button type="button" class="btn btn--outline" id="job-modal-hold" hidden>Put client's plan on hold</button>
+							<button type="button" class="btn btn--outline" id="job-modal-archive">Archive job</button>
+						</div>
 					</div>
 
 					<p class="admin-result-message" id="job-modal-message" hidden></p>
@@ -229,6 +278,13 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			const dayGrid = document.getElementById("day-grid");
 			const weekBoard = document.getElementById("week-board");
 			const monthGrid = document.getElementById("month-grid");
+
+			// Human labels for a paused subscription's billing frequency, shown
+			// in the Action Required panel — same wording
+			// /admin/minimum-commitments.astro already uses for the same field.
+			const FREQUENCY_LABELS = { weekly: "Weekly", biweekly: "Bi-Weekly", monthly: "Monthly" };
+
+			const QUOTE_SERVICE_LABELS = JSON.parse(root?.dataset.quoteServiceTypes || "{}");
 
 			const STATUS_LABELS = {
 				unassigned: "Unassigned",
@@ -360,6 +416,10 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			}
 
 			function serviceNameFor(job) {
+				// Unscheduled quote pseudo-rows (see loadListView) have no calendar
+				// event summary to parse a service name back out of — their label
+				// comes straight from the quote's own serviceType instead.
+				if (job.isUnscheduled) return job.serviceLabel || "";
 				return parseSummary(job.summary).service;
 			}
 
@@ -490,6 +550,8 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			const modalStatus = document.getElementById("job-modal-status");
 			const modalConfirmed = document.getElementById("job-modal-confirmed");
 			const modalNotes = document.getElementById("job-modal-notes");
+			const modalHoldBtn = document.getElementById("job-modal-hold");
+			const modalArchiveBtn = document.getElementById("job-modal-archive");
 			const modalMessage = document.getElementById("job-modal-message");
 
 			let currentModalJob = null;
@@ -518,6 +580,18 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				modalConfirmed.checked = !!job.cleanerConfirmed;
 				modalConfirmed.disabled = assignedIds.length === 0;
 				modalNotes.value = job.dispatchNotes || "";
+
+				// "Put on hold" only makes sense for a recurring plan's job — see
+				// AGENTS.md → "Jobs" for why this is a client-level Stripe action
+				// (pauses the whole subscription), not a per-visit field like
+				// everything else in this modal.
+				modalHoldBtn.hidden = job.jobType !== "recurring";
+				modalHoldBtn.disabled = false;
+				modalHoldBtn.textContent = "Put client's plan on hold";
+
+				modalArchiveBtn.textContent = job.archived ? "Unarchive job" : "Archive job";
+				modalArchiveBtn.disabled = false;
+
 				modalMessage.hidden = true;
 				modalBackdrop.hidden = false;
 			}
@@ -608,6 +682,51 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				}, 600);
 			});
 
+			modalArchiveBtn.addEventListener("click", async () => {
+				if (!currentModalJob) return;
+				const nextArchived = !currentModalJob.archived;
+				modalArchiveBtn.disabled = true;
+				await saveModalJob({ archived: nextArchived });
+				currentModalJob.archived = nextArchived;
+				closeJobModal();
+			});
+
+			modalHoldBtn.addEventListener("click", async () => {
+				if (!currentModalJob) return;
+				if (!currentModalJob.clientEmail) {
+					modalMessage.hidden = false;
+					modalMessage.textContent = "No client email on file for this booking — can't look up their plan.";
+					modalMessage.classList.add("admin-result-message--error");
+					return;
+				}
+				if (!confirm(`Put ${clientNameFor(currentModalJob)}'s recurring plan on hold? This pauses billing and stops new visits from being created until you take them off hold.`)) {
+					return;
+				}
+				modalHoldBtn.disabled = true;
+				modalMessage.hidden = true;
+				try {
+					const res = await fetch("/api/admin/subscriptions/toggle-hold", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ hold: true, clientEmail: currentModalJob.clientEmail }),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						modalMessage.hidden = false;
+						modalMessage.textContent = data.error || "Something went wrong.";
+						modalMessage.classList.add("admin-result-message--error");
+						modalHoldBtn.disabled = false;
+						return;
+					}
+					closeJobModal();
+				} catch {
+					modalMessage.hidden = false;
+					modalMessage.textContent = "Network error, please try again.";
+					modalMessage.classList.add("admin-result-message--error");
+					modalHoldBtn.disabled = false;
+				}
+			});
+
 			// --- List view: overview stats + filterable/sortable/searchable table --
 
 			const statRecentCount = document.getElementById("stat-recent-count");
@@ -615,33 +734,75 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			const statUpcomingCount = document.getElementById("stat-upcoming-count");
 			const statUpcomingTotal = document.getElementById("stat-upcoming-total");
 			const statUnassignedCount = document.getElementById("stat-unassigned-count");
-			const statPastDueCount = document.getElementById("stat-pastdue-count");
+			const statLateCount = document.getElementById("stat-late-count");
+			const statInvoicingCount = document.getElementById("stat-invoicing-count");
+			const statActionCount = document.getElementById("stat-action-count");
+			const statUnscheduledCount = document.getElementById("stat-unscheduled-count");
+			const overviewListEl = document.getElementById("overview-list");
 			const listStatusFilterEl = document.getElementById("list-status-filter");
 			const listTypeFilterEl = document.getElementById("list-type-filter");
 			const listSearchEl = document.getElementById("list-search");
 			const listResultsCountEl = document.getElementById("list-results-count");
 			const listTableBody = document.getElementById("list-table-body");
 			const listSortHeaders = Array.from(document.querySelectorAll("#list-view th[data-sort]"));
+			const jobsTableWrap = document.getElementById("jobs-table-wrap");
+			const actionRequiredPanel = document.getElementById("action-required-panel");
+			const actionRequiredTableBody = document.getElementById("action-required-table-body");
 
 			let listWindowJobs = [];
+			let listPausedPlans = [];
 			let listStatusFilter = "all";
 			let listTypeFilter = "all";
 			let listSortKey = "start";
 			let listSortDir = "asc";
 
+			// Statuses adapted from Jobber's own Jobs list (confirmed against
+			// their help docs — see AGENTS.md → "Jobs" for the full mapping and
+			// why "Ending Within 30 Days" was deliberately left out: this app's
+			// recurring plans have no built-in end date, only an optional
+			// early-cancellation date staff set by hand, so that stat would only
+			// ever flag clients who've already told you they're leaving).
+			//
+			// `archived` jobs are hidden from every filter except "archived"
+			// itself, checked first so none of the branches below need to repeat
+			// that exclusion. Unscheduled quote pseudo-rows (see loadListView)
+			// only ever match "all" or "unscheduled" — they have no status/date
+			// for any of the other predicates to mean anything.
 			function matchesStatusFilter(job, filter, today) {
+				if (job.isUnscheduled) return filter === "all" || filter === "unscheduled";
+				if (filter === "archived") return !!job.archived;
+				if (job.archived) return false;
 				if (filter === "all") return true;
+				if (filter === "active") return job.status === "in_progress";
 				if (filter === "today") return job.visitDate === today;
 				if (filter === "upcoming") return job.visitDate > today;
-				if (filter === "past_due") return job.visitDate < today && job.status !== "completed";
+				if (filter === "late") return job.visitDate < today && job.status !== "completed";
+				if (filter === "requires_invoicing") return !!job.requiresInvoicing;
+				if (filter === "unscheduled") return false;
+				if (filter === "action_required") return false; // shown in its own panel, not table rows
+				// Checked against assignedCleanerIds, not job.status, so this always
+				// agrees with the "Needs a Cleaner" Overview count above (which
+				// uses the same predicate) — status can go stale here: unassigning
+				// every cleaner from an already-assigned/en-route job only resets
+				// status back to "unassigned" when going the OTHER direction (see
+				// the modalAssign change handler), so a job can end up with
+				// assignedCleanerIds: [] while status still reads "assigned".
+				if (filter === "unassigned") return (job.assignedCleanerIds || []).length === 0;
 				return job.status === filter;
 			}
 
 			// Fixed 90-day rolling window (30 days back, 60 forward) — enough to
 			// cover Jobber's own "past 30 days" / "next 30 days" stat cards in one
-			// read, with some headroom for the Past Due count. Jobs overdue by
-			// more than 30 days won't be counted — an edge case for a small crew
-			// that marks visits completed same-day, not worth a second query.
+			// read, with some headroom for the Late count. Jobs overdue by more
+			// than 30 days won't be counted — an edge case for a small crew that
+			// marks visits completed same-day, not worth a second query.
+			//
+			// Alongside the calendar read, this also pulls in accepted-but-
+			// unscheduled quotes (Unscheduled), open invoices (Requires
+			// Invoicing), and paused recurring plans (Action Required) — three
+			// reads this page didn't need before the Jobber-parity redesign, all
+			// non-fatal on their own if one fails, same tolerance every other
+			// best-effort read in this app has.
 			async function loadListView() {
 				loadStatus.hidden = false;
 				loadStatus.textContent = "Loading…";
@@ -649,15 +810,92 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				listTableBody.innerHTML = "";
 				const windowStart = addDays(todayLocalIso(), -30);
 				try {
-					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${windowStart}&days=90`);
-					const data = await res.json();
-					if (!res.ok) {
+					const [jobsRes, quotesRes, invoicesRes, pausedRes] = await Promise.all([
+						fetch(`/api/admin/dispatch/list-jobs?date=${windowStart}&days=90`),
+						fetch(`/api/admin/quotes/list?status=accepted`).catch(() => null),
+						fetch(`/api/admin/invoices/list`).catch(() => null),
+						fetch(`/api/admin/subscriptions/list-paused`).catch(() => null),
+					]);
+					const data = await jobsRes.json();
+					if (!jobsRes.ok) {
 						loadStatus.textContent = data.error || "Couldn't load jobs.";
 						loadStatus.classList.add("admin-status--error");
 						return;
 					}
 					loadStatus.hidden = true;
-					listWindowJobs = data.jobs || [];
+
+					const realJobs = data.jobs || [];
+
+					// Requires Invoicing: a completed quote-based job whose invoice
+					// isn't paid (or void) yet — draft, sent, or overdue all count,
+					// same as a client would describe "I still need to bill this."
+					let unpaidInvoiceJobKeys = new Set();
+					if (invoicesRes?.ok) {
+						try {
+							const invoicesData = await invoicesRes.json();
+							unpaidInvoiceJobKeys = new Set(
+								(invoicesData.invoices || [])
+									.filter((inv) => inv.status !== "paid" && inv.status !== "void")
+									.map((inv) => inv.jobKey),
+							);
+						} catch {
+							// Non-fatal — Requires Invoicing just reads as 0 for this load.
+						}
+					}
+					realJobs.forEach((job) => {
+						job.requiresInvoicing = unpaidInvoiceJobKeys.has(job.jobKey);
+					});
+
+					// Unscheduled: quotes the customer already accepted (deposit
+					// paid) but staff haven't picked a date for yet — represented
+					// as pseudo-rows with no eventId/jobKey, since no calendar event
+					// exists for these (see AGENTS.md → "Requests, Assessments &
+					// Quotes"). Clicking one jumps to the Quotes page, where the
+					// actual "Schedule Job" action already lives, rather than
+					// duplicating that whole flow here.
+					let unscheduledPseudoJobs = [];
+					if (quotesRes?.ok) {
+						try {
+							const quotesData = await quotesRes.json();
+							unscheduledPseudoJobs = (quotesData.quotes || []).map((q) => {
+								const customer = q.customer || {};
+								return {
+									isUnscheduled: true,
+									quoteId: q.id,
+									jobNumber: "",
+									clientName: customer.name || "(no name)",
+									serviceLabel: QUOTE_SERVICE_LABELS[q.serviceType] || q.serviceType || "Quote",
+									location: customer.address || "",
+									jobType: "quote_based",
+									amountPaid: "",
+									quotedTotal: q.quotedTotal || "",
+									status: "unscheduled",
+									assignedCleanerIds: [],
+									start: null,
+									visitDate: "",
+								};
+							});
+						} catch {
+							// Non-fatal — Unscheduled just reads as 0 for this load.
+						}
+					}
+
+					// Action Required: recurring plans currently on hold — see
+					// list-paused.js. These never appear as table rows (a plan on
+					// hold by definition has no upcoming visit for a row to
+					// represent), just as an Overview count and their own panel.
+					if (pausedRes?.ok) {
+						try {
+							const pausedData = await pausedRes.json();
+							listPausedPlans = pausedData.paused || [];
+						} catch {
+							listPausedPlans = [];
+						}
+					} else {
+						listPausedPlans = [];
+					}
+
+					listWindowJobs = [...realJobs, ...unscheduledPseudoJobs];
 					renderListStats();
 					applyListFilters();
 				} catch {
@@ -676,9 +914,16 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				let upcomingCount = 0;
 				let upcomingTotal = 0;
 				let unassignedCount = 0;
-				let pastDueCount = 0;
+				let lateCount = 0;
+				let invoicingCount = 0;
+				let unscheduledCount = 0;
 
 				listWindowJobs.forEach((job) => {
+					if (job.isUnscheduled) {
+						unscheduledCount++;
+						return;
+					}
+					if (job.archived) return;
 					const amount = parseFloat(job.amountPaid) || 0;
 					if (job.visitDate < today && job.visitDate >= back30) {
 						recentCount++;
@@ -692,7 +937,10 @@ import { WORKING_HOURS } from "../../data/booking.js";
 						unassignedCount++;
 					}
 					if (job.visitDate < today && job.status !== "completed") {
-						pastDueCount++;
+						lateCount++;
+					}
+					if (job.requiresInvoicing) {
+						invoicingCount++;
 					}
 				});
 
@@ -701,7 +949,10 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				statUpcomingCount.textContent = String(upcomingCount);
 				statUpcomingTotal.textContent = `$${upcomingTotal.toFixed(2)}`;
 				statUnassignedCount.textContent = String(unassignedCount);
-				statPastDueCount.textContent = String(pastDueCount);
+				statLateCount.textContent = String(lateCount);
+				statInvoicingCount.textContent = String(invoicingCount);
+				statUnscheduledCount.textContent = String(unscheduledCount);
+				statActionCount.textContent = String(listPausedPlans.length);
 			}
 
 			function listSortValue(job, key) {
@@ -715,7 +966,10 @@ import { WORKING_HOURS } from "../../data/booking.js";
 					case "location":
 						return (job.location || "").toLowerCase();
 					case "start":
-						return new Date(job.start).getTime();
+						// Unscheduled pseudo-rows have no start time — sort them to
+						// the end under ascending order rather than colliding at the
+						// Unix epoch (which `new Date(null)` would otherwise do).
+						return job.start ? new Date(job.start).getTime() : Number.POSITIVE_INFINITY;
 					case "status":
 						return job.status || "";
 					case "amountPaid":
@@ -725,8 +979,64 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				}
 			}
 
+			function renderActionRequiredPanel() {
+				actionRequiredTableBody.innerHTML = "";
+				if (!listPausedPlans.length) {
+					actionRequiredTableBody.innerHTML = `<tr><td colspan="5" class="admin-table__empty">No plans on hold right now.</td></tr>`;
+					return;
+				}
+				listPausedPlans.forEach((plan) => {
+					const tr = document.createElement("tr");
+					tr.innerHTML = `
+						<td>${escapeHtml(plan.name || plan.email || "—")}</td>
+						<td>${escapeHtml(plan.phone || "—")}</td>
+						<td>${escapeHtml(FREQUENCY_LABELS[plan.frequency] || plan.frequency || "Recurring plan")}</td>
+						<td><span class="admin-badge admin-badge--action_required">Action Required</span></td>
+						<td><button type="button" class="btn btn--outline admin-resume-btn">Resume</button></td>
+					`;
+					tr.querySelector(".admin-resume-btn").addEventListener("click", async (e) => {
+						if (!confirm(`Take ${plan.name || "this client"} off hold and resume their plan?`)) return;
+						const btn = e.currentTarget;
+						btn.disabled = true;
+						try {
+							const res = await fetch("/api/admin/subscriptions/toggle-hold", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ hold: false, subscriptionId: plan.subscriptionId }),
+							});
+							if (!res.ok) {
+								const data = await res.json();
+								alert(data.error || "Something went wrong.");
+								btn.disabled = false;
+								return;
+							}
+							await loadListView();
+						} catch {
+							alert("Network error, please try again.");
+							btn.disabled = false;
+						}
+					});
+					actionRequiredTableBody.appendChild(tr);
+				});
+			}
+
 			function applyListFilters() {
 				const today = todayLocalIso();
+
+				overviewListEl.querySelectorAll(".admin-overview-list__item").forEach((li) => {
+					li.classList.toggle("is-active", li.dataset.filter === listStatusFilter);
+				});
+
+				if (listStatusFilter === "action_required") {
+					jobsTableWrap.hidden = true;
+					actionRequiredPanel.hidden = false;
+					listResultsCountEl.textContent = `${listPausedPlans.length} plan${listPausedPlans.length === 1 ? "" : "s"} on hold`;
+					renderActionRequiredPanel();
+					return;
+				}
+				jobsTableWrap.hidden = false;
+				actionRequiredPanel.hidden = true;
+
 				const q = listSearchEl.value.trim().toLowerCase();
 
 				let rows = listWindowJobs.filter((job) => {
@@ -762,6 +1072,28 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				rows.forEach((job) => {
 					const tr = document.createElement("tr");
 					tr.className = "admin-jobs-table__row";
+
+					if (job.isUnscheduled) {
+						tr.innerHTML = `
+							<td>—</td>
+							<td>${escapeHtml(job.clientName)}</td>
+							<td>${escapeHtml(serviceNameFor(job))}</td>
+							<td>${escapeHtml(job.location || "—")}</td>
+							<td>Not yet scheduled</td>
+							<td><span class="admin-badge admin-badge--unscheduled">Unscheduled</span></td>
+							<td>${job.quotedTotal ? `$${job.quotedTotal}` : "N/A"}</td>
+						`;
+						// No calendar event exists yet for this row (see loadListView) —
+						// the shared job-detail modal only knows how to edit a real
+						// job, so this jumps to the Quotes page's own "Schedule Job"
+						// action instead of duplicating it here.
+						tr.addEventListener("click", () => {
+							window.location.href = "/admin/crm/quotes";
+						});
+						listTableBody.appendChild(tr);
+						return;
+					}
+
 					const names = cleanerNamesFor(job.assignedCleanerIds);
 					tr.innerHTML = `
 						<td>${job.jobNumber ? "#" + escapeHtml(job.jobNumber) : "—"}</td>
@@ -772,6 +1104,8 @@ import { WORKING_HOURS } from "../../data/booking.js";
 						<td>
 							<span class="admin-badge admin-badge--${job.status}">${STATUS_LABELS[job.status] || job.status}</span>
 							${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
+							${job.archived ? `<div class="admin-table__sub">Archived</div>` : ""}
+							${job.requiresInvoicing ? `<div class="admin-table__sub admin-table__sub--warn">Requires invoicing</div>` : ""}
 							${names.length ? `<div class="admin-table__sub">${escapeHtml(names.join(", "))}</div>` : ""}
 						</td>
 						<td>${amountLabel(job)}${depositBadge(job)}</td>
@@ -790,6 +1124,24 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				applyListFilters();
 			});
 			listSearchEl.addEventListener("input", () => applyListFilters());
+
+			// Overview list rows are a second way to set the very same
+			// listStatusFilter/`<select>` the toolbar dropdown controls — kept in
+			// sync both directions so it never looks like two different filters.
+			overviewListEl.querySelectorAll(".admin-overview-list__item").forEach((li) => {
+				const activate = () => {
+					listStatusFilter = li.dataset.filter;
+					listStatusFilterEl.value = li.dataset.filter;
+					applyListFilters();
+				};
+				li.addEventListener("click", activate);
+				li.addEventListener("keydown", (e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						activate();
+					}
+				});
+			});
 
 			listSortHeaders.forEach((th) => {
 				th.addEventListener("click", () => {
@@ -1352,6 +1704,29 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				color: #1e7a34;
 			}
 
+			.admin-badge--unscheduled {
+				background: #f1e9fb;
+				color: #6b3fa0;
+			}
+
+			.admin-badge--action_required {
+				background: #fdf0dc;
+				color: #a4640a;
+			}
+
+			.admin-table__sub--warn {
+				color: #a4640a;
+				font-weight: 600;
+			}
+
+			.admin-modal__extra-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+				padding-top: 0.5rem;
+				border-top: 1px solid var(--color-border);
+			}
+
 			.admin-confirmed-check {
 				display: inline-block;
 				font-size: 0.78rem;
@@ -1373,23 +1748,63 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			/* --- List view: overview cards ---------------------------------------- */
 
-			.admin-overview-grid {
+			.admin-overview-row {
 				display: grid;
-				grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+				grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(160px, 1fr));
 				gap: 0.75rem;
 				margin-bottom: 1.25rem;
+				align-items: stretch;
+			}
+
+			@media (max-width: 800px) {
+				.admin-overview-row {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.admin-overview-list-card {
+				padding: 1rem 1.1rem;
+			}
+
+			.admin-overview-list {
+				list-style: none;
+				margin: 0.5rem 0 0;
+				padding: 0;
+			}
+
+			.admin-overview-list__item {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.75rem;
+				padding: 0.4rem 0.3rem;
+				border-radius: 6px;
+				cursor: pointer;
+				font-size: 0.88rem;
+				color: var(--color-ink);
+			}
+
+			.admin-overview-list__item:hover {
+				background: var(--color-sky-light);
+			}
+
+			.admin-overview-list__item.is-active {
+				background: var(--color-sky-light);
+				font-weight: 600;
+			}
+
+			.admin-overview-list__count {
+				font-weight: 700;
+				color: var(--color-slate);
+				min-width: 1.5em;
+				text-align: right;
 			}
 
 			.admin-overview-card {
 				padding: 1rem 1.1rem;
 			}
 
-			.admin-overview-card--warn {
-				border-color: #f3c8c5;
-				background: #fdeceb;
-			}
-
-			.admin-overview-card__label {
+.admin-overview-card__label {
 				margin: 0;
 				font-weight: 600;
 				font-size: 0.85rem;
