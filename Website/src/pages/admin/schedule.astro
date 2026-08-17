@@ -1599,6 +1599,16 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				gap: 0.5rem;
 			}
 
+			/* .btn's global padding/font-size (global.css) is sized for the
+			   public site's big CTA buttons — oversized next to this toolbar's
+			   own compact filter popover buttons (0.4rem 0.9rem, 0.82rem font).
+			   Scoped overrides here rather than touching .btn itself, which is
+			   shared by every button on every admin AND public page. */
+			.admin-schedule-toolbar__nav .btn {
+				padding: 0.45rem 1rem;
+				font-size: 0.85rem;
+			}
+
 			.admin-day-picker-hidden {
 				display: none;
 			}
@@ -2361,6 +2371,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				display: flex;
 				gap: 0.5rem;
 				margin-top: 1rem;
+			}
+
+			/* Same reasoning as .admin-schedule-toolbar__nav .btn above — the
+			   Visit Popup is a small quick-glance card, .btn's public-site-scale
+			   padding overwhelmed it. Covers both the bottom •••/Edit/Details
+			   row and (via .admin-visit-popup__actions--top sharing this same
+			   base class) the Visit Details view's Mark Complete/More Actions
+			   row, for the same reason. */
+			.admin-visit-popup__actions .btn {
+				padding: 0.4rem 0.9rem;
+				font-size: 0.85rem;
 			}
 
 			.admin-visit-popup__actions--top {
