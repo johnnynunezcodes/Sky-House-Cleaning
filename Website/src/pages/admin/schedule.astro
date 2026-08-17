@@ -122,9 +122,14 @@ import { WORKING_HOURS } from "../../data/booking.js";
 						<span class="admin-visit-popup__label">Details</span>
 						<span id="popup-details"></span>
 					</div>
-					<div class="admin-visit-popup__row">
+					<div class="admin-visit-popup__row admin-visit-popup__row--team">
 						<span class="admin-visit-popup__label">Team</span>
-						<span id="popup-team"></span>
+						<div class="admin-filter-popover" id="popup-team-wrap">
+							<button type="button" class="admin-filter-btn admin-filter-btn--full" id="popup-team-btn" aria-label="Assign team members">
+								<span id="popup-team-summary"></span>
+							</button>
+							<div class="admin-filter-popover__menu" id="popup-team-menu" hidden></div>
+						</div>
 					</div>
 					<div class="admin-visit-popup__row" id="popup-location-row">
 						<span class="admin-visit-popup__label">Location</span>
@@ -611,7 +616,9 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			const popupSubtitle = document.getElementById("popup-subtitle");
 			const popupCompleted = document.getElementById("popup-completed");
 			const popupDetails = document.getElementById("popup-details");
-			const popupTeam = document.getElementById("popup-team");
+			const popupTeamBtn = document.getElementById("popup-team-btn");
+			const popupTeamMenu = document.getElementById("popup-team-menu");
+			const popupTeamSummary = document.getElementById("popup-team-summary");
 			const popupLocationRow = document.getElementById("popup-location-row");
 			const popupLocation = document.getElementById("popup-location");
 			const popupStart = document.getElementById("popup-start");
@@ -635,8 +642,9 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				popupSubtitle.textContent = isAssessment ? "Assessment" : "Visit";
 				popupCompleted.checked = job.status === "completed";
 				popupDetails.textContent = `${clientNameFor(job)}${serviceNameFor(job) ? " — " + serviceNameFor(job) : ""}`;
-				const names = cleanerNamesFor(job.assignedCleanerIds);
-				popupTeam.textContent = names.length ? names.join(", ") : "Needs a cleaner";
+				popupTeamMenu.innerHTML = cleanerCheckboxRows(job.assignedCleanerIds || []);
+				popupTeamMenu.hidden = true;
+				updatePopupTeamSummary();
 				popupLocationRow.hidden = !job.location;
 				popupLocation.textContent = job.location || "";
 				popupStart.textContent = `${fmtDateTime(job.start)}, ${fmtTime(job.start)}`;
@@ -722,6 +730,46 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				if (!res.ok) throw new Error(data.error || "Something went wrong.");
 				return data;
 			}
+
+			// Visit Popup's "Team" field — same checkbox-popover markup/behavior
+			// as Edit Visit's "Assign team members" (cleanerCheckboxRows()), but
+			// it saves immediately on change instead of waiting for a Save
+			// button — the popup doesn't have one, matching how the Completed
+			// checkbox above already auto-saves. Lets staff add/remove a cleaner
+			// right from the quick-glance popup instead of having to open the
+			// full Edit Visit form just for a team change.
+			function popupTeamSelectedIds() {
+				return Array.from(popupTeamMenu.querySelectorAll('input[type="checkbox"]:checked')).map((cb) => cb.value);
+			}
+
+			function updatePopupTeamSummary() {
+				const names = cleanerNamesFor(popupTeamSelectedIds());
+				popupTeamSummary.textContent = names.length ? names.join(", ") : "Needs a cleaner";
+			}
+
+			// Same open/close wiring as editAssignBtn/editAssignMenu above.
+			popupTeamBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				const opening = popupTeamMenu.hidden;
+				document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
+				popupTeamMenu.hidden = !opening;
+				if (opening) flipMenuIfNeeded(popupTeamBtn, popupTeamMenu);
+			});
+			popupTeamMenu.addEventListener("click", (e) => e.stopPropagation());
+			popupTeamMenu.addEventListener("change", async () => {
+				updatePopupTeamSummary();
+				if (!currentJob) return;
+				const selectedIds = popupTeamSelectedIds();
+				try {
+					await saveJobFields(currentJob, { assignedCleanerIds: selectedIds });
+					currentJob.assignedCleanerIds = selectedIds;
+					await loadCurrentPeriod();
+				} catch (err) {
+					popupMessage.hidden = false;
+					popupMessage.textContent = err.message;
+					popupMessage.classList.add("admin-result-message--error");
+				}
+			});
 
 			popupCompleted.addEventListener("change", async () => {
 				if (!currentJob) return;
@@ -2379,6 +2427,35 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				flex: 0 0 90px;
 				font-weight: 600;
 				color: var(--color-slate);
+			}
+
+			/* Team row's popover button needs to fill the rest of the row's
+			   width (same min-width: 0 grid-column-stretch gotcha noted
+			   elsewhere in this file — a flex child also defaults to
+			   min-width: auto, which would let the button push past the row). */
+			.admin-visit-popup__row--team {
+				align-items: flex-start;
+			}
+
+			.admin-visit-popup__row--team #popup-team-wrap {
+				flex: 1;
+				min-width: 0;
+			}
+
+			#popup-team-wrap .admin-filter-btn--full {
+				padding: 0.3rem 0.5rem;
+				font-size: 0.9rem;
+				border: 1px solid transparent;
+			}
+
+			#popup-team-wrap .admin-filter-btn--full:hover {
+				border-color: var(--color-border);
+			}
+
+			#popup-team-wrap .admin-filter-popover__menu {
+				width: 100%;
+				max-height: 220px;
+				overflow-y: auto;
 			}
 
 			.admin-visit-popup__actions {
