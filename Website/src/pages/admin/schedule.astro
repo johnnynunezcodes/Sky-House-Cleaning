@@ -26,9 +26,11 @@
 //   billing desync for a lower-priority convenience; one-off, quote-based,
 //   and assessment visits have no subscription to desync, so those ARE
 //   fully editable here.
-// - The small popup is a centered modal, not a pixel-anchored floating
-//   card near the clicked chip — simpler and more reliable across the
-//   different chip layouts each of Month/Week/Day use.
+// - No "Manage cleaners" section on this page — that moved to its own nav
+//   tab, /admin/team-organization (see AGENTS.md → "Team Organization
+//   (split from Schedule)"), after the business owner asked for it to be
+//   separate. This page still loads the same cleaner roster for its Team
+//   filter and the Edit Visit form's assignment dropdown.
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
@@ -43,32 +45,6 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				data-working-hours-end={WORKING_HOURS.end}
 			>
 				<h1>Schedule</h1>
-				<p class="admin-hint">
-					Your calendar, day by day, week by week, or month by month. Click any visit for a quick
-					look, then Edit or see full Details. For the flat, filterable list with billing totals
-					and status counts, see <a href="/admin/jobs">Jobs</a>.
-				</p>
-
-				<details class="card admin-add-card">
-					<summary class="admin-add-summary">Manage cleaners</summary>
-					<div id="cleaners-list"></div>
-					<form id="add-cleaner-form" class="admin-form admin-inline-form">
-						<div class="admin-form__row">
-							<label for="add-cleaner-name">Name *</label>
-							<input type="text" id="add-cleaner-name" name="name" required />
-						</div>
-						<div class="admin-form__row">
-							<label for="add-cleaner-phone">Phone</label>
-							<input type="tel" id="add-cleaner-phone" name="phone" />
-						</div>
-						<div class="admin-form__row">
-							<label for="add-cleaner-email">Email</label>
-							<input type="email" id="add-cleaner-email" name="email" />
-						</div>
-						<button type="submit" class="btn btn--outline">Add Cleaner</button>
-					</form>
-					<p class="admin-result-message" id="cleaner-message" hidden></p>
-				</details>
 
 				<div class="admin-schedule-toolbar">
 					<div class="admin-schedule-toolbar__nav">
@@ -301,9 +277,6 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			const todayBtn = document.getElementById("today-btn");
 			const periodLabel = document.getElementById("period-label");
 			const loadStatus = document.getElementById("load-status");
-			const cleanersList = document.getElementById("cleaners-list");
-			const addCleanerForm = document.getElementById("add-cleaner-form");
-			const cleanerMessage = document.getElementById("cleaner-message");
 			const viewButtons = Array.from(document.querySelectorAll(".admin-view-btn"));
 			const dayViewEl = document.getElementById("day-view");
 			const weekViewEl = document.getElementById("week-view");
@@ -440,83 +413,21 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				return parseSummary(job.summary).service;
 			}
 
+			// Adding/deactivating cleaners moved to its own page — /admin/team-
+			// organization (see AGENTS.md → "Team Organization (split from
+			// Schedule)") — but this page still needs the roster itself, for
+			// the Team filter popover and the Edit Visit form's assignment
+			// dropdown, so it still fetches the same list-cleaners endpoint.
 			async function loadCleaners() {
 				try {
 					const res = await fetch("/api/admin/dispatch/list-cleaners");
 					const data = await res.json();
 					if (res.ok) cleaners = data.cleaners || [];
-					renderCleanersList();
 					renderTeamFilterOptions();
 				} catch {
 					// Non-fatal — assignment dropdowns/names just come up empty.
 				}
 			}
-
-			function renderCleanersList() {
-				if (!cleaners.length) {
-					cleanersList.innerHTML = `<p class="admin-card__meta">No cleaners added yet.</p>`;
-					return;
-				}
-				cleanersList.innerHTML = cleaners
-					.map(
-						(c) => `
-						<div class="admin-cleaner-row">
-							<span>${escapeHtml(c.name)}${c.phone ? " · " + escapeHtml(c.phone) : ""}${c.active ? "" : " (inactive)"}</span>
-							<button type="button" class="btn btn--outline admin-toggle-active" data-id="${c.id}" data-active="${c.active}">
-								${c.active ? "Mark inactive" : "Mark active"}
-							</button>
-						</div>
-					`,
-					)
-					.join("");
-
-				cleanersList.querySelectorAll(".admin-toggle-active").forEach((btn) => {
-					btn.addEventListener("click", async () => {
-						btn.disabled = true;
-						try {
-							await fetch("/api/admin/dispatch/update-cleaner", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ id: btn.dataset.id, active: btn.dataset.active !== "true" }),
-							});
-							await loadCleaners();
-						} finally {
-							btn.disabled = false;
-						}
-					});
-				});
-			}
-
-			addCleanerForm.addEventListener("submit", async (e) => {
-				e.preventDefault();
-				const formData = new FormData(addCleanerForm);
-				const payload = Object.fromEntries(formData.entries());
-				const submitBtn = addCleanerForm.querySelector("button[type=submit]");
-				submitBtn.disabled = true;
-				cleanerMessage.hidden = true;
-				try {
-					const res = await fetch("/api/admin/dispatch/create-cleaner", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify(payload),
-					});
-					const data = await res.json();
-					if (!res.ok) {
-						cleanerMessage.hidden = false;
-						cleanerMessage.textContent = data.error || "Something went wrong.";
-						cleanerMessage.classList.add("admin-result-message--error");
-						return;
-					}
-					addCleanerForm.reset();
-					await loadCleaners();
-				} catch {
-					cleanerMessage.hidden = false;
-					cleanerMessage.textContent = "Network error, please try again.";
-					cleanerMessage.classList.add("admin-result-message--error");
-				} finally {
-					submitBtn.disabled = false;
-				}
-			});
 
 			function cleanerOptions(selectedIds) {
 				return cleaners
@@ -1551,35 +1462,6 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-status--error {
 				color: #b3261e;
-			}
-
-			.admin-add-card {
-				margin-bottom: 1.5rem;
-				padding: 1.25rem 1.5rem;
-			}
-
-			.admin-add-summary {
-				cursor: pointer;
-				font-weight: 600;
-				color: var(--color-ink);
-			}
-
-			.admin-cleaner-row {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 1rem;
-				padding: 0.5rem 0;
-				border-bottom: 1px solid var(--color-border);
-				font-size: 0.9rem;
-			}
-
-			.admin-inline-form {
-				display: flex;
-				align-items: flex-end;
-				gap: 1rem;
-				flex-wrap: wrap;
-				margin-top: 1rem;
 			}
 
 			.admin-form__row {

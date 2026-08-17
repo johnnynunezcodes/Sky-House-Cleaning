@@ -31,9 +31,18 @@ const ICONS = {
 	deals: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>`,
 	dispatch: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="13" height="10"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="6" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>`,
 	schedule: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 13h2M8 17h2M12 13h2M12 17h2M16 13h2"/></svg>`,
+	teamOrg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 21c0-3.6 3-6.3 6.5-6.3s6.5 2.7 6.5 6.3"/><circle cx="17.5" cy="8.5" r="2.4"/><path d="M15.5 21c0-2.6 1.6-4.7 4-5.4"/></svg>`,
 	quoteJob: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M12 17v-6M9.8 12.8c0-.9.9-1.3 2.2-1.3s2.2.5 2.2 1.2-.9 1.1-2.2 1.3-2.2.6-2.2 1.4.9 1.3 2.2 1.3 2.2-.4 2.2-1.3"/></svg>`,
 	invoices: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>`,
 };
+
+// Schedule sits above every grouped section, same as Jobber's own sidebar
+// (Home, then Schedule, then everything else) — the business owner asked
+// for it explicitly after seeing that placement in their reference
+// screenshots. Rendered as its own unlabeled flat-link row before navGroups
+// in the template below, not folded into `flatLinks` (that group renders
+// AFTER navGroups, at the bottom of the sidebar — the opposite end).
+const topLinks = [{ label: "Schedule", href: "/admin/schedule", icon: ICONS.schedule }];
 
 const navGroups = [
 	{
@@ -76,11 +85,10 @@ const navGroups = [
 
 // Sections with just one destination (nothing to group yet) sit below the
 // grouped sections as flat links, same indentation as a group label rather
-// than a nested item — Dispatch today, easy to promote into its own group
-// later (e.g. once a separate Cleaners page exists).
+// than a nested item.
 const flatLinks = [
-	{ label: "Schedule", href: "/admin/schedule", icon: ICONS.schedule },
 	{ label: "Jobs", href: "/admin/jobs", icon: ICONS.dispatch },
+	{ label: "Team Organization", href: "/admin/team-organization", icon: ICONS.teamOrg },
 	{ label: "Invoices", href: "/admin/invoices", icon: ICONS.invoices },
 ];
 
@@ -116,6 +124,22 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				</div>
 
 				<nav class="admin-sidebar__nav" aria-label="Staff tools navigation">
+					<div class="admin-nav-group admin-nav-group--top">
+						{
+							topLinks.map((item) => (
+								<a
+									href={item.href}
+									class:list={["admin-nav-link", "admin-nav-link--flat", { "is-active": isItemActive(item) }]}
+								>
+									<span class="admin-nav-link__flat-main">
+										<span class="admin-nav-link__icon" set:html={item.icon} />
+										<span class="admin-nav-link__label">{item.label}</span>
+									</span>
+								</a>
+							))
+						}
+					</div>
+
 					{
 						navGroups.map((group) => (
 							<div class="admin-nav-group">
@@ -296,6 +320,20 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				padding-top: 0.75rem;
 				margin-top: 0.25rem;
 				border-top: 1px solid var(--color-border);
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+			}
+
+			/* topLinks (currently just Schedule) — sits above every grouped
+			   section, right under the brand header, mirroring Jobber's own
+			   Home/Schedule placement. A bottom divider (not top — the brand
+			   header above already has its own border-bottom) separates it
+			   from the Booking group below. */
+			.admin-nav-group--top {
+				padding-bottom: 0.6rem;
+				margin-bottom: 0.5rem;
+				border-bottom: 1px solid var(--color-border);
 				display: flex;
 				flex-direction: column;
 				gap: 0.15rem;

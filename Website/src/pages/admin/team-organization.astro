@@ -1,0 +1,214 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. The
+// cleaner/crew roster (add a cleaner, mark active/inactive) used to live as
+// a collapsible "Manage cleaners" section at the top of /admin/schedule; the
+// business owner asked for it to be its own nav tab instead, since managing
+// who's on the team isn't really a Schedule-page task, it's its own thing.
+// Split out verbatim — same fields, same endpoints, same active/inactive
+// toggle — just moved to its own page. See AGENTS.md → "Team Organization
+// (split from Schedule)".
+//
+// Schedule (and Jobs) still each fetch the same /api/admin/dispatch/list-cleaners
+// endpoint on their own — this page doesn't own the only copy of the roster,
+// it's just where staff go to edit it. Both those pages need `cleaners` in
+// memory for their own team-assignment dropdowns/filters regardless of
+// whether this management page has ever been visited.
+import AdminLayout from "../../layouts/AdminLayout.astro";
+
+export const prerender = false;
+---
+
+<AdminLayout title="Team Organization | Sky House Cleaning Staff Tools">
+	<div class="container admin-container">
+		<h1>Team Organization</h1>
+		<p class="admin-hint">
+			Add cleaners to your team and mark them active or inactive. An inactive cleaner drops out
+			of assignment dropdowns on Schedule and Jobs going forward, but stays assigned to any visit
+			they're already on.
+		</p>
+
+		<div class="card admin-cleaners-card">
+			<div id="cleaners-list"></div>
+			<form id="add-cleaner-form" class="admin-form admin-inline-form">
+				<div class="admin-form__row">
+					<label for="add-cleaner-name">Name *</label>
+					<input type="text" id="add-cleaner-name" name="name" required />
+				</div>
+				<div class="admin-form__row">
+					<label for="add-cleaner-phone">Phone</label>
+					<input type="tel" id="add-cleaner-phone" name="phone" />
+				</div>
+				<div class="admin-form__row">
+					<label for="add-cleaner-email">Email</label>
+					<input type="email" id="add-cleaner-email" name="email" />
+				</div>
+				<button type="submit" class="btn btn--outline">Add Cleaner</button>
+			</form>
+			<p class="admin-result-message" id="cleaner-message" hidden></p>
+		</div>
+	</div>
+
+	<script>
+		// is:global styling below, plain DOM-building JS here — same pattern
+		// as schedule.astro (see that file's own top-of-<style> comment for
+		// why): this page's list of cleaners is rendered via innerHTML, which
+		// Astro's scoped-CSS attribute-tagging never reaches anyway.
+		function escapeHtml(str) {
+			const div = document.createElement("div");
+			div.textContent = str ?? "";
+			return div.innerHTML;
+		}
+
+		let cleaners = [];
+		const cleanersList = document.getElementById("cleaners-list");
+		const addCleanerForm = document.getElementById("add-cleaner-form");
+		const cleanerMessage = document.getElementById("cleaner-message");
+
+		async function loadCleaners() {
+			try {
+				const res = await fetch("/api/admin/dispatch/list-cleaners");
+				const data = await res.json();
+				if (res.ok) cleaners = data.cleaners || [];
+				renderCleanersList();
+			} catch {
+				cleanersList.innerHTML = `<p class="admin-card__meta">Couldn't load the team — please refresh.</p>`;
+			}
+		}
+
+		function renderCleanersList() {
+			if (!cleaners.length) {
+				cleanersList.innerHTML = `<p class="admin-card__meta">No cleaners added yet.</p>`;
+				return;
+			}
+			cleanersList.innerHTML = cleaners
+				.map(
+					(c) => `
+					<div class="admin-cleaner-row">
+						<span>${escapeHtml(c.name)}${c.phone ? " · " + escapeHtml(c.phone) : ""}${c.active ? "" : " (inactive)"}</span>
+						<button type="button" class="btn btn--outline admin-toggle-active" data-id="${c.id}" data-active="${c.active}">
+							${c.active ? "Mark inactive" : "Mark active"}
+						</button>
+					</div>
+				`,
+				)
+				.join("");
+
+			cleanersList.querySelectorAll(".admin-toggle-active").forEach((btn) => {
+				btn.addEventListener("click", async () => {
+					btn.disabled = true;
+					try {
+						await fetch("/api/admin/dispatch/update-cleaner", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ id: btn.dataset.id, active: btn.dataset.active !== "true" }),
+						});
+						await loadCleaners();
+					} finally {
+						btn.disabled = false;
+					}
+				});
+			});
+		}
+
+		addCleanerForm.addEventListener("submit", async (e) => {
+			e.preventDefault();
+			const formData = new FormData(addCleanerForm);
+			const payload = Object.fromEntries(formData.entries());
+			const submitBtn = addCleanerForm.querySelector("button[type=submit]");
+			submitBtn.disabled = true;
+			cleanerMessage.hidden = true;
+			try {
+				const res = await fetch("/api/admin/dispatch/create-cleaner", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(payload),
+				});
+				const data = await res.json();
+				if (!res.ok) {
+					cleanerMessage.hidden = false;
+					cleanerMessage.textContent = data.error || "Something went wrong.";
+					cleanerMessage.classList.add("admin-result-message--error");
+					return;
+				}
+				addCleanerForm.reset();
+				await loadCleaners();
+			} catch {
+				cleanerMessage.hidden = false;
+				cleanerMessage.textContent = "Network error, please try again.";
+				cleanerMessage.classList.add("admin-result-message--error");
+			} finally {
+				submitBtn.disabled = false;
+			}
+		});
+
+		loadCleaners();
+	</script>
+
+	<style is:global>
+		.admin-container {
+			max-width: 900px;
+			margin: 0 auto;
+			padding-block: 3rem;
+		}
+
+		.admin-hint {
+			color: var(--color-slate);
+			margin-bottom: 1.5rem;
+		}
+
+		.admin-cleaners-card {
+			padding: 1.5rem;
+		}
+
+		.admin-cleaner-row {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 1rem;
+			padding: 0.6rem 0;
+			border-bottom: 1px solid var(--color-border);
+			font-size: 0.9rem;
+		}
+
+		.admin-inline-form {
+			display: flex;
+			align-items: flex-end;
+			gap: 1rem;
+			flex-wrap: wrap;
+			margin-top: 1.25rem;
+			padding-top: 1.25rem;
+			border-top: 1px solid var(--color-border);
+		}
+
+		.admin-form__row {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+		}
+
+		.admin-form__row label {
+			font-weight: 600;
+			font-size: 0.85rem;
+			color: var(--color-ink);
+		}
+
+		.admin-form__row input {
+			padding: 0.6rem 0.75rem;
+			border: 1px solid var(--color-border);
+			border-radius: 8px;
+			font-size: 0.95rem;
+			font-family: inherit;
+		}
+
+		.admin-result-message {
+			margin-top: 0.75rem;
+			font-weight: 600;
+			color: #1e7a34;
+			font-size: 0.9rem;
+		}
+
+		.admin-result-message--error {
+			color: #b3261e;
+		}
+	</style>
+</AdminLayout>
