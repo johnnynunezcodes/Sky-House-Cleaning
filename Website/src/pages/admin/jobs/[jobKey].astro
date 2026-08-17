@@ -1,0 +1,882 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Full
+// job-detail page, replacing the small job-detail modal that used to open
+// from a row click on /admin/jobs (see AGENTS.md → "Jobs" → "Full job
+// detail page (replaces the job-detail modal)"). The business owner asked
+// for this after seeing Jobber's own dedicated job page and wanting more
+// room for client info + an edit path than a small popup could hold.
+//
+// Data loads client-side (fetch in the <script> below), NOT server-side in
+// this frontmatter — unlike the public one-shot confirm/[id].astro-style
+// pages, this page needs the same live-editing affordances (checkbox
+// popover for team, status dropdown, debounced notes save, etc.) every
+// other /admin page already builds with plain client-side JS, so it follows
+// THAT convention instead. Astro.params.jobKey is only used here to hand
+// the raw string to the page as a data attribute for the script to read.
+export const prerender = false;
+
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+
+const { jobKey } = Astro.params;
+---
+
+<AdminLayout title="Job | Sky House Cleaning Staff Tools">
+	<div class="container admin-container" id="job-page" data-job-key={jobKey}>
+		<a href="/admin/jobs" class="admin-back-link">← Back to Jobs</a>
+
+		<p id="load-status" class="admin-status">Loading…</p>
+
+		<div id="job-content" hidden>
+			<div class="admin-job-header">
+				<div>
+					<h1 id="job-title"></h1>
+					<div class="admin-job-header__meta">
+						<span class="admin-badge" id="job-status-badge"></span>
+						<span class="admin-confirmed-check" id="job-confirmed-check" hidden>✓ Confirmed by cleaner</span>
+						<span class="admin-badge admin-badge--archived" id="job-archived-badge" hidden>Archived</span>
+					</div>
+				</div>
+				<div class="admin-filter-popover" id="job-more-wrap">
+					<button type="button" class="btn btn--outline" id="job-more-btn">•••</button>
+					<div class="admin-filter-popover__menu admin-filter-popover__menu--actions" id="job-more-menu" hidden>
+						<button type="button" class="admin-menu-item" id="job-hold-btn" hidden>Put client's plan on hold</button>
+						<button type="button" class="admin-menu-item" id="job-archive-btn">Archive job</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="admin-job-grid">
+				<div class="admin-job-main">
+					<div class="card admin-card">
+						<h3>Client</h3>
+						<div id="job-client-body">Loading…</div>
+					</div>
+
+					<div class="card admin-card">
+						<h3>Job info</h3>
+						<div class="admin-job-info-grid">
+							<span>Job #</span><span id="job-number"></span>
+							<span>Service</span><span id="job-service"></span>
+							<span>Type</span><span id="job-type"></span>
+							<span>Scheduled</span><span id="job-scheduled"></span>
+							<span>Location</span><span id="job-location"></span>
+							<span>Billing</span><span id="job-billing"></span>
+						</div>
+					</div>
+
+					<div class="card admin-card">
+						<h3>Team &amp; status</h3>
+						<div class="admin-form__row">
+							<label id="job-assign-label">Assign team members</label>
+							<div class="admin-filter-popover" id="job-assign-wrap">
+								<button
+									type="button"
+									class="admin-filter-btn admin-filter-btn--full"
+									id="job-assign-btn"
+									aria-labelledby="job-assign-label"
+								>
+									<span id="job-assign-summary">Needs a cleaner</span>
+								</button>
+								<div class="admin-filter-popover__menu" id="job-assign-menu" hidden></div>
+							</div>
+						</div>
+						<div class="admin-form__row">
+							<label for="job-status-select">Status</label>
+							<select class="admin-status-select" id="job-status-select"></select>
+						</div>
+						<div class="admin-form__row admin-form__row--checkbox">
+							<label class="admin-confirm-label">
+								<input type="checkbox" id="job-confirmed-checkbox" />
+								Confirmed by cleaner
+							</label>
+						</div>
+						<div class="admin-form__row">
+							<label for="job-notes">Dispatch notes</label>
+							<textarea id="job-notes" rows="3" placeholder="Anything the team should know"></textarea>
+						</div>
+					</div>
+				</div>
+
+				<div class="admin-job-side">
+					<div class="card admin-card" id="job-invoice-card" hidden>
+						<h3>Invoice</h3>
+						<div id="job-invoice-body"></div>
+					</div>
+					<div class="card admin-card" id="job-no-invoice-card" hidden>
+						<h3>Invoice</h3>
+						<p class="admin-card__meta">No invoice yet for this job.</p>
+						<a href="/admin/invoices" class="btn btn--outline">Go to Invoices</a>
+					</div>
+				</div>
+			</div>
+
+			<p class="admin-result-message" id="job-message" hidden></p>
+		</div>
+	</div>
+
+	<script>
+		const root = document.getElementById("job-page");
+		const requestedJobKey = root?.dataset.jobKey || "";
+
+		const loadStatus = document.getElementById("load-status");
+		const jobContent = document.getElementById("job-content");
+		const jobTitle = document.getElementById("job-title");
+		const jobStatusBadge = document.getElementById("job-status-badge");
+		const jobConfirmedCheck = document.getElementById("job-confirmed-check");
+		const jobArchivedBadge = document.getElementById("job-archived-badge");
+
+		const moreBtn = document.getElementById("job-more-btn");
+		const moreMenu = document.getElementById("job-more-menu");
+		const holdBtn = document.getElementById("job-hold-btn");
+		const archiveBtn = document.getElementById("job-archive-btn");
+
+		const clientBody = document.getElementById("job-client-body");
+
+		const jobNumberEl = document.getElementById("job-number");
+		const jobServiceEl = document.getElementById("job-service");
+		const jobTypeEl = document.getElementById("job-type");
+		const jobScheduledEl = document.getElementById("job-scheduled");
+		const jobLocationEl = document.getElementById("job-location");
+		const jobBillingEl = document.getElementById("job-billing");
+
+		const assignBtn = document.getElementById("job-assign-btn");
+		const assignMenu = document.getElementById("job-assign-menu");
+		const assignSummary = document.getElementById("job-assign-summary");
+		const statusSelect = document.getElementById("job-status-select");
+		const confirmedCheckbox = document.getElementById("job-confirmed-checkbox");
+		const notesEl = document.getElementById("job-notes");
+		const message = document.getElementById("job-message");
+
+		const invoiceCard = document.getElementById("job-invoice-card");
+		const invoiceBody = document.getElementById("job-invoice-body");
+		const noInvoiceCard = document.getElementById("job-no-invoice-card");
+
+		const STATUS_LABELS = {
+			unassigned: "Unassigned",
+			assigned: "Assigned",
+			en_route: "En route",
+			in_progress: "In progress",
+			completed: "Completed",
+		};
+		const STATUS_ORDER = ["unassigned", "assigned", "en_route", "in_progress", "completed"];
+		const JOB_TYPE_LABELS = {
+			one_time: "One-off",
+			recurring: "Recurring",
+			quote_based: "Quote-based",
+			assessment: "Assessment",
+		};
+		const INVOICE_STATUS_LABELS = { draft: "Draft", sent: "Sent", overdue: "Overdue", paid: "Paid", void: "Void" };
+
+		let currentJob = null;
+		let cleaners = [];
+		let allClientsCache = null;
+
+		function escapeHtml(str) {
+			const div = document.createElement("div");
+			div.textContent = str ?? "";
+			return div.innerHTML;
+		}
+
+		function fmtTime(iso) {
+			return new Date(iso).toLocaleTimeString("en-US", {
+				timeZone: "America/Los_Angeles",
+				hour: "numeric",
+				minute: "2-digit",
+			});
+		}
+
+		function fmtDateTime(iso) {
+			return new Date(iso).toLocaleDateString("en-US", {
+				timeZone: "America/Los_Angeles",
+				weekday: "short",
+				month: "short",
+				day: "numeric",
+				year: "numeric",
+			});
+		}
+
+		// Same fallback as every other page that reads a calendar-event-backed
+		// job: clientName usually comes from extendedProperties.private, but
+		// events that predate that field parse it back out of the summary
+		// Sky House Cleaning writes ("Sky House Cleaning: <client>, <service>").
+		function parseSummary(summary) {
+			const m = (summary || "").match(/^Sky House Cleaning: (.+?), (.+)$/);
+			return m ? { client: m[1], service: m[2] } : { client: summary || "—", service: "" };
+		}
+
+		function clientNameFor(job) {
+			return job.clientName || parseSummary(job.summary).client;
+		}
+
+		function serviceNameFor(job) {
+			return parseSummary(job.summary).service;
+		}
+
+		async function loadCleaners() {
+			try {
+				const res = await fetch("/api/admin/dispatch/list-cleaners");
+				const data = await res.json();
+				if (res.ok) cleaners = data.cleaners || [];
+			} catch {
+				// Non-fatal — the assign dropdown just comes up empty.
+			}
+		}
+
+		// Same checkbox-popover markup Schedule's Edit Visit / Visit Popup use
+		// for team assignment — see schedule.astro's own comment on
+		// cleanerCheckboxRows() for why an inactive-but-already-assigned
+		// cleaner still needs to show up (and stay checked) here.
+		function cleanerCheckboxRows(selectedIds) {
+			return cleaners
+				.filter((c) => c.active || selectedIds.includes(c.id))
+				.map(
+					(c) => `
+					<label class="admin-filter-popover__option">
+						<input type="checkbox" value="${c.id}" ${selectedIds.includes(c.id) ? "checked" : ""} />
+						${escapeHtml(c.name)}${c.active ? "" : " (inactive)"}
+					</label>
+				`,
+				)
+				.join("");
+		}
+
+		function cleanerNamesFor(ids) {
+			return (ids || []).map((id) => cleaners.find((c) => c.id === id)?.name).filter(Boolean);
+		}
+
+		function assignSelectedIds() {
+			return Array.from(assignMenu.querySelectorAll('input[type="checkbox"]:checked')).map((cb) => cb.value);
+		}
+
+		function updateAssignSummary() {
+			const names = cleanerNamesFor(assignSelectedIds());
+			assignSummary.textContent = names.length ? names.join(", ") : "Needs a cleaner";
+		}
+
+		function flipMenuIfNeeded(btn, menu) {
+			const btnRect = btn.getBoundingClientRect();
+			const menuRect = menu.getBoundingClientRect();
+			const gap = 8;
+			const fitsBelow = window.innerHeight - btnRect.bottom >= menuRect.height + gap;
+			const fitsAbove = btnRect.top >= menuRect.height + gap;
+			if (!fitsBelow && fitsAbove) {
+				menu.style.top = "auto";
+				menu.style.bottom = "calc(100% + 4px)";
+			} else {
+				menu.style.top = "";
+				menu.style.bottom = "";
+			}
+		}
+
+		document.addEventListener("click", () => {
+			document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
+		});
+
+		assignBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			const opening = assignMenu.hidden;
+			document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
+			assignMenu.hidden = !opening;
+			if (opening) flipMenuIfNeeded(assignBtn, assignMenu);
+		});
+		assignMenu.addEventListener("click", (e) => e.stopPropagation());
+		assignMenu.addEventListener("change", () => {
+			updateAssignSummary();
+			const selectedIds = assignSelectedIds();
+			const nextStatus = selectedIds.length && currentJob.status === "unassigned" ? "assigned" : undefined;
+			if (nextStatus) statusSelect.value = nextStatus;
+			const extra = { assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) };
+
+			// Unassigning everyone makes "confirmed" meaningless — reset it
+			// rather than leaving a stale confirmation attached to nobody, same
+			// as the old modal's modalAssign handler did.
+			confirmedCheckbox.disabled = selectedIds.length === 0;
+			if (selectedIds.length === 0 && confirmedCheckbox.checked) {
+				confirmedCheckbox.checked = false;
+				extra.cleanerConfirmed = false;
+			}
+
+			currentJob.assignedCleanerIds = selectedIds;
+			if (nextStatus) currentJob.status = nextStatus;
+			renderStatusBadge();
+			saveJob(extra);
+		});
+
+		moreBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			const opening = moreMenu.hidden;
+			document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
+			moreMenu.hidden = !opening;
+			if (opening) flipMenuIfNeeded(moreBtn, moreMenu);
+		});
+		moreMenu.addEventListener("click", (e) => e.stopPropagation());
+
+		function renderStatusBadge() {
+			jobStatusBadge.textContent = STATUS_LABELS[currentJob.status] || currentJob.status;
+			jobStatusBadge.className = `admin-badge admin-badge--${currentJob.status}`;
+			jobConfirmedCheck.hidden = !currentJob.cleanerConfirmed;
+			jobArchivedBadge.hidden = !currentJob.archived;
+		}
+
+		async function saveJob(extraFields) {
+			if (!currentJob) return;
+			message.hidden = true;
+			try {
+				const res = await fetch("/api/admin/dispatch/update-job", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						jobKey: currentJob.jobKey,
+						eventId: currentJob.eventId,
+						visitDate: currentJob.visitDate,
+						...extraFields,
+					}),
+				});
+				const data = await res.json();
+				if (!res.ok) {
+					message.hidden = false;
+					message.textContent = data.error || "Something went wrong.";
+					message.classList.add("admin-result-message--error");
+				}
+			} catch {
+				message.hidden = false;
+				message.textContent = "Network error, please try again.";
+				message.classList.add("admin-result-message--error");
+			}
+		}
+
+		statusSelect.addEventListener("change", () => {
+			currentJob.status = statusSelect.value;
+			renderStatusBadge();
+			saveJob({ status: statusSelect.value });
+		});
+
+		confirmedCheckbox.addEventListener("change", () => {
+			currentJob.cleanerConfirmed = confirmedCheckbox.checked;
+			renderStatusBadge();
+			saveJob({ cleanerConfirmed: confirmedCheckbox.checked });
+		});
+
+		let notesDebounce;
+		notesEl.addEventListener("input", () => {
+			clearTimeout(notesDebounce);
+			notesDebounce = setTimeout(() => {
+				if (!currentJob) return;
+				currentJob.dispatchNotes = notesEl.value;
+				saveJob({ dispatchNotes: notesEl.value });
+			}, 600);
+		});
+
+		archiveBtn.addEventListener("click", async () => {
+			if (!currentJob) return;
+			const nextArchived = !currentJob.archived;
+			moreMenu.hidden = true;
+			archiveBtn.disabled = true;
+			await saveJob({ archived: nextArchived });
+			currentJob.archived = nextArchived;
+			archiveBtn.textContent = nextArchived ? "Unarchive job" : "Archive job";
+			archiveBtn.disabled = false;
+			renderStatusBadge();
+		});
+
+		holdBtn.addEventListener("click", async () => {
+			if (!currentJob) return;
+			moreMenu.hidden = true;
+			if (!currentJob.clientEmail) {
+				message.hidden = false;
+				message.textContent = "No client email on file for this booking — can't look up their plan.";
+				message.classList.add("admin-result-message--error");
+				return;
+			}
+			if (
+				!confirm(
+					`Put ${clientNameFor(currentJob)}'s recurring plan on hold? This pauses billing and stops new visits from being created until you take them off hold.`,
+				)
+			) {
+				return;
+			}
+			holdBtn.disabled = true;
+			message.hidden = true;
+			try {
+				const res = await fetch("/api/admin/subscriptions/toggle-hold", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ hold: true, clientEmail: currentJob.clientEmail }),
+				});
+				const data = await res.json();
+				if (!res.ok) {
+					message.hidden = false;
+					message.textContent = data.error || "Something went wrong.";
+					message.classList.add("admin-result-message--error");
+				}
+			} catch {
+				message.hidden = false;
+				message.textContent = "Network error, please try again.";
+				message.classList.add("admin-result-message--error");
+			} finally {
+				holdBtn.disabled = false;
+			}
+		});
+
+		// Contact records (the `clients` CRM collection) aren't automatically
+		// created for every booking — only ones that passed through a Request
+		// at some point. A booking with no matching contact isn't an error, it
+		// just falls back to whatever the calendar event itself has — same
+		// email-match-with-fallback Schedule's Visit Details "Client" tab
+		// already does (loadClientTab() in schedule.astro).
+		async function loadClientCard() {
+			clientBody.innerHTML = "Loading…";
+			try {
+				if (!allClientsCache) {
+					const res = await fetch("/api/admin/crm/list-clients");
+					const data = await res.json();
+					allClientsCache = res.ok ? data.clients || [] : [];
+				}
+				const match = currentJob.clientEmail
+					? allClientsCache.find((c) => c.email && c.email.toLowerCase() === currentJob.clientEmail.toLowerCase())
+					: null;
+				const editLink = currentJob.clientEmail
+					? `<p><a href="/admin/crm/contacts?email=${encodeURIComponent(currentJob.clientEmail)}" target="_blank" rel="noopener">Edit contact →</a></p>`
+					: "";
+				if (match) {
+					clientBody.innerHTML = `
+						<p><strong>${escapeHtml(match.name)}</strong></p>
+						${match.phone ? `<p>${escapeHtml(match.phone)}</p>` : ""}
+						${match.email ? `<p>${escapeHtml(match.email)}</p>` : ""}
+						${match.address ? `<p>${escapeHtml(match.address)}</p>` : ""}
+						${match.accessNotes ? `<p class="admin-card__meta">Access: ${escapeHtml(match.accessNotes)}</p>` : ""}
+						${match.petNotes ? `<p class="admin-card__meta">Pets: ${escapeHtml(match.petNotes)}</p>` : ""}
+						${editLink}
+					`;
+				} else {
+					clientBody.innerHTML = `
+						<p><strong>${escapeHtml(clientNameFor(currentJob))}</strong></p>
+						${currentJob.clientEmail ? `<p>${escapeHtml(currentJob.clientEmail)}</p>` : ""}
+						<p class="admin-card__meta">No contact record on file for this booking.</p>
+						${editLink}
+					`;
+				}
+			} catch {
+				clientBody.innerHTML = `<p class="admin-card__meta">Couldn't load client details.</p>`;
+			}
+		}
+
+		// No server-side jobKey filter exists on /api/admin/invoices/list (see
+		// AGENTS.md) — filtered client-side against the full invoice list,
+		// same as every other jobKey-based lookup in this app.
+		async function loadInvoice() {
+			invoiceCard.hidden = true;
+			noInvoiceCard.hidden = true;
+			try {
+				const res = await fetch("/api/admin/invoices/list");
+				const data = await res.json();
+				if (!res.ok) return;
+				const invoice = (data.invoices || []).find((i) => i.jobKey === currentJob.jobKey);
+				if (!invoice) {
+					// Only worth surfacing "no invoice yet" for job types that
+					// actually get invoiced through this app — a plain one-off
+					// visit that was paid up front at booking never gets one.
+					noInvoiceCard.hidden = currentJob.jobType !== "quote_based";
+					return;
+				}
+				invoiceCard.hidden = false;
+				invoiceBody.innerHTML = `
+					<p><span class="admin-badge admin-badge--${invoice.effectiveStatus}">${INVOICE_STATUS_LABELS[invoice.effectiveStatus] || invoice.effectiveStatus}</span></p>
+					<p>$${invoice.amount || "0.00"}</p>
+					<p><a href="/admin/invoices" target="_blank" rel="noopener">View in Invoices →</a></p>
+				`;
+			} catch {
+				// Non-fatal — the invoice card just stays hidden.
+			}
+		}
+
+		function renderJob() {
+			const job = currentJob;
+			jobTitle.textContent = job.jobNumber ? `#${job.jobNumber} — ${clientNameFor(job)}` : clientNameFor(job);
+			renderStatusBadge();
+
+			jobNumberEl.textContent = job.jobNumber ? `#${job.jobNumber}` : "—";
+			jobServiceEl.textContent = serviceNameFor(job) || "—";
+			jobTypeEl.textContent = JOB_TYPE_LABELS[job.jobType] || job.jobType || "—";
+			jobScheduledEl.textContent = `${fmtDateTime(job.start)} · ${fmtTime(job.start)} – ${fmtTime(job.end)}`;
+			jobLocationEl.textContent = job.location || "—";
+			if (job.jobType === "quote_based") {
+				const paid = job.depositStatus === "paid";
+				jobBillingEl.innerHTML = `Quoted total: $${job.quotedTotal || "0.00"} · Deposit ${
+					paid ? "paid ✓" : `pending ($${job.depositAmount || "0.00"})`
+				}`;
+			} else if (job.amountPaid) {
+				jobBillingEl.textContent = `Paid at booking: $${job.amountPaid}`;
+			} else {
+				jobBillingEl.textContent = "—";
+			}
+
+			const assignedIds = job.assignedCleanerIds || [];
+			assignMenu.innerHTML = cleanerCheckboxRows(assignedIds);
+			assignMenu.hidden = true;
+			updateAssignSummary();
+
+			statusSelect.innerHTML = STATUS_ORDER.map(
+				(s) => `<option value="${s}" ${job.status === s ? "selected" : ""}>${STATUS_LABELS[s]}</option>`,
+			).join("");
+			confirmedCheckbox.checked = !!job.cleanerConfirmed;
+			confirmedCheckbox.disabled = assignedIds.length === 0;
+			notesEl.value = job.dispatchNotes || "";
+
+			// "Put on hold" only makes sense for a recurring plan's job — see
+			// AGENTS.md → "Jobs" for why this is a client-level Stripe action
+			// (pauses the whole subscription), not a per-visit field.
+			holdBtn.hidden = job.jobType !== "recurring";
+			archiveBtn.textContent = job.archived ? "Unarchive job" : "Archive job";
+
+			loadClientCard();
+			loadInvoice();
+		}
+
+		async function loadJob() {
+			if (!requestedJobKey) {
+				loadStatus.textContent = "Missing job.";
+				loadStatus.classList.add("admin-status--error");
+				return;
+			}
+			loadStatus.hidden = false;
+			loadStatus.textContent = "Loading…";
+			jobContent.hidden = true;
+			try {
+				const res = await fetch(`/api/admin/dispatch/get-job?jobKey=${encodeURIComponent(requestedJobKey)}`);
+				const data = await res.json();
+				if (!res.ok) {
+					loadStatus.textContent = data.error || "Couldn't load this job.";
+					loadStatus.classList.add("admin-status--error");
+					return;
+				}
+				currentJob = data.job;
+				document.title = `${jobTitle.textContent || "Job"} | Sky House Cleaning Staff Tools`;
+				loadStatus.hidden = true;
+				jobContent.hidden = false;
+				renderJob();
+			} catch {
+				loadStatus.textContent = "Network error, please try again.";
+				loadStatus.classList.add("admin-status--error");
+			}
+		}
+
+		loadCleaners().then(loadJob);
+	</script>
+
+	<style is:global>
+		.admin-container {
+			max-width: 1100px;
+			margin: 0 auto;
+			padding-block: 3rem;
+		}
+
+		.admin-back-link {
+			display: inline-block;
+			margin-bottom: 1.25rem;
+			font-weight: 600;
+			font-size: 0.9rem;
+			color: var(--color-slate);
+		}
+
+		.admin-status {
+			margin-bottom: 1rem;
+		}
+
+		.admin-status--error {
+			color: #b3261e;
+		}
+
+		.admin-job-header {
+			display: flex;
+			align-items: flex-start;
+			justify-content: space-between;
+			gap: 1rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.admin-job-header h1 {
+			margin-bottom: 0.4rem;
+		}
+
+		.admin-job-header__meta {
+			display: flex;
+			align-items: center;
+			gap: 0.6rem;
+			flex-wrap: wrap;
+		}
+
+		.admin-job-grid {
+			display: grid;
+			grid-template-columns: 2fr 1fr;
+			gap: 1.5rem;
+			align-items: start;
+		}
+
+		.admin-job-main,
+		.admin-job-side {
+			display: flex;
+			flex-direction: column;
+			gap: 1.5rem;
+			min-width: 0;
+		}
+
+		@media (max-width: 900px) {
+			.admin-job-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		.admin-card h3 {
+			margin-top: 0;
+			margin-bottom: 1rem;
+			font-size: 1.05rem;
+		}
+
+		.admin-card__meta {
+			color: var(--color-slate);
+			margin: 0.35rem 0;
+		}
+
+		.admin-job-info-grid {
+			display: grid;
+			grid-template-columns: 110px 1fr;
+			gap: 0.6rem 0.75rem;
+			font-size: 0.92rem;
+		}
+
+		.admin-job-info-grid > span:nth-child(odd) {
+			font-weight: 600;
+			color: var(--color-slate);
+		}
+
+		.admin-form__row {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+			margin-bottom: 1rem;
+		}
+
+		.admin-form__row:last-child {
+			margin-bottom: 0;
+		}
+
+		.admin-form__row label {
+			font-weight: 600;
+			font-size: 0.85rem;
+			color: var(--color-ink);
+		}
+
+		.admin-form__row--checkbox {
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.admin-form__row textarea {
+			padding: 0.6rem 0.75rem;
+			border: 1px solid var(--color-border);
+			border-radius: 8px;
+			font-size: 0.95rem;
+			font-family: inherit;
+			resize: vertical;
+		}
+
+		.admin-status-select {
+			padding: 0.6rem 0.75rem;
+			border: 1px solid var(--color-border);
+			border-radius: 8px;
+			font-size: 0.95rem;
+			font-family: inherit;
+			background: var(--color-white);
+		}
+
+		.admin-confirm-label {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			font-weight: 600;
+			font-size: 0.85rem;
+			color: var(--color-ink);
+			cursor: pointer;
+		}
+
+		.admin-confirm-label input {
+			width: auto;
+		}
+
+		.admin-confirmed-check {
+			color: #1e7a34;
+			font-weight: 600;
+			font-size: 0.85rem;
+		}
+
+		.admin-result-message {
+			margin-top: 1rem;
+			font-weight: 600;
+			color: #1e7a34;
+		}
+
+		.admin-result-message--error {
+			color: #b3261e;
+		}
+
+		/* --- Badges (job status + invoice status; same values as jobs.astro /
+		   invoices.astro — each admin page duplicates its own badge CSS since
+		   there's no shared stylesheet across these is:global page blocks). */
+		.admin-badge {
+			display: inline-block;
+			padding: 0.25rem 0.7rem;
+			border-radius: 999px;
+			font-size: 0.8rem;
+			font-weight: 600;
+			white-space: nowrap;
+		}
+
+		.admin-badge--unassigned {
+			background: var(--color-sky-light);
+			color: var(--color-ink);
+		}
+
+		.admin-badge--assigned {
+			background: #eaf1fb;
+			color: #1a5fb4;
+		}
+
+		.admin-badge--en_route,
+		.admin-badge--in_progress {
+			background: #fdf0dc;
+			color: #a4640a;
+		}
+
+		.admin-badge--completed,
+		.admin-badge--paid {
+			background: #e3f3e6;
+			color: #1e7a34;
+		}
+
+		.admin-badge--archived {
+			background: #ececec;
+			color: var(--color-slate);
+		}
+
+		.admin-badge--draft {
+			background: var(--color-sky-light);
+			color: var(--color-ink);
+		}
+
+		.admin-badge--sent {
+			background: #eaf1fb;
+			color: #1a5fb4;
+		}
+
+		.admin-badge--overdue {
+			background: #fdeceb;
+			color: #b3261e;
+		}
+
+		.admin-badge--void {
+			background: #ececec;
+			color: var(--color-slate);
+		}
+
+		/* --- Checkbox-popover (Assign team members) — same pattern/values as
+		   schedule.astro's edit-assign-wrap. */
+		.admin-filter-popover {
+			position: relative;
+		}
+
+		.admin-filter-btn {
+			padding: 0.4rem 0.9rem;
+			border-radius: 999px;
+			border: 1px solid var(--color-border);
+			background: var(--color-white);
+			font-size: 0.82rem;
+			font-weight: 600;
+			color: var(--color-ink);
+			cursor: pointer;
+			white-space: nowrap;
+		}
+
+		.admin-filter-btn--full {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			width: 100%;
+			border-radius: 8px;
+			padding: 0.6rem 0.75rem;
+			font-size: 0.95rem;
+			text-align: left;
+		}
+
+		.admin-filter-btn--full::after {
+			content: "▾";
+			color: var(--color-slate-light);
+			margin-left: 0.5rem;
+		}
+
+		#job-assign-wrap .admin-filter-popover__menu {
+			width: 100%;
+			max-height: 220px;
+			overflow-y: auto;
+		}
+
+		.admin-filter-popover__menu {
+			position: absolute;
+			top: calc(100% + 4px);
+			left: 0;
+			z-index: 30;
+			background: var(--color-white);
+			border: 1px solid var(--color-border);
+			border-radius: 10px;
+			padding: 0.5rem;
+			min-width: 200px;
+			box-shadow: 0 8px 24px rgba(28, 43, 69, 0.12);
+		}
+
+		.admin-filter-popover__option {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			padding: 0.35rem 0.4rem;
+			font-size: 0.88rem;
+			color: var(--color-ink);
+			cursor: pointer;
+			border-radius: 6px;
+		}
+
+		.admin-filter-popover__option:hover {
+			background: var(--color-sky-light);
+		}
+
+		.admin-filter-popover__option input {
+			width: auto;
+		}
+
+		/* :not([hidden]) matters — see schedule.astro's own comment on this
+		   exact rule for why an unconditional `display: flex` here silently
+		   beats the `hidden` attribute otherwise. */
+		.admin-filter-popover__menu--actions:not([hidden]) {
+			display: flex;
+			flex-direction: column;
+			gap: 0.15rem;
+		}
+
+		.admin-menu-item {
+			display: block;
+			width: 100%;
+			text-align: left;
+			padding: 0.5rem 0.6rem;
+			border: none;
+			background: none;
+			border-radius: 6px;
+			font-size: 0.88rem;
+			font-family: inherit;
+			color: var(--color-ink);
+			cursor: pointer;
+		}
+
+		.admin-menu-item:hover {
+			background: var(--color-sky-light);
+		}
+	</style>
+</AdminLayout>

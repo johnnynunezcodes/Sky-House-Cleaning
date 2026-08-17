@@ -156,48 +156,6 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				</div>
 			</div>
 
-			<div class="admin-modal-backdrop" id="job-modal-backdrop" hidden>
-				<div class="admin-modal card" id="job-modal" role="dialog" aria-modal="true" aria-labelledby="job-modal-title">
-					<div class="admin-modal__header">
-						<div>
-							<h3 id="job-modal-title"></h3>
-							<p class="admin-card__meta" id="job-modal-client"></p>
-							<p class="admin-card__meta" id="job-modal-time"></p>
-							<p class="admin-card__meta" id="job-modal-location"></p>
-							<p class="admin-card__meta admin-card__meta--quote" id="job-modal-quote" hidden></p>
-						</div>
-						<button type="button" class="admin-modal__close" id="job-modal-close" aria-label="Close">✕</button>
-					</div>
-
-					<div class="admin-modal__body">
-						<div class="admin-form__row">
-							<label for="job-modal-assign">Team</label>
-							<select multiple class="admin-assign-select" id="job-modal-assign"></select>
-						</div>
-						<div class="admin-form__row">
-							<label for="job-modal-status">Status</label>
-							<select class="admin-status-select" id="job-modal-status"></select>
-						</div>
-						<div class="admin-form__row admin-form__row--checkbox">
-							<label class="admin-confirm-label">
-								<input type="checkbox" id="job-modal-confirmed" />
-								Confirmed by cleaner
-							</label>
-						</div>
-						<div class="admin-form__row">
-							<label for="job-modal-notes">Dispatch notes</label>
-							<textarea id="job-modal-notes" rows="2" placeholder="Anything the team should know"></textarea>
-						</div>
-						<div class="admin-modal__extra-actions">
-							<button type="button" class="btn btn--outline" id="job-modal-hold" hidden>Put client's plan on hold</button>
-							<button type="button" class="btn btn--outline" id="job-modal-archive">Archive job</button>
-						</div>
-					</div>
-
-					<p class="admin-result-message" id="job-modal-message" hidden></p>
-				</div>
-			</div>
-
 		<script>
 			const root = document.getElementById("jobs-page");
 			const WORKING_HOURS_START = Number(root?.dataset.workingHoursStart) || 8;
@@ -380,8 +338,7 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 
 			// Cleaner roster management (add/deactivate) moved to
 			// /admin/schedule — this page only needs the roster itself, to
-			// resolve assignedCleanerIds into names for the table and the
-			// job-detail modal's team picker.
+			// resolve assignedCleanerIds into names for the table.
 			async function loadCleaners() {
 				try {
 					const res = await fetch("/api/admin/dispatch/list-cleaners");
@@ -391,217 +348,6 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 					// Non-fatal — assignment dropdowns/names just come up empty.
 				}
 			}
-
-			function cleanerOptions(selectedIds) {
-				return cleaners
-					.filter((c) => c.active || selectedIds.includes(c.id))
-					.map((c) => `<option value="${c.id}" ${selectedIds.includes(c.id) ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
-					.join("");
-			}
-
-			// --- Job-detail modal ---------------------------------------------------
-
-			const modalBackdrop = document.getElementById("job-modal-backdrop");
-			const modalTitle = document.getElementById("job-modal-title");
-			const modalClient = document.getElementById("job-modal-client");
-			const modalTime = document.getElementById("job-modal-time");
-			const modalLocation = document.getElementById("job-modal-location");
-			const modalQuote = document.getElementById("job-modal-quote");
-			const modalClose = document.getElementById("job-modal-close");
-			const modalAssign = document.getElementById("job-modal-assign");
-			const modalStatus = document.getElementById("job-modal-status");
-			const modalConfirmed = document.getElementById("job-modal-confirmed");
-			const modalNotes = document.getElementById("job-modal-notes");
-			const modalHoldBtn = document.getElementById("job-modal-hold");
-			const modalArchiveBtn = document.getElementById("job-modal-archive");
-			const modalMessage = document.getElementById("job-modal-message");
-
-			let currentModalJob = null;
-
-			function openJobModal(job) {
-				currentModalJob = job;
-				const assignedIds = job.assignedCleanerIds || [];
-				modalTitle.textContent = job.jobNumber ? `#${job.jobNumber} — ${job.summary || "Job"}` : job.summary || "Job";
-				// Jobs/visits aren't stored with a Firestore contact id (see
-				// AGENTS.md — they come from Google Calendar events, not the CRM
-				// `clients` collection), so we can't deep-link straight to a doc.
-				// We match by email instead: /admin/crm/contacts?email=... finds
-				// the contact with that email and opens its edit form. Falls back
-				// to plain text (no link) when the calendar event has no attendee
-				// email to match against.
-				const clientName = clientNameFor(job);
-				if (job.clientEmail) {
-					modalClient.innerHTML = `Client: <a href="/admin/crm/contacts?email=${encodeURIComponent(job.clientEmail)}" target="_blank" rel="noopener">${escapeHtml(clientName)}</a>`;
-				} else {
-					modalClient.textContent = `Client: ${clientName}`;
-				}
-				modalClient.hidden = !clientName || clientName === "—";
-				modalTime.textContent = `${fmtDateTime(job.start)} · ${fmtTime(job.start)} – ${fmtTime(job.end)}`;
-				modalLocation.textContent = job.location || "";
-				modalLocation.hidden = !job.location;
-				if (job.jobType === "quote_based") {
-					const paid = job.depositStatus === "paid";
-					modalQuote.innerHTML = `Quoted total: $${job.quotedTotal || "0.00"} · Deposit ${
-						paid ? "paid ✓" : `pending ($${job.depositAmount || "0.00"})`
-					}`;
-					modalQuote.hidden = false;
-				} else {
-					modalQuote.hidden = true;
-				}
-				modalAssign.innerHTML = cleanerOptions(assignedIds);
-				modalAssign.size = Math.min(4, Math.max(2, cleaners.length));
-				modalStatus.innerHTML = STATUS_ORDER.map(
-					(s) => `<option value="${s}" ${job.status === s ? "selected" : ""}>${STATUS_LABELS[s]}</option>`,
-				).join("");
-				modalConfirmed.checked = !!job.cleanerConfirmed;
-				modalConfirmed.disabled = assignedIds.length === 0;
-				modalNotes.value = job.dispatchNotes || "";
-
-				// "Put on hold" only makes sense for a recurring plan's job — see
-				// AGENTS.md → "Jobs" for why this is a client-level Stripe action
-				// (pauses the whole subscription), not a per-visit field like
-				// everything else in this modal.
-				modalHoldBtn.hidden = job.jobType !== "recurring";
-				modalHoldBtn.disabled = false;
-				modalHoldBtn.textContent = "Put client's plan on hold";
-
-				modalArchiveBtn.textContent = job.archived ? "Unarchive job" : "Archive job";
-				modalArchiveBtn.disabled = false;
-
-				modalMessage.hidden = true;
-				modalBackdrop.hidden = false;
-			}
-
-			function closeJobModal() {
-				modalBackdrop.hidden = true;
-				currentModalJob = null;
-				// Anything edited in the modal can change the sidebar's unassigned
-				// badge on next page load too, but the list itself just needs a
-				// fresh read.
-				loadListView();
-			}
-
-			modalClose.addEventListener("click", closeJobModal);
-			modalBackdrop.addEventListener("click", (e) => {
-				if (e.target === modalBackdrop) closeJobModal();
-			});
-			document.addEventListener("keydown", (e) => {
-				if (e.key === "Escape" && !modalBackdrop.hidden) closeJobModal();
-			});
-
-			async function saveModalJob(extraFields) {
-				if (!currentModalJob) return;
-				modalMessage.hidden = true;
-				try {
-					const res = await fetch("/api/admin/dispatch/update-job", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							jobKey: currentModalJob.jobKey,
-							eventId: currentModalJob.eventId,
-							visitDate: currentModalJob.visitDate,
-							...extraFields,
-						}),
-					});
-					const data = await res.json();
-					if (!res.ok) {
-						modalMessage.hidden = false;
-						modalMessage.textContent = data.error || "Something went wrong.";
-						modalMessage.classList.add("admin-result-message--error");
-					}
-				} catch {
-					modalMessage.hidden = false;
-					modalMessage.textContent = "Network error, please try again.";
-					modalMessage.classList.add("admin-result-message--error");
-				}
-			}
-
-			modalAssign.addEventListener("change", () => {
-				const selectedIds = Array.from(modalAssign.selectedOptions).map((o) => o.value);
-				const nextStatus = selectedIds.length && currentModalJob.status === "unassigned" ? "assigned" : undefined;
-				if (nextStatus) modalStatus.value = nextStatus;
-
-				const extra = { assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) };
-
-				// Unassigning everyone makes "confirmed" meaningless — reset it
-				// rather than leaving a stale confirmation attached to nobody.
-				modalConfirmed.disabled = selectedIds.length === 0;
-				if (selectedIds.length === 0 && modalConfirmed.checked) {
-					modalConfirmed.checked = false;
-					extra.cleanerConfirmed = false;
-				}
-
-				currentModalJob.assignedCleanerIds = selectedIds;
-				if (nextStatus) currentModalJob.status = nextStatus;
-				saveModalJob(extra);
-			});
-
-			modalStatus.addEventListener("change", () => {
-				currentModalJob.status = modalStatus.value;
-				saveModalJob({ status: modalStatus.value });
-			});
-
-			modalConfirmed.addEventListener("change", () => {
-				currentModalJob.cleanerConfirmed = modalConfirmed.checked;
-				saveModalJob({ cleanerConfirmed: modalConfirmed.checked });
-			});
-
-			// Debounced — notes are free text, saving on every keystroke would be
-			// wasteful and could race with itself.
-			let notesDebounceTimer;
-			modalNotes.addEventListener("input", () => {
-				clearTimeout(notesDebounceTimer);
-				notesDebounceTimer = setTimeout(() => {
-					if (!currentModalJob) return;
-					currentModalJob.dispatchNotes = modalNotes.value;
-					saveModalJob({ dispatchNotes: modalNotes.value });
-				}, 600);
-			});
-
-			modalArchiveBtn.addEventListener("click", async () => {
-				if (!currentModalJob) return;
-				const nextArchived = !currentModalJob.archived;
-				modalArchiveBtn.disabled = true;
-				await saveModalJob({ archived: nextArchived });
-				currentModalJob.archived = nextArchived;
-				closeJobModal();
-			});
-
-			modalHoldBtn.addEventListener("click", async () => {
-				if (!currentModalJob) return;
-				if (!currentModalJob.clientEmail) {
-					modalMessage.hidden = false;
-					modalMessage.textContent = "No client email on file for this booking — can't look up their plan.";
-					modalMessage.classList.add("admin-result-message--error");
-					return;
-				}
-				if (!confirm(`Put ${clientNameFor(currentModalJob)}'s recurring plan on hold? This pauses billing and stops new visits from being created until you take them off hold.`)) {
-					return;
-				}
-				modalHoldBtn.disabled = true;
-				modalMessage.hidden = true;
-				try {
-					const res = await fetch("/api/admin/subscriptions/toggle-hold", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ hold: true, clientEmail: currentModalJob.clientEmail }),
-					});
-					const data = await res.json();
-					if (!res.ok) {
-						modalMessage.hidden = false;
-						modalMessage.textContent = data.error || "Something went wrong.";
-						modalMessage.classList.add("admin-result-message--error");
-						modalHoldBtn.disabled = false;
-						return;
-					}
-					closeJobModal();
-				} catch {
-					modalMessage.hidden = false;
-					modalMessage.textContent = "Network error, please try again.";
-					modalMessage.classList.add("admin-result-message--error");
-					modalHoldBtn.disabled = false;
-				}
-			});
 
 			// --- List view: overview stats + filterable/sortable/searchable table --
 
@@ -661,8 +407,9 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				// uses the same predicate) — status can go stale here: unassigning
 				// every cleaner from an already-assigned/en-route job only resets
 				// status back to "unassigned" when going the OTHER direction (see
-				// the modalAssign change handler), so a job can end up with
-				// assignedCleanerIds: [] while status still reads "assigned".
+				// the team-assignment change handler on the job detail page), so a
+				// job can end up with assignedCleanerIds: [] while status still
+				// reads "assigned".
 				if (filter === "unassigned") return (job.assignedCleanerIds || []).length === 0;
 				return job.status === filter;
 			}
@@ -960,9 +707,10 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 							<td>${job.quotedTotal ? `$${job.quotedTotal}` : "N/A"}</td>
 						`;
 						// No calendar event exists yet for this row (see loadListView) —
-						// the shared job-detail modal only knows how to edit a real
-						// job, so this jumps to the Quotes page's own "Schedule Job"
-						// action instead of duplicating it here.
+						// the full job detail page needs a real jobKey to load
+						// (/api/admin/dispatch/get-job fetches a live Calendar event),
+						// so this jumps to the Quotes page's own "Schedule Job" action
+						// instead of linking somewhere that would 404.
 						tr.addEventListener("click", () => {
 							window.location.href = "/admin/crm/quotes";
 						});
@@ -986,7 +734,14 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 						</td>
 						<td>${amountLabel(job)}${depositBadge(job)}</td>
 					`;
-					tr.addEventListener("click", () => openJobModal(job));
+					// Full job detail page (replaces the old job-detail modal — see
+					// AGENTS.md → "Jobs") instead of a popup, so there's room for a
+					// real client card, invoice status, and an edit path, matching
+					// what the business owner asked for after seeing Jobber's own
+					// job page.
+					tr.addEventListener("click", () => {
+						window.location.href = `/admin/jobs/${encodeURIComponent(job.jobKey)}`;
+					});
 					listTableBody.appendChild(tr);
 				});
 			}
@@ -1101,48 +856,6 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				margin-top: 1rem;
 			}
 
-			.admin-form__row {
-				display: flex;
-				flex-direction: column;
-				gap: 0.35rem;
-			}
-
-			.admin-form__row label {
-				font-weight: 600;
-				font-size: 0.85rem;
-				color: var(--color-ink);
-			}
-
-			.admin-form__row input,
-			.admin-form__row select,
-			.admin-form__row textarea {
-				padding: 0.6rem 0.75rem;
-				border: 1px solid var(--color-border);
-				border-radius: 8px;
-				font-size: 0.95rem;
-				font-family: inherit;
-				resize: vertical;
-			}
-
-			.admin-form__row--checkbox {
-				flex-direction: row;
-				align-items: center;
-			}
-
-			.admin-confirm-label {
-				display: flex;
-				align-items: center;
-				gap: 0.5rem;
-				font-weight: 600;
-				font-size: 0.85rem;
-				color: var(--color-ink);
-				cursor: pointer;
-			}
-
-			.admin-confirm-label input {
-				width: auto;
-			}
-
 			.admin-badge {
 				display: inline-block;
 				padding: 0.2rem 0.6rem;
@@ -1190,14 +903,6 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 			.admin-table__sub--warn {
 				color: #a4640a;
 				font-weight: 600;
-			}
-
-			.admin-modal__extra-actions {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.5rem;
-				padding-top: 0.5rem;
-				border-top: 1px solid var(--color-border);
 			}
 
 			.admin-confirmed-check {
@@ -1413,82 +1118,11 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				font-weight: 600;
 			}
 
-			.admin-card__meta--quote {
-				font-weight: 600;
-				color: var(--color-ink);
-			}
-
 			.admin-table__empty {
 				text-align: center;
 				color: var(--color-slate-light);
 				padding: 2rem 1rem;
 			}
 
-			/* --- Job detail modal (List/Month/Week/Day all share this) ----------- */
-
-			.admin-modal-backdrop {
-				position: fixed;
-				inset: 0;
-				z-index: 80;
-				background: rgba(28, 43, 69, 0.45);
-				display: flex;
-				align-items: flex-start;
-				justify-content: center;
-				padding: 4rem 1.5rem;
-				overflow-y: auto;
-			}
-
-			.admin-modal-backdrop[hidden] {
-				display: none;
-			}
-
-			.admin-modal {
-				width: 100%;
-				max-width: 480px;
-				padding: 1.5rem;
-			}
-
-			.admin-modal__header {
-				display: flex;
-				align-items: flex-start;
-				justify-content: space-between;
-				gap: 1rem;
-				margin-bottom: 1rem;
-				padding-bottom: 1rem;
-				border-bottom: 1px solid var(--color-border);
-			}
-
-			.admin-modal__header h3 {
-				margin: 0 0 0.3rem;
-			}
-
-			.admin-modal__close {
-				flex-shrink: 0;
-				width: 32px;
-				height: 32px;
-				border-radius: 50%;
-				border: 1px solid var(--color-border);
-				background: var(--color-white);
-				color: var(--color-slate);
-				cursor: pointer;
-				font-size: 0.9rem;
-			}
-
-			.admin-modal__close:hover {
-				border-color: var(--color-sky);
-				color: var(--color-sky-dark);
-			}
-
-			.admin-modal__body {
-				display: flex;
-				flex-direction: column;
-				gap: 1rem;
-			}
-
-			@media (max-width: 900px) {
-				.admin-week-board {
-					grid-template-columns: repeat(7, minmax(150px, 1fr));
-				}
-			}
 		</style>
 </AdminLayout>

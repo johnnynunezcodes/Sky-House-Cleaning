@@ -9,21 +9,10 @@ import {
 	zonedTimeToUtc,
 	isConfigured as calendarConfigured,
 } from "../../../../lib/googleCalendar.js";
-import { getJobAssignments, jobKey } from "../../../../lib/dispatch.js";
+import { getJobAssignments, isoDateInTimeZone, jobFromCalendarEvent } from "../../../../lib/dispatch.js";
 import { isConfigured as firebaseConfigured } from "../../../../lib/firebaseAdmin.js";
 
 const TIME_ZONE = "America/Los_Angeles";
-
-// "YYYY-MM-DD" for `date` (already local wall-clock, no conversion needed)
-// vs. the equivalent for an arbitrary UTC instant, in the business's time
-// zone — used to figure out which visit-date bucket a calendar event's
-// start time actually falls in locally, not whatever the server's own time
-// zone happens to be.
-function isoDateInTimeZone(date, timeZone = TIME_ZONE) {
-	return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
-		date,
-	);
-}
 
 export async function GET({ url }) {
 	if (!calendarConfigured()) {
@@ -51,52 +40,10 @@ export async function GET({ url }) {
 
 		const events = await listEvents({ timeMin: windowStart.toISOString(), timeMax: windowEnd.toISOString() });
 
-		const jobs = events.map((event) => {
-			const start = event.start?.dateTime || event.start?.date;
-			const end = event.end?.dateTime || event.end?.date;
-			const visitDate = isoDateInTimeZone(new Date(start));
-			// Staff-only fields (amountPaid, jobType, clientName) live in
-			// extendedProperties.private, set at booking time by
-			// stripe-webhook.js — see the comment on createBookingEvent() in
-			// googleCalendar.js for why that's the right place for anything
-			// that shouldn't be visible to cleaners even with calendar access.
-			// Events created before this existed simply won't have these —
-			// callers should treat empty string as "not known," not an error.
-			const priv = event.extendedProperties?.private || {};
-			return {
-				eventId: event.id,
-				jobKey: jobKey(event.id, visitDate),
-				visitDate,
-				start,
-				end,
-				summary: event.summary || "",
-				description: event.description || "",
-				location: event.location || "",
-				clientName: priv.clientName || "",
-				// Not from private metadata — this is a real Google Calendar
-				// attendee (set via `attendeeEmail` in createBookingEvent(), see
-				// stripe-webhook.js), so it's available retroactively on every
-				// recurring job ever booked, not just ones created after some new
-				// field was added. Added for the Jobber-parity "Action Required"
-				// on-hold feature (AGENTS.md → "Jobs") — the modal's "Put on
-				// hold" button uses this to find the client's Stripe subscription
-				// by email, the same lookup /admin/reschedule already does.
-				clientEmail: event.attendees?.[0]?.email || "",
-				amountPaid: priv.amountPaid || "",
-				jobType: priv.jobType || "",
-				jobNumber: priv.jobNumber || "",
-				// Only set for quote-based jobs (jobType "quote_based") —
-				// quotedTotal/depositAmount are what staff entered at
-				// job-creation time (create-quote-job.js), fixed once and never
-				// updated after. What DOES change over time — depositStatus
-				// ("pending" -> "paid") — deliberately isn't here: it lives in
-				// the Firestore jobAssignments overlay instead (merged in
-				// below), same "static facts on the calendar event, mutable
-				// state in Firestore" split the rest of this file already uses.
-				quotedTotal: priv.quotedTotal || "",
-				depositAmount: priv.depositAmount || "",
-			};
-		});
+		// Per-event -> job-shape transform lives in dispatch.js now
+		// (jobFromCalendarEvent) — shared with get-job.js's single-event read
+		// for the /admin/jobs/[jobKey] detail page, so the two never drift.
+		const jobs = events.map(jobFromCalendarEvent);
 
 		const assignments = await getJobAssignments(jobs.map((j) => j.jobKey));
 
