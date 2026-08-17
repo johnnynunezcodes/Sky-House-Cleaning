@@ -1,28 +1,84 @@
 ---
 // Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. CRM
-// Contacts: the client roster, backed by Firestore (src/lib/crm.js), not
-// Stripe/Calendar like the rest of /admin — a contact can exist here before
+// Clients: the client roster, backed by Firestore (src/lib/crm.js), not
+// Stripe/Calendar like the rest of /admin — a client can exist here before
 // they've ever booked or paid anything (a lead). See AGENTS.md → "CRM
 // (Firebase/Firestore)" for the data model and setup status.
+//
+// UI-facing text renamed from "Contacts" to "Clients" (matching Jobber's own
+// wording, after the business owner shared screenshots of Jobber's Clients
+// page and asked for this page to look more like it) — the file/route stay
+// `contacts.astro` / `/admin/crm/contacts` on purpose, since Jobs' job-detail
+// page and Schedule's Edit Visit form both link here via `?email=...` (see
+// "Client deep link" in AGENTS.md) and renaming the route would break those
+// without adding anything the business owner asked for.
+//
+// Redesigned to mirror Jobber's Clients page: an overview stat row (New
+// leads / New clients / Total new clients), a Status filter dropdown
+// (single-select, not the old multi-button pill row), a real table instead
+// of a card list, and a "New Client" button opening the add-client form in a
+// modal instead of an inline collapsible. Deliberately NOT built (no data
+// model or explicit ask for either): a Tags column/filter, bulk-select
+// checkboxes, the "Merge duplicate clients" tool, and the New/Total stat
+// cards' period-over-period "↑ N%" badges — see AGENTS.md for the reasoning
+// on each.
 export const prerender = false;
 
 import AdminLayout from "../../../layouts/AdminLayout.astro";
 ---
 
-<AdminLayout title="CRM: Contacts | Sky House Cleaning Staff Tools">
+<AdminLayout title="Clients | Sky House Cleaning Staff Tools">
 			<div class="container admin-container">
-				<h1>CRM: Contacts</h1>
+				<div class="admin-page-header">
+					<h1>Clients</h1>
+					<button type="button" class="btn btn--primary" id="new-client-btn">New Client</button>
+				</div>
 				<p class="admin-hint">
 					Every client and lead, in one place — separate from Stripe/Calendar, so a lead can exist
 					here before they've ever booked or paid anything. When a lead is ready to book for real,
 					use the normal booking flow (or <a href="/admin/quote">Book a customer who called in</a>)
-					and come back here to flip their stage to "Active client."
+					and come back here to flip their stage to "Active."
 				</p>
 
 				<p id="load-status" class="admin-status">Loading…</p>
 
-				<details class="card admin-add-card">
-					<summary class="admin-add-summary">+ Add a contact</summary>
+				<div class="admin-stats-grid" id="stats-grid" hidden>
+					<div class="card admin-stat-card">
+						<p class="admin-stat-card__label">New leads</p>
+						<p class="admin-stat-card__meta">Past 30 days</p>
+						<p class="admin-stat-card__value" id="stat-new-leads">0</p>
+					</div>
+					<div class="card admin-stat-card">
+						<p class="admin-stat-card__label">New clients</p>
+						<p class="admin-stat-card__meta">Past 30 days</p>
+						<p class="admin-stat-card__value" id="stat-new-clients">0</p>
+					</div>
+					<div class="card admin-stat-card">
+						<p class="admin-stat-card__label">Total new clients</p>
+						<p class="admin-stat-card__meta">Year to date</p>
+						<p class="admin-stat-card__value" id="stat-total-new-clients">0</p>
+					</div>
+				</div>
+
+				<div class="admin-list-header">
+					<h2 id="results-heading">Filtered clients</h2>
+					<div class="admin-filter-popover" id="status-filter-wrap">
+						<button type="button" class="admin-filter-btn" id="status-filter-btn">
+							Status <span class="admin-filter-btn__divider">|</span> <span id="status-filter-summary">Leads and Active</span>
+						</button>
+						<div class="admin-filter-popover__menu admin-filter-popover__menu--actions" id="status-filter-menu" hidden></div>
+					</div>
+				</div>
+
+				<div id="results"></div>
+			</div>
+
+			<div class="admin-modal-backdrop" id="add-modal-backdrop" hidden>
+				<div class="admin-modal card" id="add-modal" role="dialog" aria-modal="true" aria-labelledby="add-modal-title">
+					<div class="admin-modal__header">
+						<h3 id="add-modal-title">New Client</h3>
+						<button type="button" class="admin-modal__close" id="add-modal-close" aria-label="Close">✕</button>
+					</div>
 					<form id="add-form" class="admin-form">
 						<div class="admin-form__grid">
 							<div class="admin-form__row">
@@ -62,41 +118,52 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 								<input type="text" id="add-petNotes" name="petNotes" />
 							</div>
 						</div>
-						<button type="submit" class="btn btn--primary">Add Contact</button>
+						<button type="submit" class="btn btn--primary">Add Client</button>
 						<p class="admin-result-message" hidden></p>
 					</form>
-				</details>
-
-				<div class="admin-filters" role="group" aria-label="Filter by stage">
-					<button type="button" class="admin-filter is-active" data-stage="">All</button>
-					<button type="button" class="admin-filter" data-stage="lead">Leads</button>
-					<button type="button" class="admin-filter" data-stage="active_client">Active clients</button>
-					<button type="button" class="admin-filter" data-stage="past_client">Past clients</button>
 				</div>
-
-				<div id="results"></div>
 			</div>
 
 		<script>
 			const loadStatus = document.getElementById("load-status");
+			const statsGrid = document.getElementById("stats-grid");
+			const statNewLeads = document.getElementById("stat-new-leads");
+			const statNewClients = document.getElementById("stat-new-clients");
+			const statTotalNewClients = document.getElementById("stat-total-new-clients");
+			const resultsHeading = document.getElementById("results-heading");
 			const resultsEl = document.getElementById("results");
+
+			const newClientBtn = document.getElementById("new-client-btn");
+			const addModalBackdrop = document.getElementById("add-modal-backdrop");
+			const addModalClose = document.getElementById("add-modal-close");
 			const addForm = document.getElementById("add-form");
-			const filterButtons = document.querySelectorAll(".admin-filter");
 
-			const STAGE_LABELS = { lead: "Lead", active_client: "Active client", past_client: "Past client" };
-			let currentStage = "";
+			const statusFilterBtn = document.getElementById("status-filter-btn");
+			const statusFilterMenu = document.getElementById("status-filter-menu");
+			const statusFilterSummary = document.getElementById("status-filter-summary");
 
-			// Deep-link support: Jobs' job-detail modal and Schedule's Edit Visit
-			// modal both link here as /admin/crm/contacts?email=... so staff can
-			// jump straight from a booking to editing the client's info. Jobs
-			// and visits come from Google Calendar events, not this page's
-			// Firestore `clients` collection, so there's no shared id to link by
-			// — email is the best available match. Read once on load, consumed
-			// (cleared) after the first successful match so switching stage
-			// filters afterward doesn't keep re-triggering it.
-			let pendingDeepLinkEmail = (new URLSearchParams(location.search).get("email") || "")
-				.trim()
-				.toLowerCase();
+			const STAGE_LABELS = { lead: "Lead", active_client: "Active", past_client: "Past client" };
+			// Jobber's own Status dropdown has 5 options (All / Leads and Active
+			// / Leads / Active / Archived) — this app has 3 real lifecycle stages
+			// (see LIFECYCLE_STAGES in crm.js), not 4, so "Archived" maps to our
+			// existing "Past client" stage rather than inventing a 4th one.
+			// "Leads and Active" is a combined filter (not a real stage) and is
+			// the default view, same as Jobber's own screenshot shows it
+			// pre-selected — most day-to-day work is with clients who aren't done
+			// with you yet.
+			const STAGE_FILTER_LABELS = {
+				"": "All",
+				leads_and_active: "Leads and Active",
+				lead: "Leads",
+				active_client: "Active",
+				past_client: "Past clients",
+			};
+
+			let allClients = [];
+			let currentStageFilter = "leads_and_active";
+			// Set by loadClients() from ?email= on first load only — see the
+			// deep-link handling at the bottom of this file.
+			let pendingDeepLinkEmail = (new URLSearchParams(location.search).get("email") || "").trim().toLowerCase();
 
 			function escapeHtml(str) {
 				const div = document.createElement("div");
@@ -104,51 +171,168 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 				return div.innerHTML;
 			}
 
-			async function loadContacts() {
+			// Firestore Admin SDK timestamps serialize to `{ _seconds, _nanoseconds }`
+			// over JSON (see invoices.astro's own identical `_seconds` handling) —
+			// this app doesn't backfill createdAt/updatedAt on old docs, so either
+			// field can be missing entirely on a client that predates this feature.
+			function toMillis(ts) {
+				if (!ts) return null;
+				if (typeof ts === "string" || typeof ts === "number") {
+					const d = new Date(ts).getTime();
+					return Number.isNaN(d) ? null : d;
+				}
+				if (typeof ts._seconds === "number") return ts._seconds * 1000;
+				return null;
+			}
+
+			function fmtRelativeDate(ts) {
+				const ms = toMillis(ts);
+				if (ms == null) return "—";
+				return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+			}
+
+			async function loadClients() {
 				loadStatus.hidden = false;
 				loadStatus.textContent = "Loading…";
+				loadStatus.classList.remove("admin-status--error");
+				statsGrid.hidden = true;
 				resultsEl.innerHTML = "";
 				try {
-					const qs = currentStage ? `?lifecycleStage=${encodeURIComponent(currentStage)}` : "";
-					const res = await fetch(`/api/admin/crm/list-clients${qs}`);
+					// Fetch everything once and filter/sort client-side — the Status
+					// dropdown's "Leads and Active" combined option has no single
+					// server-side lifecycleStage value to ask for anyway, so there's
+					// no round trip to save by asking the API to pre-filter.
+					const res = await fetch("/api/admin/crm/list-clients");
 					const data = await res.json();
 					if (!res.ok) {
-						loadStatus.textContent = data.error || "Couldn't load contacts.";
+						loadStatus.textContent = data.error || "Couldn't load clients.";
 						loadStatus.classList.add("admin-status--error");
 						return;
 					}
+					allClients = data.clients || [];
 					loadStatus.hidden = true;
-					renderContacts(data.clients || []);
+					renderStats();
+					renderClients();
 				} catch {
 					loadStatus.textContent = "Network error, please try again.";
 					loadStatus.classList.add("admin-status--error");
 				}
 			}
 
-			function renderContacts(clients) {
-				if (!clients.length) {
-					resultsEl.innerHTML = `<p class="admin-status">No contacts yet${currentStage ? " in this stage" : ""}.</p>`;
+			// New leads / New clients (past 30 days) and Total new clients
+			// (year to date) — approximated from `createdAt` + the client's
+			// CURRENT `lifecycleStage`, since this app has no separate
+			// "became active on X date" timestamp the way Jobber's own metric
+			// likely tracks. A lead who was created 6 months ago and only
+			// flipped to Active client yesterday would show up as a "new
+			// client" here even though the underlying record is old — an
+			// acceptable approximation for a small crew's own dashboard, but
+			// worth knowing about if the numbers ever look surprising.
+			function renderStats() {
+				const now = Date.now();
+				const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+				const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
+				let newLeads = 0;
+				let newClients = 0;
+				let totalNewClientsYtd = 0;
+				for (const c of allClients) {
+					const created = toMillis(c.createdAt);
+					if (created == null) continue;
+					if (c.lifecycleStage === "lead" && now - created <= THIRTY_DAYS_MS) newLeads++;
+					if (c.lifecycleStage === "active_client") {
+						if (now - created <= THIRTY_DAYS_MS) newClients++;
+						if (created >= yearStart) totalNewClientsYtd++;
+					}
+				}
+				statNewLeads.textContent = String(newLeads);
+				statNewClients.textContent = String(newClients);
+				statTotalNewClients.textContent = String(totalNewClientsYtd);
+				statsGrid.hidden = false;
+			}
+
+			function matchesStageFilter(client) {
+				if (!currentStageFilter) return true;
+				if (currentStageFilter === "leads_and_active") {
+					return client.lifecycleStage === "lead" || client.lifecycleStage === "active_client";
+				}
+				return client.lifecycleStage === currentStageFilter;
+			}
+
+			function renderStatusMenu() {
+				statusFilterMenu.innerHTML = Object.entries(STAGE_FILTER_LABELS)
+					.map(
+						([value, label]) => `
+						<button type="button" class="admin-menu-item admin-menu-item--select${value === currentStageFilter ? " is-checked" : ""}" data-value="${value}">
+							<span>${label}</span>
+							${value === currentStageFilter ? '<span aria-hidden="true">✓</span>' : ""}
+						</button>
+					`,
+					)
+					.join("");
+			}
+			renderStatusMenu();
+			statusFilterSummary.textContent = STAGE_FILTER_LABELS[currentStageFilter];
+
+			statusFilterBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				statusFilterMenu.hidden = !statusFilterMenu.hidden;
+			});
+			statusFilterMenu.addEventListener("click", (e) => {
+				e.stopPropagation();
+				const btn = e.target.closest("[data-value]");
+				if (!btn) return;
+				currentStageFilter = btn.dataset.value;
+				statusFilterSummary.textContent = STAGE_FILTER_LABELS[currentStageFilter];
+				renderStatusMenu();
+				statusFilterMenu.hidden = true;
+				renderClients();
+			});
+			document.addEventListener("click", () => {
+				statusFilterMenu.hidden = true;
+			});
+
+			function renderClients() {
+				const filtered = allClients.filter(matchesStageFilter);
+				resultsHeading.textContent = `Filtered clients (${filtered.length} result${filtered.length === 1 ? "" : "s"})`;
+
+				if (!filtered.length) {
+					resultsEl.innerHTML = `<p class="admin-status">No clients found${currentStageFilter ? " in this filter" : ""}.</p>`;
 					return;
 				}
 
-				resultsEl.innerHTML = "";
-				let deepLinkMatchCard = null;
-				for (const client of clients) {
-					const card = document.createElement("div");
-					card.className = "card admin-card";
-					card.id = `contact-${client.id}`;
-					card.innerHTML = `
-						<div class="admin-card__header">
-							<h3>${escapeHtml(client.name) || "(no name)"}</h3>
-							<span class="admin-badge admin-badge--${client.lifecycleStage}">${STAGE_LABELS[client.lifecycleStage] || client.lifecycleStage}</span>
-						</div>
-						<p class="admin-card__meta">
-							${[client.phone, client.email].filter(Boolean).map(escapeHtml).join(" · ") || "No contact info on file"}
-						</p>
-						${client.address ? `<p class="admin-card__meta">${escapeHtml(client.address)}</p>` : ""}
-						${client.leadSource ? `<p class="admin-card__meta">Source: ${escapeHtml(client.leadSource)}</p>` : ""}
-						<button type="button" class="btn btn--outline admin-edit-toggle">Edit</button>
-						<form class="admin-form admin-edit-form" hidden>
+				const table = document.createElement("table");
+				table.className = "admin-table admin-clients-table";
+				table.innerHTML = `
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>Address</th>
+							<th>Status</th>
+							<th>Last Activity</th>
+						</tr>
+					</thead>
+					<tbody></tbody>
+				`;
+				const tbody = table.querySelector("tbody");
+
+				for (const client of filtered) {
+					const summaryRow = document.createElement("tr");
+					summaryRow.className = "admin-clients-table__row";
+					summaryRow.dataset.clientId = client.id;
+					summaryRow.innerHTML = `
+						<td>${escapeHtml(client.name) || "(no name)"}</td>
+						<td>${escapeHtml(client.address) || "—"}</td>
+						<td><span class="admin-status-dot admin-status-dot--${client.lifecycleStage}"></span>${STAGE_LABELS[client.lifecycleStage] || client.lifecycleStage}</td>
+						<td>${fmtRelativeDate(client.updatedAt || client.createdAt)}</td>
+					`;
+
+					const editRow = document.createElement("tr");
+					editRow.className = "admin-clients-table__edit-row";
+					editRow.hidden = true;
+					const editCell = document.createElement("td");
+					editCell.colSpan = 4;
+					editCell.innerHTML = `
+						<form class="admin-form admin-edit-form">
 							<div class="admin-form__grid">
 								<div class="admin-form__row">
 									<label>Name</label>
@@ -196,19 +380,21 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 							<p class="admin-result-message" hidden></p>
 						</form>
 					`;
+					editRow.appendChild(editCell);
 
-					const editToggle = card.querySelector(".admin-edit-toggle");
-					const editForm = card.querySelector(".admin-edit-form");
-					const editCancel = card.querySelector(".admin-edit-cancel");
+					const editForm = editCell.querySelector(".admin-edit-form");
+					const editCancel = editCell.querySelector(".admin-edit-cancel");
 
-					editToggle.addEventListener("click", () => {
-						editForm.hidden = !editForm.hidden;
-						editToggle.hidden = !editForm.hidden;
+					summaryRow.addEventListener("click", () => {
+						editRow.hidden = !editRow.hidden;
 					});
 					editCancel.addEventListener("click", () => {
-						editForm.hidden = true;
-						editToggle.hidden = false;
+						editRow.hidden = true;
 					});
+					// Stop clicks inside the edit form (a <select>, text inputs) from
+					// bubbling up to summaryRow's click listener and re-toggling
+					// editRow shut while someone's mid-edit.
+					editForm.addEventListener("click", (e) => e.stopPropagation());
 
 					editForm.addEventListener("submit", async (e) => {
 						e.preventDefault();
@@ -233,7 +419,7 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 								messageEl.classList.add("admin-result-message--error");
 								return;
 							}
-							await loadContacts();
+							await loadClients();
 						} catch {
 							messageEl.hidden = false;
 							messageEl.textContent = "Network error, please try again.";
@@ -243,22 +429,49 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 						}
 					});
 
+					tbody.appendChild(summaryRow);
+					tbody.appendChild(editRow);
+
+					// Deep link from Jobs' job-detail page / Schedule's Edit Visit
+					// (see AGENTS.md → "Client deep link") — auto-open this client's
+					// edit row, scroll to it, and briefly highlight it. Only
+					// consumed once per page load so re-filtering afterward doesn't
+					// keep re-triggering it.
 					if (pendingDeepLinkEmail && (client.email || "").trim().toLowerCase() === pendingDeepLinkEmail) {
-						deepLinkMatchCard = card;
-						editForm.hidden = false;
-						editToggle.hidden = true;
+						editRow.hidden = false;
+						summaryRow.classList.add("admin-clients-table__row--highlight");
+						setTimeout(() => {
+							summaryRow.scrollIntoView({ behavior: "smooth", block: "center" });
+						}, 0);
+						setTimeout(() => summaryRow.classList.remove("admin-clients-table__row--highlight"), 2500);
+						pendingDeepLinkEmail = "";
 					}
-
-					resultsEl.appendChild(card);
 				}
 
-				if (deepLinkMatchCard) {
-					deepLinkMatchCard.classList.add("admin-card--highlight");
-					deepLinkMatchCard.scrollIntoView({ behavior: "smooth", block: "center" });
-					setTimeout(() => deepLinkMatchCard.classList.remove("admin-card--highlight"), 2500);
-					pendingDeepLinkEmail = ""; // only auto-open once per page load
-				}
+				resultsEl.innerHTML = "";
+				resultsEl.appendChild(table);
 			}
+
+			function openAddModal() {
+				addForm.reset();
+				const messageEl = addForm.querySelector(".admin-result-message");
+				messageEl.hidden = true;
+				messageEl.classList.remove("admin-result-message--error");
+				addModalBackdrop.hidden = false;
+			}
+
+			function closeAddModal() {
+				addModalBackdrop.hidden = true;
+			}
+
+			newClientBtn.addEventListener("click", openAddModal);
+			addModalClose.addEventListener("click", closeAddModal);
+			addModalBackdrop.addEventListener("click", (e) => {
+				if (e.target === addModalBackdrop) closeAddModal();
+			});
+			document.addEventListener("keydown", (e) => {
+				if (e.key === "Escape" && !addModalBackdrop.hidden) closeAddModal();
+			});
 
 			addForm.addEventListener("submit", async (e) => {
 				e.preventDefault();
@@ -282,11 +495,8 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 						messageEl.classList.add("admin-result-message--error");
 						return;
 					}
-					addForm.reset();
-					messageEl.hidden = false;
-					messageEl.classList.remove("admin-result-message--error");
-					messageEl.textContent = "Contact added.";
-					await loadContacts();
+					closeAddModal();
+					await loadClients();
 				} catch {
 					messageEl.hidden = false;
 					messageEl.textContent = "Network error, please try again.";
@@ -296,28 +506,30 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 				}
 			});
 
-			filterButtons.forEach((btn) => {
-				btn.addEventListener("click", () => {
-					filterButtons.forEach((b) => b.classList.remove("is-active"));
-					btn.classList.add("is-active");
-					currentStage = btn.dataset.stage || "";
-					loadContacts();
-				});
-			});
-
-			loadContacts();
+			loadClients();
 		</script>
 
-		<style>
+		<style is:global>
 			.admin-container {
-				max-width: 780px;
+				max-width: 1100px;
 				margin: 0 auto;
 				padding-block: 3rem;
 			}
 
+			.admin-page-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+			}
+
+			.admin-page-header h1 {
+				margin-bottom: 0;
+			}
+
 			.admin-hint {
 				color: var(--color-slate);
-				margin-bottom: 1.5rem;
+				margin: 0.75rem 0 1.5rem;
 			}
 
 			.admin-status {
@@ -328,19 +540,59 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 				color: #b3261e;
 			}
 
-			.admin-add-card {
-				margin-bottom: 1.5rem;
+			.admin-stats-grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 1.25rem;
+				margin-bottom: 2rem;
+			}
+
+			@media (max-width: 720px) {
+				.admin-stats-grid {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.admin-stat-card {
 				padding: 1.25rem 1.5rem;
 			}
 
-			.admin-add-summary {
-				cursor: pointer;
+			.admin-stat-card__label {
 				font-weight: 600;
 				color: var(--color-ink);
+				margin: 0 0 0.2rem;
 			}
 
-			.admin-add-card form {
-				margin-top: 1.25rem;
+			.admin-stat-card__meta {
+				font-size: 0.8rem;
+				color: var(--color-slate-light);
+				margin: 0 0 0.75rem;
+			}
+
+			.admin-stat-card__value {
+				font-family: var(--font-heading);
+				font-size: 2rem;
+				font-weight: 700;
+				color: var(--color-ink);
+				margin: 0;
+			}
+
+			.admin-list-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				margin-bottom: 1rem;
+			}
+
+			.admin-list-header h2 {
+				font-size: 1.1rem;
+				margin: 0;
+			}
+
+			.admin-add-card {
+				margin-bottom: 1.5rem;
+				padding: 1.25rem 1.5rem;
 			}
 
 			.admin-form__grid {
@@ -381,95 +633,8 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 				}
 			}
 
-			.admin-filters {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.5rem;
-				margin-bottom: 1.5rem;
-			}
-
-			.admin-filter {
-				padding: 0.4rem 0.9rem;
-				border-radius: 999px;
-				border: 1px solid var(--color-border);
-				background: var(--color-white);
-				font-size: 0.85rem;
-				font-weight: 600;
-				color: var(--color-slate);
-				cursor: pointer;
-			}
-
-			.admin-filter.is-active {
-				background: var(--color-ink);
-				border-color: var(--color-ink);
-				color: var(--color-white);
-			}
-
-			.admin-card {
-				margin-bottom: 1.25rem;
-				padding: 1.5rem;
-				transition: box-shadow 0.3s ease;
-			}
-
-			/* Briefly marks the contact a Jobs/Schedule deep link (?email=...)
-			   scrolled to and auto-opened for editing, so it's obvious which
-			   card just appeared/expanded. Removed a couple seconds after
-			   render — see the deep-link handling in renderContacts(). */
-			.admin-card--highlight {
-				box-shadow: 0 0 0 3px var(--color-sky);
-			}
-
-			.admin-card__header {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 1rem;
-			}
-
-			.admin-card__header h3 {
-				margin: 0;
-			}
-
-			.admin-card__meta {
-				color: var(--color-slate);
-				margin: 0.35rem 0;
-			}
-
-			.admin-badge {
-				display: inline-block;
-				padding: 0.2rem 0.6rem;
-				border-radius: 999px;
-				font-size: 0.8rem;
-				font-weight: 600;
-				white-space: nowrap;
-			}
-
-			.admin-badge--lead {
-				background: var(--color-sky-light);
-				color: var(--color-ink);
-			}
-
-			.admin-badge--active_client {
-				background: #e3f3e6;
-				color: #1e7a34;
-			}
-
-			.admin-badge--past_client {
-				background: #f1efe9;
-				color: var(--color-slate);
-			}
-
-			.admin-edit-toggle {
-				margin-top: 1rem;
-			}
-
-			.admin-edit-form {
-				margin-top: 1.25rem;
-				padding-top: 1.25rem;
-				border-top: 1px solid var(--color-border);
-			}
-
-			.admin-edit-form .btn {
+			.admin-edit-form .btn,
+			#add-form .btn {
 				margin-right: 0.75rem;
 			}
 
@@ -481,6 +646,193 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 
 			.admin-result-message--error {
 				color: #b3261e;
+			}
+
+			/* --- Status filter dropdown — single-select variant of the
+			   checkbox-popover pattern used elsewhere (Schedule's Type/Team/
+			   Status filters, Jobs' team-assignment popovers): a plain button
+			   list instead of checkboxes, since only one status view can be
+			   active at a time here, matching Jobber's own dropdown. */
+			.admin-filter-popover {
+				position: relative;
+			}
+
+			.admin-filter-btn {
+				padding: 0.5rem 1rem;
+				border-radius: 999px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				font-size: 0.88rem;
+				font-weight: 600;
+				color: var(--color-ink);
+				cursor: pointer;
+				white-space: nowrap;
+			}
+
+			.admin-filter-btn__divider {
+				color: var(--color-border);
+				margin: 0 0.15rem;
+			}
+
+			.admin-filter-popover__menu {
+				position: absolute;
+				top: calc(100% + 4px);
+				right: 0;
+				z-index: 30;
+				background: var(--color-white);
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+				padding: 0.4rem;
+				min-width: 220px;
+				box-shadow: 0 8px 24px rgba(28, 43, 69, 0.12);
+			}
+
+			.admin-filter-popover__menu--actions {
+				display: flex;
+				flex-direction: column;
+				gap: 0.1rem;
+			}
+
+			.admin-menu-item--select {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				width: 100%;
+				text-align: left;
+				padding: 0.5rem 0.6rem;
+				border: none;
+				background: none;
+				border-radius: 6px;
+				font-size: 0.9rem;
+				font-family: inherit;
+				color: var(--color-ink);
+				cursor: pointer;
+			}
+
+			.admin-menu-item--select:hover {
+				background: var(--color-sky-light);
+			}
+
+			.admin-menu-item--select.is-checked {
+				font-weight: 600;
+				color: var(--color-sky-dark);
+			}
+
+			/* --- Clients table --- */
+			.admin-table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 0.9rem;
+			}
+
+			.admin-table th,
+			.admin-table td {
+				text-align: left;
+				padding: 0.75rem 1rem;
+				border-bottom: 1px solid var(--color-border);
+			}
+
+			.admin-table th {
+				background: var(--color-sky-light);
+				font-weight: 600;
+				font-size: 0.78rem;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+				color: var(--color-slate);
+				white-space: nowrap;
+			}
+
+			.admin-clients-table__row {
+				cursor: pointer;
+			}
+
+			.admin-clients-table__row:hover td {
+				background: var(--color-cream);
+			}
+
+			.admin-clients-table__row--highlight td {
+				background: var(--color-sky-light);
+				transition: background 0.3s ease;
+			}
+
+			.admin-clients-table__edit-row td {
+				background: var(--color-cream);
+				padding: 1.25rem;
+			}
+
+			.admin-status-dot {
+				display: inline-block;
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				margin-right: 0.5rem;
+			}
+
+			.admin-status-dot--lead {
+				background: var(--color-sky);
+			}
+
+			.admin-status-dot--active_client {
+				background: #1e7a34;
+			}
+
+			.admin-status-dot--past_client {
+				background: var(--color-slate-light);
+			}
+
+			/* --- New Client modal — same admin-modal pattern used elsewhere
+			   (e.g. the Jobs page's now-retired job-detail modal). */
+			.admin-modal-backdrop {
+				position: fixed;
+				inset: 0;
+				z-index: 80;
+				background: rgba(28, 43, 69, 0.45);
+				display: flex;
+				align-items: flex-start;
+				justify-content: center;
+				padding: 4rem 1.5rem;
+				overflow-y: auto;
+			}
+
+			.admin-modal-backdrop[hidden] {
+				display: none;
+			}
+
+			.admin-modal {
+				width: 100%;
+				max-width: 560px;
+				padding: 1.5rem;
+			}
+
+			.admin-modal__header {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				gap: 1rem;
+				margin-bottom: 1rem;
+				padding-bottom: 1rem;
+				border-bottom: 1px solid var(--color-border);
+			}
+
+			.admin-modal__header h3 {
+				margin: 0;
+			}
+
+			.admin-modal__close {
+				flex-shrink: 0;
+				width: 32px;
+				height: 32px;
+				border-radius: 50%;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				color: var(--color-slate);
+				cursor: pointer;
+				font-size: 0.9rem;
+			}
+
+			.admin-modal__close:hover {
+				border-color: var(--color-sky);
+				color: var(--color-sky-dark);
 			}
 		</style>
 </AdminLayout>
