@@ -459,8 +459,21 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 			   untouched. Page-specific overrides with an equally- or more-
 			   specific selector still win where they exist (Astro renders this
 			   layout's <style> before the page's own, so later = higher
-			   priority on a tie) — this is just the shared default. */
-			.admin-main .btn {
+			   priority on a tie) — this is just the shared default.
+
+			   IMPORTANT: this <style> block is scoped (not is:global), and
+			   Astro's scoping only tags elements that live in THIS file's own
+			   template. Every .btn this rule needs to reach (Schedule's nav
+			   buttons, Team Organization's Add Cleaner button, Manage Plans'
+			   ←/→, Contacts' Edit, etc.) is rendered by the PAGE file through
+			   <main class="admin-main"><slot /></main> — slotted content keeps
+			   its own file's scope hash, not this layout's. A plain
+			   `.admin-main .btn` selector compiles to require both sides to
+			   carry the same scope class, which slotted .btn elements never
+			   do, so the rule silently matched nothing. `:global(.btn)` opts
+			   the inner selector out of scoping so it reaches into slotted
+			   page content while .admin-main itself stays scoped normally. */
+			.admin-main :global(.btn) {
 				padding: 0.45rem 1rem;
 				font-size: 0.85rem;
 			}
