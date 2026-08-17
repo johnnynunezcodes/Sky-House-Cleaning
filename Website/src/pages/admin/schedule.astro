@@ -202,8 +202,18 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 						<p class="admin-edit-section-title">Team</p>
 						<div class="admin-form__row">
-							<label for="edit-assign">Assign team members</label>
-							<select multiple class="admin-assign-select" id="edit-assign"></select>
+							<label id="edit-assign-label">Assign team members</label>
+							<div class="admin-filter-popover" id="edit-assign-wrap">
+								<button
+									type="button"
+									class="admin-filter-btn admin-filter-btn--full"
+									id="edit-assign-btn"
+									aria-labelledby="edit-assign-label"
+								>
+									<span id="edit-assign-summary">Needs a cleaner</span>
+								</button>
+								<div class="admin-filter-popover__menu" id="edit-assign-menu" hidden></div>
+							</div>
 						</div>
 					</div>
 					<p class="admin-result-message" id="edit-message" hidden></p>
@@ -429,11 +439,32 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				}
 			}
 
-			function cleanerOptions(selectedIds) {
+			// Checkbox rows for the Edit Visit form's "Assign team members"
+			// popover (see the .admin-filter-btn--full CSS comment) — same
+			// active-or-currently-assigned filter the old <select> used, so an
+			// inactive cleaner who's already on this visit still shows up
+			// (and stays checked) rather than silently vanishing from the list.
+			function cleanerCheckboxRows(selectedIds) {
 				return cleaners
 					.filter((c) => c.active || selectedIds.includes(c.id))
-					.map((c) => `<option value="${c.id}" ${selectedIds.includes(c.id) ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
+					.map(
+						(c) => `
+						<label class="admin-filter-popover__option">
+							<input type="checkbox" value="${c.id}" ${selectedIds.includes(c.id) ? "checked" : ""} />
+							${escapeHtml(c.name)}${c.active ? "" : " (inactive)"}
+						</label>
+					`,
+					)
 					.join("");
+			}
+
+			function editAssignSelectedIds() {
+				return Array.from(editAssignMenu.querySelectorAll('input[type="checkbox"]:checked')).map((cb) => cb.value);
+			}
+
+			function updateEditAssignSummary() {
+				const names = cleanerNamesFor(editAssignSelectedIds());
+				editAssignSummary.textContent = names.length ? names.join(", ") : "Needs a cleaner";
 			}
 
 			// --- Type/Team/Status checkbox-multiselect filter popovers --------------
@@ -766,7 +797,9 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			const editDate = document.getElementById("edit-date");
 			const editStartTime = document.getElementById("edit-start-time");
 			const editEndTime = document.getElementById("edit-end-time");
-			const editAssign = document.getElementById("edit-assign");
+			const editAssignBtn = document.getElementById("edit-assign-btn");
+			const editAssignMenu = document.getElementById("edit-assign-menu");
+			const editAssignSummary = document.getElementById("edit-assign-summary");
 			const editMessage = document.getElementById("edit-message");
 			const editDeleteBtn = document.getElementById("edit-delete-btn");
 			const editCancelBtn = document.getElementById("edit-cancel-btn");
@@ -792,8 +825,9 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				editEndTime.value = toTimeInputValue(job.end);
 
 				const assignedIds = job.assignedCleanerIds || [];
-				editAssign.innerHTML = cleanerOptions(assignedIds);
-				editAssign.size = Math.min(4, Math.max(2, cleaners.length));
+				editAssignMenu.innerHTML = cleanerCheckboxRows(assignedIds);
+				editAssignMenu.hidden = true;
+				updateEditAssignSummary();
 
 				editDeleteBtn.disabled = isRecurring;
 				editDeleteBtn.title = isRecurring ? "Use Manage Plans to cancel a recurring plan's visit." : "";
@@ -801,6 +835,23 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				popupBackdrop.hidden = true;
 				editBackdrop.hidden = false;
 			}
+
+			// Same checkbox-popover open/close wiring setupFilterPopover() gives
+			// the toolbar filters — toggle on button click, keep open on clicks
+			// inside the menu itself (the global "close every .admin-filter-
+			// popover__menu" document listener below would otherwise close this
+			// the instant a checkbox is clicked), flip upward if there's no room
+			// below (see flipMenuIfNeeded's own comment), and live-update the
+			// button's summary text as boxes are checked/unchecked.
+			editAssignBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				const opening = editAssignMenu.hidden;
+				document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
+				editAssignMenu.hidden = !opening;
+				if (opening) flipMenuIfNeeded(editAssignBtn, editAssignMenu);
+			});
+			editAssignMenu.addEventListener("click", (e) => e.stopPropagation());
+			editAssignMenu.addEventListener("change", updateEditAssignSummary);
 
 			function toTimeInputValue(iso) {
 				const parts = new Intl.DateTimeFormat("en-US", {
@@ -830,7 +881,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				editSaveBtn.disabled = true;
 				editMessage.hidden = true;
 				try {
-					const selectedIds = Array.from(editAssign.selectedOptions).map((o) => o.value);
+					const selectedIds = editAssignSelectedIds();
 					await saveJobFields(currentJob, {
 						assignedCleanerIds: selectedIds,
 						dispatchNotes: editInstructions.value,
@@ -1580,6 +1631,38 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				color: var(--color-ink);
 				cursor: pointer;
 				white-space: nowrap;
+			}
+
+			/* Same checkbox-popover pattern as the Type/Team/Status toolbar
+			   filters, reused for the Edit Visit form's "Assign team members"
+			   field — replaces what used to be a native <select multiple>,
+			   which gives no visual affordance for which cleaners are
+			   currently checked and requires a ctrl/cmd-click to multi-select,
+			   not exactly discoverable. --full stretches it to the width of a
+			   normal form field (rounded rect, left-aligned) instead of the
+			   toolbar's pill-shaped, content-width button, and adds a caret so
+			   it still reads as a dropdown rather than a plain button. */
+			.admin-filter-btn--full {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				width: 100%;
+				border-radius: 8px;
+				padding: 0.6rem 0.75rem;
+				font-size: 0.95rem;
+				text-align: left;
+			}
+
+			.admin-filter-btn--full::after {
+				content: "▾";
+				color: var(--color-slate-light);
+				margin-left: 0.5rem;
+			}
+
+			#edit-assign-wrap .admin-filter-popover__menu {
+				width: 100%;
+				max-height: 220px;
+				overflow-y: auto;
 			}
 
 			.admin-filter-popover__menu {
