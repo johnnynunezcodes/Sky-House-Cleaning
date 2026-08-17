@@ -1412,6 +1412,15 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			});
 
 			dayPicker.value = todayLocalIso();
+			// setViewMode() is what un-hides whichever of day-view/week-view/
+			// month-view matches viewMode — the three containers all start
+			// `hidden` in the markup above, and otherwise only the view-button
+			// click handler ever calls it. Without this, the Month grid still
+			// gets built and inserted on first load (loadCurrentPeriod ->
+			// renderCurrentView -> renderMonthGrid), it's just invisible until
+			// a button click (e.g. Week, then back to Month) finally calls
+			// setViewMode() for the first time.
+			setViewMode(viewMode);
 			loadCleaners().then(loadCurrentPeriod);
 		</script>
 
