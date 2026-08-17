@@ -637,6 +637,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			// --- Tier 1: Visit Popup -------------------------------------------------
 
 			const popupBackdrop = document.getElementById("popup-backdrop");
+			const visitPopup = document.getElementById("visit-popup");
 			const popupTitle = document.getElementById("popup-title");
 			const popupSubtitle = document.getElementById("popup-subtitle");
 			const popupCompleted = document.getElementById("popup-completed");
@@ -657,7 +658,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			let currentJob = null;
 
-			function openPopup(job) {
+			function openPopup(job, anchorEl) {
 				currentJob = job;
 				popupMessage.hidden = true;
 				const isAssessment = job.jobType === "assessment";
@@ -675,6 +676,50 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				popupArchiveBtn.textContent = job.archived ? "Unarchive visit" : "Archive visit";
 				popupMoreMenu.hidden = true;
 				popupBackdrop.hidden = false;
+				positionPopupNear(anchorEl);
+			}
+
+			// Jobber's own popup opens right next to whatever you clicked, not
+			// centered on screen — this measures the clicked chip/block's real
+			// position (only available once the popup is un-hidden and has a
+			// rendered size to measure) and places the card beside it instead,
+			// flipping to the left/clamping to the viewport edges so it never
+			// runs off-screen. #popup-backdrop stays a full-viewport transparent
+			// click-catcher (for the existing click-outside-to-close listener)
+			// but no longer dims the page or flex-centers its child — see that
+			// selector's own CSS comment.
+			function positionPopupNear(anchorEl) {
+				if (!anchorEl) {
+					visitPopup.style.position = "";
+					visitPopup.style.top = "";
+					visitPopup.style.left = "";
+					visitPopup.style.margin = "";
+					return;
+				}
+				const anchorRect = anchorEl.getBoundingClientRect();
+				const popupRect = visitPopup.getBoundingClientRect();
+				const gap = 10;
+				const viewportW = window.innerWidth;
+				const viewportH = window.innerHeight;
+
+				let left = anchorRect.right + gap;
+				if (left + popupRect.width > viewportW - gap) {
+					left = anchorRect.left - popupRect.width - gap;
+				}
+				if (left < gap) {
+					left = Math.max(gap, Math.min(anchorRect.left, viewportW - popupRect.width - gap));
+				}
+
+				let top = anchorRect.top;
+				if (top + popupRect.height > viewportH - gap) {
+					top = viewportH - popupRect.height - gap;
+				}
+				if (top < gap) top = gap;
+
+				visitPopup.style.position = "fixed";
+				visitPopup.style.margin = "0";
+				visitPopup.style.left = `${left}px`;
+				visitPopup.style.top = `${top}px`;
 			}
 
 			function closePopup() {
@@ -1120,7 +1165,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 					<span class="admin-daygrid__block-title">${escapeHtml(job.summary)}</span>
 					${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
 				`;
-				block.addEventListener("click", () => openPopup(job));
+				block.addEventListener("click", () => openPopup(job, block));
 				return block;
 			}
 
@@ -1237,7 +1282,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 						${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
 					</span>
 				`;
-				chip.addEventListener("click", () => openPopup(job));
+				chip.addEventListener("click", () => openPopup(job, chip));
 				return chip;
 			}
 
@@ -1309,7 +1354,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 					`;
 					mini.addEventListener("click", (e) => {
 						e.stopPropagation();
-						openPopup(job);
+						openPopup(job, mini);
 					});
 					chipsEl.appendChild(mini);
 				});
@@ -1449,6 +1494,18 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				max-width: 1200px;
 				margin: 0 auto;
 				padding-block: 3rem;
+			}
+
+			/* Schedule specifically wants to run wider than the site's usual
+			   1200px admin-page cap, closer to how Jobber's own calendar fills
+			   nearly the whole window — a 7-column month grid has a lot more to
+			   show per row than a form or table does. Scoped to #schedule-page
+			   (this page's own container id) rather than widening .admin-container
+			   itself, since that class — and this whole <style is:global> block
+			   — is shared by every other /admin/* page; an ID selector's higher
+			   specificity wins here without touching their width. */
+			#schedule-page.admin-container {
+				max-width: 1800px;
 			}
 
 			.admin-hint {
@@ -1617,7 +1674,16 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				width: auto;
 			}
 
-			.admin-filter-popover__menu--actions {
+			/* :not([hidden]) matters here — an unconditional `display: flex`
+			   is an author-level rule, which beats the browser's own
+			   `[hidden] { display: none }` UA rule regardless of selector
+			   specificity. Without this guard, the popup-more-menu and
+			   details-more-menu elements (both use this class alongside
+			   admin-filter-popover__menu) render open immediately whenever
+			   their parent popup opens, ignoring their `hidden` attribute —
+			   exactly the bug where "Put client's plan on hold" showed up
+			   unprompted. */
+			.admin-filter-popover__menu--actions:not([hidden]) {
 				display: flex;
 				flex-direction: column;
 				gap: 0.15rem;
@@ -1804,13 +1870,14 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				gap: 0.2rem;
 				width: 100%;
 				text-align: left;
-				border: none;
+				border: 1px solid #cddef2;
 				border-radius: 8px;
 				background: #eaf1fb;
 				color: #1a3a5c;
 				padding: 0.5rem 0.6rem;
 				font-family: inherit;
 				cursor: pointer;
+				box-shadow: 0 1px 2px rgba(28, 43, 69, 0.06);
 			}
 
 			.admin-chip:hover {
@@ -1819,6 +1886,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-chip--unassigned {
 				background: #fdeceb;
+				border-color: #f3c6c1;
 				color: #7a1a15;
 			}
 
@@ -1893,8 +1961,8 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				   headers above. Same overflow bug fixed elsewhere in this
 				   codebase (see AdminLayout.astro's own min-width: 0 comment) —
 				   this explicit override is what lets the column actually shrink
-				   back to 1fr and rely on .admin-month-chip's own text-overflow:
-				   ellipsis to truncate the label instead. */
+				   back to 1fr; .admin-month-chip's own text then wraps onto a
+				   second line within that width instead of overflowing. */
 				min-width: 0;
 				padding: 0.4rem;
 				border-radius: 10px;
@@ -1907,9 +1975,14 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				box-shadow: 0 0 0 1px var(--color-sky);
 			}
 
-			.admin-month-day.has-unassigned {
-				background: #fdeceb;
-			}
+			/* Deliberately NOT tinting the whole cell here (an earlier version
+			   set this to the exact same #fdeceb as .admin-month-chip--unassigned
+			   below) — a "needs a cleaner" day and its visit card ended up the
+			   same color and visually merged into one blob, which is what
+			   prompted this pass. The cell stays neutral white/bordered; only
+			   the chip itself (with its own border below) carries the color, so
+			   it reads as a distinct card sitting inside the cell — closer to
+			   how Jobber's own calendar looks. */
 
 			.admin-month-day__header {
 				display: flex;
@@ -1959,7 +2032,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				gap: 0.35rem;
 				width: 100%;
 				text-align: left;
-				border: none;
+				border: 1px solid #cddef2;
 				border-radius: 8px;
 				background: #eaf1fb;
 				color: #1a3a5c;
@@ -1967,6 +2040,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				font-size: 0.72rem;
 				font-family: inherit;
 				cursor: pointer;
+				box-shadow: 0 1px 2px rgba(28, 43, 69, 0.06);
 			}
 
 			.admin-month-chip:hover {
@@ -1999,6 +2073,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-month-chip--unassigned {
 				background: #fdeceb;
+				border-color: #f3c6c1;
 				color: #7a1a15;
 			}
 
@@ -2138,6 +2213,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-modal-backdrop[hidden] {
 				display: none;
+			}
+
+			/* The Tier-1 Visit Popup is positioned next to whatever chip/block
+			   was clicked (see positionPopupNear() in the script) rather than
+			   flex-centered like Edit Visit/Details below — so its backdrop
+			   stays a transparent full-viewport click-catcher (for the existing
+			   click-outside-to-close listener) instead of dimming the page,
+			   matching Jobber's own lightweight "quick glance" popup rather
+			   than a heavier modal treatment. */
+			#popup-backdrop {
+				background: transparent;
 			}
 
 			.admin-modal {
