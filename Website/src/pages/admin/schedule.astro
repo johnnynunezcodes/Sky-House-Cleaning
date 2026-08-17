@@ -679,7 +679,11 @@ import { WORKING_HOURS } from "../../data/booking.js";
 					left = Math.max(gap, Math.min(anchorRect.left, viewportW - popupRect.width - gap));
 				}
 
-				let top = anchorRect.top;
+				// Center the popup vertically on the clicked card/event rather
+				// than aligning its top edge to the anchor's top edge — Jobber's
+				// popup sits with its middle roughly level with the middle of
+				// the date card it was opened from, not flush against its top.
+				let top = anchorRect.top + anchorRect.height / 2 - popupRect.height / 2;
 				if (top + popupRect.height > viewportH - gap) {
 					top = viewportH - popupRect.height - gap;
 				}
