@@ -1325,10 +1325,14 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			// --- Month view (calendar grid, chips open the popup) ------------------
 
-			function monthCell(dateStr, dayNum, jobs, isToday) {
+			function monthCell(dateStr, dayNum, jobs, isToday, isOutside) {
 				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
 				const cell = document.createElement("div");
-				cell.className = "admin-month-day" + (isToday ? " is-today" : "") + (unassignedCount ? " has-unassigned" : "");
+				cell.className =
+					"admin-month-day" +
+					(isToday ? " is-today" : "") +
+					(unassignedCount ? " has-unassigned" : "") +
+					(isOutside ? " admin-month-day--outside" : "");
 
 				cell.innerHTML = `
 					<button type="button" class="admin-month-day__header" data-date="${dateStr}">
@@ -1369,14 +1373,37 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				const byDate = groupByDate(jobs);
 				const today = todayLocalIso();
 				const firstDow = localDate(monthStart).getDay();
+
+				// Leading days from the previous month and trailing days from the
+				// next, shown muted (.admin-month-day--outside) so the grid always
+				// fills complete weeks — Jobber-style — instead of ending abruptly
+				// mid-row. These get `jobs: []` rather than a real count: the
+				// period this view actually fetched (loadCurrentPeriod, above) is
+				// just this month's own days, so there's no visit data on hand for
+				// a neighboring month without a second network round trip, which
+				// isn't worth it for what's meant to be a muted, secondary glance
+				// at "what week does the 1st/last fall in." The day number itself
+				// is still a real, clickable jumpToDay() link (see monthCell), so
+				// staff can jump straight into an adjacent month's Day view from
+				// here same as any other cell.
+				const prevMonthStart = addMonths(monthStart, -1);
+				const prevMonthDays = daysInMonthCount(prevMonthStart);
 				for (let i = 0; i < firstDow; i++) {
-					const pad = document.createElement("span");
-					pad.className = "admin-month-pad";
-					monthGrid.appendChild(pad);
+					const dayNum = prevMonthDays - firstDow + 1 + i;
+					const dateStr = `${prevMonthStart.slice(0, 8)}${String(dayNum).padStart(2, "0")}`;
+					monthGrid.appendChild(monthCell(dateStr, dayNum, [], false, true));
 				}
+
 				for (let d = 1; d <= totalDays; d++) {
 					const dateStr = `${monthStart.slice(0, 8)}${String(d).padStart(2, "0")}`;
-					monthGrid.appendChild(monthCell(dateStr, d, byDate.get(dateStr) || [], dateStr === today));
+					monthGrid.appendChild(monthCell(dateStr, d, byDate.get(dateStr) || [], dateStr === today, false));
+				}
+
+				const trailingCells = (7 - ((firstDow + totalDays) % 7)) % 7;
+				const nextMonthStart = addMonths(monthStart, 1);
+				for (let d = 1; d <= trailingCells; d++) {
+					const dateStr = `${nextMonthStart.slice(0, 8)}${String(d).padStart(2, "0")}`;
+					monthGrid.appendChild(monthCell(dateStr, d, [], false, true));
 				}
 			}
 
@@ -1964,13 +1991,18 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				overflow: hidden;
 			}
 
-			.admin-month-pad {
-				/* No day number, no visits — colored to match the page
-				   background (not the grid's own white cells) so it reads as
-				   genuinely empty space rather than a clickable/relevant cell,
-				   while still keeping the same shared grid lines around it as
-				   every real cell for a continuous-looking grid. */
+			/* Leading/trailing days from the neighboring months (see
+			   renderMonthGrid's comment) — same cell markup and grid lines as
+			   a real day, just muted so the eye reads them as "outside this
+			   month" the way Jobber's own calendar grays its overflow days,
+			   rather than looking like an equally-relevant empty day. */
+			.admin-month-day--outside {
 				background: var(--color-cream);
+			}
+
+			.admin-month-day--outside .admin-month-day__num {
+				color: var(--color-slate-light);
+				font-weight: 600;
 			}
 
 			.admin-month-day {
