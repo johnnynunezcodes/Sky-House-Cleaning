@@ -1926,6 +1926,13 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			.admin-month-weekdays {
 				display: grid;
 				grid-template-columns: repeat(7, 1fr);
+				/* Zero gap, matching .admin-month-grid below — a header column
+				   needs to be the exact same computed width as the day-cell
+				   column beneath it, and grid divides 1fr shares AFTER
+				   subtracting gap space, so mismatched gap values here vs. the
+				   grid would throw the SUN-SAT labels out of alignment with
+				   their cells even though both use repeat(7, 1fr). */
+				gap: 0;
 				margin-bottom: 0.4rem;
 			}
 
@@ -1938,14 +1945,32 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				color: var(--color-slate-light);
 			}
 
+			/* Cells sit flush against each other (no gap) with a single shared
+			   grid line between them, closer to Jobber's own calendar — a
+			   1px gap filled with the container's own border color is a
+			   standard trick for that: each cell paints over it with its own
+			   background, leaving a uniform 1px line wherever two cells meet,
+			   without doubling up borders the way giving every cell its own
+			   full border would. Reclaims the space that gap: 0.4rem between
+			   every cell was eating into (was the actual ask — more room for
+			   what's inside each day, not just visual polish). */
 			.admin-month-grid {
 				display: grid;
 				grid-template-columns: repeat(7, 1fr);
-				gap: 0.4rem;
+				gap: 1px;
+				background: var(--color-border);
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+				overflow: hidden;
 			}
 
 			.admin-month-pad {
-				display: block;
+				/* No day number, no visits — colored to match the page
+				   background (not the grid's own white cells) so it reads as
+				   genuinely empty space rather than a clickable/relevant cell,
+				   while still keeping the same shared grid lines around it as
+				   every real cell for a continuous-looking grid. */
+				background: var(--color-cream);
 			}
 
 			.admin-month-day {
@@ -1964,15 +1989,15 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				   back to 1fr; .admin-month-chip's own text then wraps onto a
 				   second line within that width instead of overflowing. */
 				min-width: 0;
-				padding: 0.4rem;
-				border-radius: 10px;
-				border: 1px solid var(--color-border);
+				padding: 0.5rem;
 				background: var(--color-white);
 			}
 
 			.admin-month-day.is-today {
-				border-color: var(--color-sky);
-				box-shadow: 0 0 0 1px var(--color-sky);
+				/* inset, not a regular box-shadow — an outward ring would draw
+				   past this cell's own bounds into its neighbors now that
+				   there's no gap between cells to draw it into. */
+				box-shadow: inset 0 0 0 2px var(--color-sky);
 			}
 
 			/* Deliberately NOT tinting the whole cell here (an earlier version
