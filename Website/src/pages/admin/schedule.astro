@@ -437,6 +437,32 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			}
 
 			// --- Type/Team/Status checkbox-multiselect filter popovers --------------
+			// A dropdown menu normally opens downward (CSS default: top: calc(100%
+			// + 4px)) — flips to open upward instead whenever there isn't enough
+			// room below the button before the viewport's bottom edge. Needed
+			// once the Visit Popup started anchoring itself next to whatever
+			// visit was clicked (see positionPopupNear() below): a visit near
+			// the bottom of the Month grid puts its popup's "•••" button close
+			// to the bottom of the screen too, so its More menu had nowhere to
+			// open into and rendered off-screen, invisible. Must be called AFTER
+			// the menu's `hidden` is cleared — getBoundingClientRect() on a
+			// still-hidden ([hidden] = display:none) element only ever reports
+			// zeros, so there's nothing real to measure yet before that.
+			function flipMenuIfNeeded(btn, menu) {
+				const btnRect = btn.getBoundingClientRect();
+				const menuRect = menu.getBoundingClientRect();
+				const gap = 8;
+				const fitsBelow = window.innerHeight - btnRect.bottom >= menuRect.height + gap;
+				const fitsAbove = btnRect.top >= menuRect.height + gap;
+				if (!fitsBelow && fitsAbove) {
+					menu.style.top = "auto";
+					menu.style.bottom = "calc(100% + 4px)";
+				} else {
+					menu.style.top = "";
+					menu.style.bottom = "";
+				}
+			}
+
 			// Jobber-style: a button showing "Label | N selected" (or the single
 			// selected label, or "All" when everything's checked) that opens a
 			// checklist. All three default to fully-checked (no filtering) — same
@@ -462,6 +488,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 					const isOpen = !menu.hidden;
 					document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
 					menu.hidden = isOpen;
+					if (!menu.hidden) flipMenuIfNeeded(btn, menu);
 				});
 				menu.addEventListener("change", () => {
 					updateSummary();
@@ -645,7 +672,9 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			popupMoreBtn.addEventListener("click", (e) => {
 				e.stopPropagation();
-				popupMoreMenu.hidden = !popupMoreMenu.hidden;
+				const opening = popupMoreMenu.hidden;
+				popupMoreMenu.hidden = !opening;
+				if (opening) flipMenuIfNeeded(popupMoreBtn, popupMoreMenu);
 			});
 
 			async function saveJobFields(job, extraFields) {
@@ -992,7 +1021,9 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			detailsMoreBtn.addEventListener("click", (e) => {
 				e.stopPropagation();
-				detailsMoreMenu.hidden = !detailsMoreMenu.hidden;
+				const opening = detailsMoreMenu.hidden;
+				detailsMoreMenu.hidden = !opening;
+				if (opening) flipMenuIfNeeded(detailsMoreBtn, detailsMoreMenu);
 			});
 			detailsEditBtn.addEventListener("click", () => {
 				detailsMoreMenu.hidden = true;
