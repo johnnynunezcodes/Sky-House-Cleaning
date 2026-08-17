@@ -687,7 +687,14 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 				box-shadow: 0 8px 24px rgba(28, 43, 69, 0.12);
 			}
 
-			.admin-filter-popover__menu--actions {
+			/* :not([hidden]) matters here — an unconditional `display: flex` is
+			   an author-level rule, which beats the browser's own
+			   `[hidden] { display: none }` UA rule regardless of selector
+			   specificity (same gotcha already documented in schedule.astro's
+			   identical CSS comment — missed copying the guard over here the
+			   first time, which is why this menu rendered open on page load
+			   instead of waiting for a click). */
+			.admin-filter-popover__menu--actions:not([hidden]) {
 				display: flex;
 				flex-direction: column;
 				gap: 0.1rem;
