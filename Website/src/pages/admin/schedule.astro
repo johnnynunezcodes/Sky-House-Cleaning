@@ -1,0 +1,2220 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Split out
+// of /admin/jobs (see AGENTS.md → "Schedule (split from Jobs)") after the
+// business owner shared reference screenshots of Jobber's own separate
+// Schedule page — Month/Week/Day calendar, checkbox-multiselect Type/Team/
+// Status filters, and a click-a-visit-for-a-small-popup-then-Edit/Details
+// pattern, all distinct from Jobber's List-first Jobs page (which is what
+// /admin/jobs stayed as). Reads the exact same calendar+Firestore merge
+// /admin/jobs does (`/api/admin/dispatch/list-jobs.js`) — nothing about the
+// underlying data changed, only which page shows it and how.
+//
+// Deliberate departures from Jobber's exact screenshots, worth knowing
+// about rather than discovering by their absence:
+// - No "Find a Time" availability search — the business owner said they
+//   don't need it right now.
+// - No Text/Email reminder actions — no SMS/email provider is wired into
+//   this app (see AGENTS.md → "Invoices" for the same limitation).
+// - No "Line items" on a visit — this app has no per-visit itemized
+//   pricing breakdown, only a single total computed at booking time.
+// - A recurring job's Schedule (date/time) fields are read-only here, with
+//   a note pointing to Manage Plans — moving a recurring visit also has to
+//   update the Stripe subscription's stored lastVisitStart/lastVisitEnd (or
+//   the next auto-renewal computes the wrong following date) and realign
+//   billing, which is exactly what /admin/reschedule's dedicated tool
+//   already does correctly. Duplicating that logic here risked a silent
+//   billing desync for a lower-priority convenience; one-off, quote-based,
+//   and assessment visits have no subscription to desync, so those ARE
+//   fully editable here.
+// - The small popup is a centered modal, not a pixel-anchored floating
+//   card near the clicked chip — simpler and more reliable across the
+//   different chip layouts each of Month/Week/Day use.
+export const prerender = false;
+
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { WORKING_HOURS } from "../../data/booking.js";
+---
+
+<AdminLayout title="Schedule | Sky House Cleaning Staff Tools">
+			<div
+				class="container admin-container"
+				id="schedule-page"
+				data-working-hours-start={WORKING_HOURS.start}
+				data-working-hours-end={WORKING_HOURS.end}
+			>
+				<h1>Schedule</h1>
+				<p class="admin-hint">
+					Your calendar, day by day, week by week, or month by month. Click any visit for a quick
+					look, then Edit or see full Details. For the flat, filterable list with billing totals
+					and status counts, see <a href="/admin/jobs">Jobs</a>.
+				</p>
+
+				<details class="card admin-add-card">
+					<summary class="admin-add-summary">Manage cleaners</summary>
+					<div id="cleaners-list"></div>
+					<form id="add-cleaner-form" class="admin-form admin-inline-form">
+						<div class="admin-form__row">
+							<label for="add-cleaner-name">Name *</label>
+							<input type="text" id="add-cleaner-name" name="name" required />
+						</div>
+						<div class="admin-form__row">
+							<label for="add-cleaner-phone">Phone</label>
+							<input type="tel" id="add-cleaner-phone" name="phone" />
+						</div>
+						<div class="admin-form__row">
+							<label for="add-cleaner-email">Email</label>
+							<input type="email" id="add-cleaner-email" name="email" />
+						</div>
+						<button type="submit" class="btn btn--outline">Add Cleaner</button>
+					</form>
+					<p class="admin-result-message" id="cleaner-message" hidden></p>
+				</details>
+
+				<div class="admin-schedule-toolbar">
+					<div class="admin-schedule-toolbar__nav">
+						<button type="button" id="prev-period" class="btn btn--outline">←</button>
+						<button type="button" id="today-btn" class="btn btn--outline">Today</button>
+						<button type="button" id="next-period" class="btn btn--outline">→</button>
+						<input type="date" id="day-picker" class="admin-day-picker-hidden" />
+						<span id="period-label" class="admin-period-label"></span>
+					</div>
+
+					<div class="admin-schedule-toolbar__filters">
+						<div class="admin-filter-popover" id="type-filter-wrap">
+							<button type="button" class="admin-filter-btn" id="type-filter-btn">Type | <span id="type-filter-summary">All</span></button>
+							<div class="admin-filter-popover__menu" id="type-filter-menu" hidden>
+								<label class="admin-filter-popover__option"><input type="checkbox" value="visit" checked /> Visits</label>
+								<label class="admin-filter-popover__option"><input type="checkbox" value="assessment" checked /> Assessments</label>
+							</div>
+						</div>
+						<div class="admin-filter-popover" id="team-filter-wrap">
+							<button type="button" class="admin-filter-btn" id="team-filter-btn">Team | <span id="team-filter-summary">All</span></button>
+							<div class="admin-filter-popover__menu" id="team-filter-menu" hidden></div>
+						</div>
+						<div class="admin-filter-popover" id="status-filter-wrap">
+							<button type="button" class="admin-filter-btn" id="status-filter-btn">Status | <span id="status-filter-summary">All</span></button>
+							<div class="admin-filter-popover__menu" id="status-filter-menu" hidden>
+								<label class="admin-filter-popover__option"><input type="checkbox" value="unassigned" checked /> Unassigned</label>
+								<label class="admin-filter-popover__option"><input type="checkbox" value="assigned" checked /> Assigned</label>
+								<label class="admin-filter-popover__option"><input type="checkbox" value="en_route" checked /> En route</label>
+								<label class="admin-filter-popover__option"><input type="checkbox" value="in_progress" checked /> In progress</label>
+								<label class="admin-filter-popover__option"><input type="checkbox" value="completed" checked /> Completed</label>
+							</div>
+						</div>
+					</div>
+
+					<div class="admin-view-switcher" role="group" aria-label="View">
+						<button type="button" class="admin-view-btn is-active" data-view="month">Month</button>
+						<button type="button" class="admin-view-btn" data-view="week">Week</button>
+						<button type="button" class="admin-view-btn" data-view="day">Day</button>
+					</div>
+				</div>
+
+				<p id="load-status" class="admin-status">Loading…</p>
+
+				<div id="day-view" class="admin-day-view" hidden>
+					<div id="day-grid" class="admin-daygrid"></div>
+				</div>
+
+				<div id="week-view" class="admin-week-view" hidden>
+					<div id="week-board" class="admin-week-board"></div>
+				</div>
+
+				<div id="month-view" class="admin-month-view" hidden>
+					<div class="admin-month-weekdays">
+						<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+					</div>
+					<div id="month-grid" class="admin-month-grid"></div>
+				</div>
+			</div>
+
+			<!-- Tier 1: small popup shown on click -->
+			<div class="admin-modal-backdrop" id="popup-backdrop" hidden>
+				<div class="admin-modal card admin-visit-popup" id="visit-popup" role="dialog" aria-modal="true">
+					<div class="admin-modal__header">
+						<div>
+							<h3 id="popup-title"></h3>
+							<p class="admin-card__meta" id="popup-subtitle"></p>
+						</div>
+						<button type="button" class="admin-modal__close" id="popup-close" aria-label="Close">✕</button>
+					</div>
+					<label class="admin-confirm-label admin-visit-popup__completed">
+						<input type="checkbox" id="popup-completed" />
+						Completed
+					</label>
+					<div class="admin-visit-popup__row">
+						<span class="admin-visit-popup__label">Details</span>
+						<span id="popup-details"></span>
+					</div>
+					<div class="admin-visit-popup__row">
+						<span class="admin-visit-popup__label">Team</span>
+						<span id="popup-team"></span>
+					</div>
+					<div class="admin-visit-popup__row" id="popup-location-row">
+						<span class="admin-visit-popup__label">Location</span>
+						<span id="popup-location"></span>
+					</div>
+					<div class="admin-visit-popup__row">
+						<span class="admin-visit-popup__label">Start</span>
+						<span id="popup-start"></span>
+					</div>
+					<div class="admin-visit-popup__row">
+						<span class="admin-visit-popup__label">End</span>
+						<span id="popup-end"></span>
+					</div>
+					<p class="admin-result-message" id="popup-message" hidden></p>
+					<div class="admin-visit-popup__actions">
+						<div class="admin-filter-popover" id="popup-more-wrap">
+							<button type="button" class="btn btn--outline" id="popup-more-btn">•••</button>
+							<div class="admin-filter-popover__menu admin-filter-popover__menu--actions" id="popup-more-menu" hidden>
+								<button type="button" class="admin-menu-item" id="popup-hold-btn" hidden>Put client's plan on hold</button>
+								<button type="button" class="admin-menu-item" id="popup-archive-btn">Archive visit</button>
+							</div>
+						</div>
+						<button type="button" class="btn btn--outline" id="popup-edit-btn">Edit</button>
+						<button type="button" class="btn btn--primary" id="popup-details-btn">Details</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Tier 2a: Edit Visit -->
+			<div class="admin-modal-backdrop" id="edit-backdrop" hidden>
+				<div class="admin-modal card" id="edit-modal" role="dialog" aria-modal="true">
+					<div class="admin-modal__header">
+						<h3>Edit Visit</h3>
+						<button type="button" class="admin-modal__close" id="edit-close" aria-label="Close">✕</button>
+					</div>
+					<div class="admin-modal__body">
+						<div class="admin-form__row">
+							<label>Title</label>
+							<p class="admin-edit-title" id="edit-title-display"></p>
+						</div>
+						<div class="admin-form__row">
+							<label for="edit-instructions">Instructions</label>
+							<textarea id="edit-instructions" rows="2" placeholder="Anything the team should know"></textarea>
+						</div>
+
+						<div class="admin-edit-jobdetails">
+							<p class="admin-edit-jobdetails__title">Job details</p>
+							<div class="admin-edit-jobdetails__grid">
+								<span>Job #</span><span id="edit-jobnumber"></span>
+								<span>Client</span><span id="edit-client"></span>
+								<span>Phone</span><span id="edit-phone"></span>
+								<span>Address</span><span id="edit-address"></span>
+							</div>
+						</div>
+
+						<p class="admin-edit-section-title">Schedule</p>
+						<p class="admin-hint admin-hint--tight" id="edit-schedule-note" hidden>
+							This is a recurring plan's visit — moving it here would fall out of sync with billing.
+							Use <a href="/admin/reschedule">Manage Plans</a> to reschedule a recurring plan.
+						</p>
+						<div class="admin-form__grid">
+							<div class="admin-form__row">
+								<label for="edit-date">Date</label>
+								<input type="date" id="edit-date" />
+							</div>
+							<div class="admin-form__row">
+								<label for="edit-start-time">Start time</label>
+								<input type="time" id="edit-start-time" />
+							</div>
+							<div class="admin-form__row">
+								<label for="edit-end-time">End time</label>
+								<input type="time" id="edit-end-time" />
+							</div>
+						</div>
+
+						<p class="admin-edit-section-title">Team</p>
+						<div class="admin-form__row">
+							<label for="edit-assign">Assign team members</label>
+							<select multiple class="admin-assign-select" id="edit-assign"></select>
+						</div>
+					</div>
+					<p class="admin-result-message" id="edit-message" hidden></p>
+					<div class="admin-edit-footer">
+						<button type="button" class="btn btn--outline admin-btn--danger" id="edit-delete-btn">Delete</button>
+						<div class="admin-edit-footer__right">
+							<button type="button" class="btn btn--outline" id="edit-cancel-btn">Cancel</button>
+							<button type="button" class="btn btn--primary" id="edit-save-btn">Save</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Tier 2b: Visit Details -->
+			<div class="admin-modal-backdrop" id="details-backdrop" hidden>
+				<div class="admin-modal card" id="details-modal" role="dialog" aria-modal="true">
+					<div class="admin-modal__header">
+						<div>
+							<h3 id="details-title"></h3>
+							<p class="admin-card__meta" id="details-time"></p>
+						</div>
+						<button type="button" class="admin-modal__close" id="details-close" aria-label="Close">✕</button>
+					</div>
+					<div class="admin-visit-popup__actions admin-visit-popup__actions--top">
+						<button type="button" class="btn btn--primary" id="details-complete-btn">Mark Complete</button>
+						<div class="admin-filter-popover" id="details-more-wrap">
+							<button type="button" class="btn btn--outline" id="details-more-btn">••• More Actions</button>
+							<div class="admin-filter-popover__menu admin-filter-popover__menu--actions" id="details-more-menu" hidden>
+								<button type="button" class="admin-menu-item" id="details-edit-btn">Edit</button>
+								<button type="button" class="admin-menu-item" id="details-hold-btn" hidden>Put client's plan on hold</button>
+								<button type="button" class="admin-menu-item" id="details-archive-btn">Archive visit</button>
+							</div>
+						</div>
+					</div>
+
+					<div class="admin-tabs">
+						<button type="button" class="admin-tab is-active" data-tab="info">Info</button>
+						<button type="button" class="admin-tab" data-tab="client">Client</button>
+						<button type="button" class="admin-tab" data-tab="notes">Notes</button>
+					</div>
+
+					<div class="admin-tab-panel" id="tab-info">
+						<p class="admin-edit-section-title">Instructions</p>
+						<p id="details-instructions" class="admin-card__meta">No additional instructions</p>
+						<p class="admin-edit-section-title">Job</p>
+						<p><a href="/admin/jobs" id="details-job-link"></a></p>
+						<p class="admin-edit-section-title">Team</p>
+						<p id="details-team" class="admin-card__meta"></p>
+					</div>
+
+					<div class="admin-tab-panel" id="tab-client" hidden>
+						<div id="details-client-body">Loading…</div>
+					</div>
+
+					<div class="admin-tab-panel" id="tab-notes" hidden>
+						<textarea id="details-notes" rows="4" placeholder="Anything the team should know"></textarea>
+					</div>
+
+					<p class="admin-result-message" id="details-message" hidden></p>
+				</div>
+			</div>
+
+		<script>
+			const root = document.getElementById("schedule-page");
+			const WORKING_HOURS_START = Number(root?.dataset.workingHoursStart) || 8;
+			const WORKING_HOURS_END = Number(root?.dataset.workingHoursEnd) || 18;
+
+			const dayPicker = document.getElementById("day-picker");
+			const prevPeriodBtn = document.getElementById("prev-period");
+			const nextPeriodBtn = document.getElementById("next-period");
+			const todayBtn = document.getElementById("today-btn");
+			const periodLabel = document.getElementById("period-label");
+			const loadStatus = document.getElementById("load-status");
+			const cleanersList = document.getElementById("cleaners-list");
+			const addCleanerForm = document.getElementById("add-cleaner-form");
+			const cleanerMessage = document.getElementById("cleaner-message");
+			const viewButtons = Array.from(document.querySelectorAll(".admin-view-btn"));
+			const dayViewEl = document.getElementById("day-view");
+			const weekViewEl = document.getElementById("week-view");
+			const monthViewEl = document.getElementById("month-view");
+			const dayGrid = document.getElementById("day-grid");
+			const weekBoard = document.getElementById("week-board");
+			const monthGrid = document.getElementById("month-grid");
+
+			const STATUS_LABELS = {
+				unassigned: "Unassigned",
+				assigned: "Assigned",
+				en_route: "En route",
+				in_progress: "In progress",
+				completed: "Completed",
+			};
+			const HOUR_HEIGHT = 56; // px per hour row in the Day view grid
+
+			let cleaners = [];
+			let allJobsRaw = []; // unfiltered jobs for the currently-loaded period
+			let viewMode = "month"; // "day" | "week" | "month" — List lives on /admin/jobs now
+
+			function escapeHtml(str) {
+				const div = document.createElement("div");
+				div.textContent = str ?? "";
+				return div.innerHTML;
+			}
+
+			function todayLocalIso() {
+				return new Intl.DateTimeFormat("en-CA", {
+					timeZone: "America/Los_Angeles",
+					year: "numeric",
+					month: "2-digit",
+					day: "2-digit",
+				}).format(new Date());
+			}
+
+			function fmtTime(iso) {
+				return new Date(iso).toLocaleTimeString("en-US", {
+					timeZone: "America/Los_Angeles",
+					hour: "numeric",
+					minute: "2-digit",
+				});
+			}
+
+			function fmtDateTime(iso) {
+				return new Date(iso).toLocaleDateString("en-US", {
+					timeZone: "America/Los_Angeles",
+					weekday: "short",
+					month: "short",
+					day: "numeric",
+				});
+			}
+
+			function minutesSinceMidnightPT(iso) {
+				const parts = new Intl.DateTimeFormat("en-US", {
+					timeZone: "America/Los_Angeles",
+					hour: "2-digit",
+					minute: "2-digit",
+					hour12: false,
+				}).formatToParts(new Date(iso));
+				const hour = Number(parts.find((p) => p.type === "hour")?.value || "0") % 24;
+				const minute = Number(parts.find((p) => p.type === "minute")?.value || "0");
+				return hour * 60 + minute;
+			}
+
+			function addDays(dateStr, delta) {
+				const [y, m, d] = dateStr.split("-").map(Number);
+				const date = new Date(Date.UTC(y, m - 1, d));
+				date.setUTCDate(date.getUTCDate() + delta);
+				return date.toISOString().slice(0, 10);
+			}
+
+			function startOfWeek(dateStr) {
+				const [y, m, d] = dateStr.split("-").map(Number);
+				const date = new Date(Date.UTC(y, m - 1, d));
+				date.setUTCDate(date.getUTCDate() - date.getUTCDay());
+				return date.toISOString().slice(0, 10);
+			}
+
+			function startOfMonth(dateStr) {
+				return `${dateStr.slice(0, 7)}-01`;
+			}
+
+			function daysInMonthCount(dateStr) {
+				const [y, m] = dateStr.split("-").map(Number);
+				return new Date(Date.UTC(y, m, 0)).getUTCDate();
+			}
+
+			function addMonths(dateStr, delta) {
+				const [y, m] = dateStr.split("-").map(Number);
+				const date = new Date(Date.UTC(y, m - 1 + delta, 1));
+				return date.toISOString().slice(0, 10);
+			}
+
+			function localDate(dateStr) {
+				return new Date(dateStr + "T00:00:00");
+			}
+
+			function groupByDate(jobs) {
+				const map = new Map();
+				for (const j of jobs) {
+					if (!map.has(j.visitDate)) map.set(j.visitDate, []);
+					map.get(j.visitDate).push(j);
+				}
+				for (const arr of map.values()) arr.sort((a, b) => new Date(a.start) - new Date(b.start));
+				return map;
+			}
+
+			function cleanerNamesFor(ids) {
+				return (ids || []).map((id) => cleaners.find((c) => c.id === id)?.name).filter(Boolean);
+			}
+
+			function parseSummary(summary) {
+				const m = (summary || "").match(/^Sky House Cleaning: (.+?), (.+)$/);
+				return m ? { client: m[1], service: m[2] } : { client: summary || "—", service: "" };
+			}
+
+			function clientNameFor(job) {
+				return job.clientName || parseSummary(job.summary).client;
+			}
+
+			function serviceNameFor(job) {
+				return parseSummary(job.summary).service;
+			}
+
+			async function loadCleaners() {
+				try {
+					const res = await fetch("/api/admin/dispatch/list-cleaners");
+					const data = await res.json();
+					if (res.ok) cleaners = data.cleaners || [];
+					renderCleanersList();
+					renderTeamFilterOptions();
+				} catch {
+					// Non-fatal — assignment dropdowns/names just come up empty.
+				}
+			}
+
+			function renderCleanersList() {
+				if (!cleaners.length) {
+					cleanersList.innerHTML = `<p class="admin-card__meta">No cleaners added yet.</p>`;
+					return;
+				}
+				cleanersList.innerHTML = cleaners
+					.map(
+						(c) => `
+						<div class="admin-cleaner-row">
+							<span>${escapeHtml(c.name)}${c.phone ? " · " + escapeHtml(c.phone) : ""}${c.active ? "" : " (inactive)"}</span>
+							<button type="button" class="btn btn--outline admin-toggle-active" data-id="${c.id}" data-active="${c.active}">
+								${c.active ? "Mark inactive" : "Mark active"}
+							</button>
+						</div>
+					`,
+					)
+					.join("");
+
+				cleanersList.querySelectorAll(".admin-toggle-active").forEach((btn) => {
+					btn.addEventListener("click", async () => {
+						btn.disabled = true;
+						try {
+							await fetch("/api/admin/dispatch/update-cleaner", {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ id: btn.dataset.id, active: btn.dataset.active !== "true" }),
+							});
+							await loadCleaners();
+						} finally {
+							btn.disabled = false;
+						}
+					});
+				});
+			}
+
+			addCleanerForm.addEventListener("submit", async (e) => {
+				e.preventDefault();
+				const formData = new FormData(addCleanerForm);
+				const payload = Object.fromEntries(formData.entries());
+				const submitBtn = addCleanerForm.querySelector("button[type=submit]");
+				submitBtn.disabled = true;
+				cleanerMessage.hidden = true;
+				try {
+					const res = await fetch("/api/admin/dispatch/create-cleaner", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(payload),
+					});
+					const data = await res.json();
+					if (!res.ok) {
+						cleanerMessage.hidden = false;
+						cleanerMessage.textContent = data.error || "Something went wrong.";
+						cleanerMessage.classList.add("admin-result-message--error");
+						return;
+					}
+					addCleanerForm.reset();
+					await loadCleaners();
+				} catch {
+					cleanerMessage.hidden = false;
+					cleanerMessage.textContent = "Network error, please try again.";
+					cleanerMessage.classList.add("admin-result-message--error");
+				} finally {
+					submitBtn.disabled = false;
+				}
+			});
+
+			function cleanerOptions(selectedIds) {
+				return cleaners
+					.filter((c) => c.active || selectedIds.includes(c.id))
+					.map((c) => `<option value="${c.id}" ${selectedIds.includes(c.id) ? "selected" : ""}>${escapeHtml(c.name)}</option>`)
+					.join("");
+			}
+
+			// --- Type/Team/Status checkbox-multiselect filter popovers --------------
+			// Jobber-style: a button showing "Label | N selected" (or the single
+			// selected label, or "All" when everything's checked) that opens a
+			// checklist. All three default to fully-checked (no filtering) — same
+			// "nothing selected shouldn't mean nothing shown" reasoning as leaving
+			// every box ticked in Jobber's own screenshots.
+			function setupFilterPopover(btnId, menuId, wrapId, summaryId, labels, onChange) {
+				const btn = document.getElementById(btnId);
+				const menu = document.getElementById(menuId);
+				const wrap = document.getElementById(wrapId);
+				const summary = document.getElementById(summaryId);
+
+				function updateSummary() {
+					const boxes = Array.from(menu.querySelectorAll('input[type="checkbox"]'));
+					const checked = boxes.filter((b) => b.checked);
+					if (checked.length === boxes.length) summary.textContent = "All";
+					else if (checked.length === 0) summary.textContent = "None";
+					else if (checked.length === 1) summary.textContent = labels[checked[0].value] || checked[0].value;
+					else summary.textContent = `${checked.length} selected`;
+				}
+
+				btn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					const isOpen = !menu.hidden;
+					document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
+					menu.hidden = isOpen;
+				});
+				menu.addEventListener("change", () => {
+					updateSummary();
+					onChange();
+				});
+				wrap.addEventListener("click", (e) => e.stopPropagation());
+
+				updateSummary();
+				return { menu, updateSummary };
+			}
+
+			function selectedValues(menuId) {
+				return Array.from(document.querySelectorAll(`#${menuId} input[type="checkbox"]:checked`)).map((b) => b.value);
+			}
+
+			function renderTeamFilterOptions() {
+				const menu = document.getElementById("team-filter-menu");
+				menu.innerHTML =
+					`<label class="admin-filter-popover__option"><input type="checkbox" value="__unassigned__" checked /> Unassigned</label>` +
+					cleaners
+						.filter((c) => c.active)
+						.map((c) => `<label class="admin-filter-popover__option"><input type="checkbox" value="${c.id}" checked /> ${escapeHtml(c.name)}</label>`)
+						.join("");
+				teamFilterPopover.updateSummary();
+			}
+
+			document.addEventListener("click", () => {
+				document.querySelectorAll(".admin-filter-popover__menu").forEach((m) => (m.hidden = true));
+			});
+
+			const TYPE_LABELS = { visit: "Visits", assessment: "Assessments" };
+			const typeFilterPopover = setupFilterPopover(
+				"type-filter-btn",
+				"type-filter-menu",
+				"type-filter-wrap",
+				"type-filter-summary",
+				TYPE_LABELS,
+				() => renderCurrentView(),
+			);
+			const teamFilterPopover = setupFilterPopover(
+				"team-filter-btn",
+				"team-filter-menu",
+				"team-filter-wrap",
+				"team-filter-summary",
+				{},
+				() => renderCurrentView(),
+			);
+			const statusFilterPopover = setupFilterPopover(
+				"status-filter-btn",
+				"status-filter-menu",
+				"status-filter-wrap",
+				"status-filter-summary",
+				STATUS_LABELS,
+				() => renderCurrentView(),
+			);
+
+			function applyFilters(jobs) {
+				const types = selectedValues("type-filter-menu");
+				const teams = selectedValues("team-filter-menu");
+				const statuses = selectedValues("status-filter-menu");
+				return jobs.filter((job) => {
+					const jobTypeCategory = job.jobType === "assessment" ? "assessment" : "visit";
+					if (!types.includes(jobTypeCategory)) return false;
+					if (!statuses.includes(job.status)) return false;
+					const ids = job.assignedCleanerIds || [];
+					const matchesTeam = ids.length
+						? ids.some((id) => teams.includes(id))
+						: teams.includes("__unassigned__");
+					if (!matchesTeam) return false;
+					return true;
+				});
+			}
+
+			// Re-applies the current filter selection to the already-fetched
+			// period's jobs without a network round trip — filters are purely
+			// client-side, same as every other filter in this app.
+			function renderCurrentView() {
+				const filtered = applyFilters(allJobsRaw);
+				if (viewMode === "day") buildDayGrid(filtered);
+				else if (viewMode === "week") renderWeekBoard(filtered);
+				else renderMonthGrid(filtered);
+			}
+
+			// --- Tier 1: Visit Popup -------------------------------------------------
+
+			const popupBackdrop = document.getElementById("popup-backdrop");
+			const popupTitle = document.getElementById("popup-title");
+			const popupSubtitle = document.getElementById("popup-subtitle");
+			const popupCompleted = document.getElementById("popup-completed");
+			const popupDetails = document.getElementById("popup-details");
+			const popupTeam = document.getElementById("popup-team");
+			const popupLocationRow = document.getElementById("popup-location-row");
+			const popupLocation = document.getElementById("popup-location");
+			const popupStart = document.getElementById("popup-start");
+			const popupEnd = document.getElementById("popup-end");
+			const popupMessage = document.getElementById("popup-message");
+			const popupClose = document.getElementById("popup-close");
+			const popupMoreBtn = document.getElementById("popup-more-btn");
+			const popupMoreMenu = document.getElementById("popup-more-menu");
+			const popupHoldBtn = document.getElementById("popup-hold-btn");
+			const popupArchiveBtn = document.getElementById("popup-archive-btn");
+			const popupEditBtn = document.getElementById("popup-edit-btn");
+			const popupDetailsBtn = document.getElementById("popup-details-btn");
+
+			let currentJob = null;
+
+			function openPopup(job) {
+				currentJob = job;
+				popupMessage.hidden = true;
+				const isAssessment = job.jobType === "assessment";
+				popupTitle.textContent = job.jobNumber ? `#${job.jobNumber} — ${clientNameFor(job)}` : clientNameFor(job);
+				popupSubtitle.textContent = isAssessment ? "Assessment" : "Visit";
+				popupCompleted.checked = job.status === "completed";
+				popupDetails.textContent = `${clientNameFor(job)}${serviceNameFor(job) ? " — " + serviceNameFor(job) : ""}`;
+				const names = cleanerNamesFor(job.assignedCleanerIds);
+				popupTeam.textContent = names.length ? names.join(", ") : "Needs a cleaner";
+				popupLocationRow.hidden = !job.location;
+				popupLocation.textContent = job.location || "";
+				popupStart.textContent = `${fmtDateTime(job.start)}, ${fmtTime(job.start)}`;
+				popupEnd.textContent = `${fmtDateTime(job.end)}, ${fmtTime(job.end)}`;
+				popupHoldBtn.hidden = job.jobType !== "recurring";
+				popupArchiveBtn.textContent = job.archived ? "Unarchive visit" : "Archive visit";
+				popupMoreMenu.hidden = true;
+				popupBackdrop.hidden = false;
+			}
+
+			function closePopup() {
+				popupBackdrop.hidden = true;
+				currentJob = null;
+			}
+
+			popupClose.addEventListener("click", closePopup);
+			popupBackdrop.addEventListener("click", (e) => {
+				if (e.target === popupBackdrop) closePopup();
+			});
+
+			popupMoreBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				popupMoreMenu.hidden = !popupMoreMenu.hidden;
+			});
+
+			async function saveJobFields(job, extraFields) {
+				const res = await fetch("/api/admin/dispatch/update-job", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ jobKey: job.jobKey, eventId: job.eventId, visitDate: job.visitDate, ...extraFields }),
+				});
+				const data = await res.json();
+				if (!res.ok) throw new Error(data.error || "Something went wrong.");
+				return data;
+			}
+
+			popupCompleted.addEventListener("change", async () => {
+				if (!currentJob) return;
+				const nextStatus = popupCompleted.checked
+					? "completed"
+					: (currentJob.assignedCleanerIds || []).length
+						? "assigned"
+						: "unassigned";
+				popupCompleted.disabled = true;
+				try {
+					await saveJobFields(currentJob, { status: nextStatus });
+					currentJob.status = nextStatus;
+					await loadCurrentPeriod();
+				} catch (err) {
+					popupMessage.hidden = false;
+					popupMessage.textContent = err.message;
+					popupMessage.classList.add("admin-result-message--error");
+					popupCompleted.checked = !popupCompleted.checked;
+				} finally {
+					popupCompleted.disabled = false;
+				}
+			});
+
+			popupArchiveBtn.addEventListener("click", async () => {
+				if (!currentJob) return;
+				const nextArchived = !currentJob.archived;
+				popupMoreMenu.hidden = true;
+				try {
+					await saveJobFields(currentJob, { archived: nextArchived });
+					closePopup();
+					await loadCurrentPeriod();
+				} catch (err) {
+					popupMessage.hidden = false;
+					popupMessage.textContent = err.message;
+					popupMessage.classList.add("admin-result-message--error");
+				}
+			});
+
+			popupHoldBtn.addEventListener("click", async () => {
+				if (!currentJob) return;
+				popupMoreMenu.hidden = true;
+				if (!currentJob.clientEmail) {
+					popupMessage.hidden = false;
+					popupMessage.textContent = "No client email on file for this booking — can't look up their plan.";
+					popupMessage.classList.add("admin-result-message--error");
+					return;
+				}
+				if (!confirm(`Put ${clientNameFor(currentJob)}'s recurring plan on hold? This pauses billing and stops new visits from being created.`)) return;
+				try {
+					const res = await fetch("/api/admin/subscriptions/toggle-hold", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ hold: true, clientEmail: currentJob.clientEmail }),
+					});
+					const data = await res.json();
+					if (!res.ok) throw new Error(data.error || "Something went wrong.");
+					closePopup();
+					await loadCurrentPeriod();
+				} catch (err) {
+					popupMessage.hidden = false;
+					popupMessage.textContent = err.message;
+					popupMessage.classList.add("admin-result-message--error");
+				}
+			});
+
+			// --- Tier 2a: Edit Visit --------------------------------------------------
+
+			const editBackdrop = document.getElementById("edit-backdrop");
+			const editClose = document.getElementById("edit-close");
+			const editTitleDisplay = document.getElementById("edit-title-display");
+			const editInstructions = document.getElementById("edit-instructions");
+			const editJobNumber = document.getElementById("edit-jobnumber");
+			const editClient = document.getElementById("edit-client");
+			const editPhone = document.getElementById("edit-phone");
+			const editAddress = document.getElementById("edit-address");
+			const editScheduleNote = document.getElementById("edit-schedule-note");
+			const editDate = document.getElementById("edit-date");
+			const editStartTime = document.getElementById("edit-start-time");
+			const editEndTime = document.getElementById("edit-end-time");
+			const editAssign = document.getElementById("edit-assign");
+			const editMessage = document.getElementById("edit-message");
+			const editDeleteBtn = document.getElementById("edit-delete-btn");
+			const editCancelBtn = document.getElementById("edit-cancel-btn");
+			const editSaveBtn = document.getElementById("edit-save-btn");
+
+			function openEdit(job) {
+				currentJob = job;
+				editMessage.hidden = true;
+				editTitleDisplay.textContent = job.jobNumber ? `#${job.jobNumber} — ${job.summary || "Visit"}` : job.summary || "Visit";
+				editInstructions.value = job.dispatchNotes || "";
+				editJobNumber.textContent = job.jobNumber ? `#${job.jobNumber}` : "—";
+				editClient.textContent = clientNameFor(job);
+				editPhone.textContent = "—"; // not exposed on the calendar event today
+				editAddress.textContent = job.location || "—";
+
+				const isRecurring = job.jobType === "recurring";
+				editScheduleNote.hidden = !isRecurring;
+				editDate.disabled = isRecurring;
+				editStartTime.disabled = isRecurring;
+				editEndTime.disabled = isRecurring;
+				editDate.value = job.visitDate || "";
+				editStartTime.value = toTimeInputValue(job.start);
+				editEndTime.value = toTimeInputValue(job.end);
+
+				const assignedIds = job.assignedCleanerIds || [];
+				editAssign.innerHTML = cleanerOptions(assignedIds);
+				editAssign.size = Math.min(4, Math.max(2, cleaners.length));
+
+				editDeleteBtn.disabled = isRecurring;
+				editDeleteBtn.title = isRecurring ? "Use Manage Plans to cancel a recurring plan's visit." : "";
+
+				popupBackdrop.hidden = true;
+				editBackdrop.hidden = false;
+			}
+
+			function toTimeInputValue(iso) {
+				const parts = new Intl.DateTimeFormat("en-US", {
+					timeZone: "America/Los_Angeles",
+					hour: "2-digit",
+					minute: "2-digit",
+					hour12: false,
+				}).formatToParts(new Date(iso));
+				const hour = (parts.find((p) => p.type === "hour")?.value || "00").padStart(2, "0");
+				const minute = (parts.find((p) => p.type === "minute")?.value || "00").padStart(2, "0");
+				return `${hour === "24" ? "00" : hour}:${minute}`;
+			}
+
+			function closeEdit() {
+				editBackdrop.hidden = true;
+				currentJob = null;
+			}
+
+			editClose.addEventListener("click", closeEdit);
+			editCancelBtn.addEventListener("click", closeEdit);
+			editBackdrop.addEventListener("click", (e) => {
+				if (e.target === editBackdrop) closeEdit();
+			});
+
+			editSaveBtn.addEventListener("click", async () => {
+				if (!currentJob) return;
+				editSaveBtn.disabled = true;
+				editMessage.hidden = true;
+				try {
+					const selectedIds = Array.from(editAssign.selectedOptions).map((o) => o.value);
+					await saveJobFields(currentJob, {
+						assignedCleanerIds: selectedIds,
+						dispatchNotes: editInstructions.value,
+					});
+
+					if (currentJob.jobType !== "recurring" && editDate.value && editStartTime.value && editEndTime.value) {
+						const res = await fetch("/api/admin/dispatch/reschedule-visit", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({
+								eventId: currentJob.eventId,
+								oldVisitDate: currentJob.visitDate,
+								date: editDate.value,
+								startTime: editStartTime.value,
+								endTime: editEndTime.value,
+							}),
+						});
+						const data = await res.json();
+						if (!res.ok) throw new Error(data.error || "Couldn't move the visit.");
+						if (data.warning) alert(data.warning);
+					}
+
+					closeEdit();
+					await loadCurrentPeriod();
+				} catch (err) {
+					editMessage.hidden = false;
+					editMessage.textContent = err.message;
+					editMessage.classList.add("admin-result-message--error");
+				} finally {
+					editSaveBtn.disabled = false;
+				}
+			});
+
+			editDeleteBtn.addEventListener("click", async () => {
+				if (!currentJob || editDeleteBtn.disabled) return;
+				if (!confirm(`Delete this visit for ${clientNameFor(currentJob)}? This can't be undone.`)) return;
+				editDeleteBtn.disabled = true;
+				editMessage.hidden = true;
+				try {
+					const res = await fetch("/api/admin/dispatch/delete-visit", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ eventId: currentJob.eventId, jobKey: currentJob.jobKey }),
+					});
+					const data = await res.json();
+					if (!res.ok) throw new Error(data.error || "Couldn't delete the visit.");
+					if (data.warning) alert(data.warning);
+					closeEdit();
+					await loadCurrentPeriod();
+				} catch (err) {
+					editMessage.hidden = false;
+					editMessage.textContent = err.message;
+					editMessage.classList.add("admin-result-message--error");
+					editDeleteBtn.disabled = false;
+				}
+			});
+
+			// --- Tier 2b: Visit Details -------------------------------------------
+
+			const detailsBackdrop = document.getElementById("details-backdrop");
+			const detailsClose = document.getElementById("details-close");
+			const detailsTitle = document.getElementById("details-title");
+			const detailsTime = document.getElementById("details-time");
+			const detailsCompleteBtn = document.getElementById("details-complete-btn");
+			const detailsMoreBtn = document.getElementById("details-more-btn");
+			const detailsMoreMenu = document.getElementById("details-more-menu");
+			const detailsEditBtn = document.getElementById("details-edit-btn");
+			const detailsHoldBtn = document.getElementById("details-hold-btn");
+			const detailsArchiveBtn = document.getElementById("details-archive-btn");
+			const detailsInstructions = document.getElementById("details-instructions");
+			const detailsJobLink = document.getElementById("details-job-link");
+			const detailsTeam = document.getElementById("details-team");
+			const detailsClientBody = document.getElementById("details-client-body");
+			const detailsNotes = document.getElementById("details-notes");
+			const detailsMessage = document.getElementById("details-message");
+			const tabs = Array.from(document.querySelectorAll(".admin-tab"));
+			const tabPanels = { info: document.getElementById("tab-info"), client: document.getElementById("tab-client"), notes: document.getElementById("tab-notes") };
+
+			let allClientsCache = null;
+
+			function openDetails(job) {
+				currentJob = job;
+				detailsMessage.hidden = true;
+				detailsTitle.textContent = job.jobNumber ? `#${job.jobNumber} — ${clientNameFor(job)}` : clientNameFor(job);
+				detailsTime.textContent = `${fmtDateTime(job.start)} · ${fmtTime(job.start)} – ${fmtTime(job.end)}`;
+				detailsCompleteBtn.textContent = job.status === "completed" ? "Completed ✓" : "Mark Complete";
+				detailsCompleteBtn.disabled = job.status === "completed";
+				detailsHoldBtn.hidden = job.jobType !== "recurring";
+				detailsArchiveBtn.textContent = job.archived ? "Unarchive visit" : "Archive visit";
+				detailsInstructions.textContent = job.dispatchNotes || "No additional instructions";
+				detailsJobLink.textContent = job.jobNumber ? `Job #${job.jobNumber} — ${serviceNameFor(job) || "Visit"}` : serviceNameFor(job) || "Visit";
+				const names = cleanerNamesFor(job.assignedCleanerIds);
+				detailsTeam.textContent = names.length ? names.join(", ") : "No one assigned yet";
+				detailsNotes.value = job.dispatchNotes || "";
+
+				switchTab("info");
+				allClientsCache = null; // reset so the Client tab re-fetches for whichever job is now open
+
+				popupBackdrop.hidden = true;
+				detailsBackdrop.hidden = false;
+			}
+
+			function closeDetails() {
+				detailsBackdrop.hidden = true;
+				currentJob = null;
+			}
+
+			detailsClose.addEventListener("click", closeDetails);
+			detailsBackdrop.addEventListener("click", (e) => {
+				if (e.target === detailsBackdrop) closeDetails();
+			});
+
+			function switchTab(name) {
+				tabs.forEach((t) => t.classList.toggle("is-active", t.dataset.tab === name));
+				Object.entries(tabPanels).forEach(([key, el]) => (el.hidden = key !== name));
+				if (name === "client") loadClientTab();
+			}
+
+			tabs.forEach((t) => t.addEventListener("click", () => switchTab(t.dataset.tab)));
+
+			// Contact records (the `clients` CRM collection) aren't automatically
+			// created for every booking — only ones that passed through a Request
+			// at some point. A booking with no matching contact isn't an error,
+			// it just falls back to whatever the calendar event itself has.
+			async function loadClientTab() {
+				if (!currentJob) return;
+				detailsClientBody.innerHTML = "Loading…";
+				try {
+					if (!allClientsCache) {
+						const res = await fetch("/api/admin/crm/list-clients");
+						const data = await res.json();
+						allClientsCache = res.ok ? data.clients || [] : [];
+					}
+					const match = currentJob.clientEmail
+						? allClientsCache.find((c) => c.email && c.email.toLowerCase() === currentJob.clientEmail.toLowerCase())
+						: null;
+					if (match) {
+						detailsClientBody.innerHTML = `
+							<p><strong>${escapeHtml(match.name)}</strong></p>
+							${match.phone ? `<p>${escapeHtml(match.phone)}</p>` : ""}
+							${match.email ? `<p>${escapeHtml(match.email)}</p>` : ""}
+							${match.address ? `<p>${escapeHtml(match.address)}</p>` : ""}
+							${match.accessNotes ? `<p class="admin-card__meta">Access: ${escapeHtml(match.accessNotes)}</p>` : ""}
+							${match.petNotes ? `<p class="admin-card__meta">Pets: ${escapeHtml(match.petNotes)}</p>` : ""}
+						`;
+					} else {
+						detailsClientBody.innerHTML = `
+							<p><strong>${escapeHtml(clientNameFor(currentJob))}</strong></p>
+							${currentJob.clientEmail ? `<p>${escapeHtml(currentJob.clientEmail)}</p>` : ""}
+							${currentJob.location ? `<p>${escapeHtml(currentJob.location)}</p>` : ""}
+							<p class="admin-card__meta">No additional contact record on file for this booking.</p>
+						`;
+					}
+				} catch {
+					detailsClientBody.innerHTML = `<p class="admin-card__meta">Couldn't load client details.</p>`;
+				}
+			}
+
+			let detailsNotesDebounce;
+			detailsNotes.addEventListener("input", () => {
+				clearTimeout(detailsNotesDebounce);
+				detailsNotesDebounce = setTimeout(async () => {
+					if (!currentJob) return;
+					try {
+						await saveJobFields(currentJob, { dispatchNotes: detailsNotes.value });
+						currentJob.dispatchNotes = detailsNotes.value;
+					} catch {
+						// Non-fatal — same tolerance the Jobs page's notes field has.
+					}
+				}, 600);
+			});
+
+			detailsCompleteBtn.addEventListener("click", async () => {
+				if (!currentJob || currentJob.status === "completed") return;
+				detailsCompleteBtn.disabled = true;
+				try {
+					await saveJobFields(currentJob, { status: "completed" });
+					currentJob.status = "completed";
+					detailsCompleteBtn.textContent = "Completed ✓";
+					await loadCurrentPeriod();
+				} catch (err) {
+					detailsMessage.hidden = false;
+					detailsMessage.textContent = err.message;
+					detailsMessage.classList.add("admin-result-message--error");
+					detailsCompleteBtn.disabled = false;
+				}
+			});
+
+			detailsMoreBtn.addEventListener("click", (e) => {
+				e.stopPropagation();
+				detailsMoreMenu.hidden = !detailsMoreMenu.hidden;
+			});
+			detailsEditBtn.addEventListener("click", () => {
+				detailsMoreMenu.hidden = true;
+				detailsBackdrop.hidden = true;
+				openEdit(currentJob);
+			});
+			detailsArchiveBtn.addEventListener("click", async () => {
+				if (!currentJob) return;
+				const nextArchived = !currentJob.archived;
+				detailsMoreMenu.hidden = true;
+				try {
+					await saveJobFields(currentJob, { archived: nextArchived });
+					closeDetails();
+					await loadCurrentPeriod();
+				} catch (err) {
+					detailsMessage.hidden = false;
+					detailsMessage.textContent = err.message;
+					detailsMessage.classList.add("admin-result-message--error");
+				}
+			});
+			detailsHoldBtn.addEventListener("click", async () => {
+				if (!currentJob) return;
+				detailsMoreMenu.hidden = true;
+				if (!currentJob.clientEmail) {
+					detailsMessage.hidden = false;
+					detailsMessage.textContent = "No client email on file for this booking — can't look up their plan.";
+					detailsMessage.classList.add("admin-result-message--error");
+					return;
+				}
+				if (!confirm(`Put ${clientNameFor(currentJob)}'s recurring plan on hold?`)) return;
+				try {
+					const res = await fetch("/api/admin/subscriptions/toggle-hold", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ hold: true, clientEmail: currentJob.clientEmail }),
+					});
+					const data = await res.json();
+					if (!res.ok) throw new Error(data.error || "Something went wrong.");
+					closeDetails();
+					await loadCurrentPeriod();
+				} catch (err) {
+					detailsMessage.hidden = false;
+					detailsMessage.textContent = err.message;
+					detailsMessage.classList.add("admin-result-message--error");
+				}
+			});
+
+			popupEditBtn.addEventListener("click", () => {
+				if (!currentJob) return;
+				openEdit(currentJob);
+			});
+			popupDetailsBtn.addEventListener("click", () => {
+				if (!currentJob) return;
+				openDetails(currentJob);
+			});
+
+			// --- Day view: hour-ruler grid, one column per cleaner -----------------
+
+			function hourLabel(h) {
+				const hour24 = ((h % 24) + 24) % 24;
+				const period = hour24 < 12 ? "AM" : "PM";
+				let hour12 = hour24 % 12;
+				if (hour12 === 0) hour12 = 12;
+				return `${hour12} ${period}`;
+			}
+
+			function dayBlock(job, gridStartHour) {
+				const startMin = minutesSinceMidnightPT(job.start);
+				const endMin = Math.max(minutesSinceMidnightPT(job.end), startMin + 20);
+				const top = (startMin - gridStartHour * 60) * (HOUR_HEIGHT / 60);
+				const height = Math.max((endMin - startMin) * (HOUR_HEIGHT / 60), 24);
+
+				const assignedIds = job.assignedCleanerIds || [];
+				const block = document.createElement("button");
+				block.type = "button";
+				block.className = "admin-daygrid__block" + (assignedIds.length === 0 ? " admin-daygrid__block--unassigned" : "");
+				block.style.top = `${top}px`;
+				block.style.height = `${height}px`;
+				block.innerHTML = `
+					<span class="admin-daygrid__block-time">${fmtTime(job.start)}</span>
+					<span class="admin-daygrid__block-title">${escapeHtml(job.summary)}</span>
+					${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
+				`;
+				block.addEventListener("click", () => openPopup(job));
+				return block;
+			}
+
+			function buildDayGrid(jobs) {
+				dayGrid.innerHTML = "";
+
+				let startHour = WORKING_HOURS_START;
+				let endHour = WORKING_HOURS_END;
+				jobs.forEach((job) => {
+					const s = minutesSinceMidnightPT(job.start) / 60;
+					const e = minutesSinceMidnightPT(job.end) / 60;
+					startHour = Math.min(startHour, Math.floor(s));
+					endHour = Math.max(endHour, Math.ceil(e));
+				});
+				const totalHours = Math.max(1, endHour - startHour);
+				const gridHeight = totalHours * HOUR_HEIGHT;
+
+				const dayCleaners = cleaners.filter(
+					(c) => c.active || jobs.some((j) => (j.assignedCleanerIds || []).includes(c.id)),
+				);
+				const columns = [{ id: "", name: "Unassigned" }, ...dayCleaners.map((c) => ({ id: c.id, name: c.name }))];
+
+				const inner = document.createElement("div");
+				inner.className = "admin-daygrid__inner";
+
+				const header = document.createElement("div");
+				header.className = "admin-daygrid__headers";
+				header.innerHTML =
+					`<div class="admin-daygrid__gutter-cell"></div>` +
+					columns
+						.map(
+							(col) => `
+						<div class="admin-daygrid__col-header${col.id ? "" : " admin-daygrid__col-header--unassigned"}">
+							${escapeHtml(col.name)}
+						</div>
+					`,
+						)
+						.join("");
+				inner.appendChild(header);
+
+				const body = document.createElement("div");
+				body.className = "admin-daygrid__body";
+				body.style.height = `${gridHeight}px`;
+
+				const gutter = document.createElement("div");
+				gutter.className = "admin-daygrid__gutter";
+				for (let h = startHour; h <= endHour; h++) {
+					const label = document.createElement("div");
+					label.className = "admin-daygrid__hour-label";
+					label.style.top = `${(h - startHour) * HOUR_HEIGHT}px`;
+					label.textContent = hourLabel(h);
+					gutter.appendChild(label);
+				}
+				body.appendChild(gutter);
+
+				columns.forEach((col) => {
+					const colEl = document.createElement("div");
+					colEl.className = "admin-daygrid__col";
+
+					for (let h = startHour; h <= endHour; h++) {
+						const line = document.createElement("div");
+						line.className = "admin-daygrid__gridline";
+						line.style.top = `${(h - startHour) * HOUR_HEIGHT}px`;
+						colEl.appendChild(line);
+					}
+
+					const colJobs = jobs.filter((j) => {
+						const ids = j.assignedCleanerIds || [];
+						return col.id ? ids.includes(col.id) : ids.length === 0;
+					});
+					colJobs.forEach((job) => colEl.appendChild(dayBlock(job, startHour)));
+
+					body.appendChild(colEl);
+				});
+
+				inner.appendChild(body);
+
+				if (!jobs.length) {
+					const empty = document.createElement("p");
+					empty.className = "admin-status admin-daygrid__empty";
+					empty.textContent = "No visits scheduled this day.";
+					dayGrid.appendChild(empty);
+				}
+				dayGrid.appendChild(inner);
+			}
+
+			// --- Week view (7-column board, chips open the popup) ------------------
+
+			function formatWeekRange(weekStart) {
+				const start = localDate(weekStart).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+				const end = localDate(addDays(weekStart, 6)).toLocaleDateString("en-US", {
+					month: "short",
+					day: "numeric",
+					year: "numeric",
+				});
+				return `${start} – ${end}`;
+			}
+
+			function jobChip(job) {
+				const chip = document.createElement("button");
+				chip.type = "button";
+				const assignedIds = job.assignedCleanerIds || [];
+				const isUnassigned = assignedIds.length === 0;
+				chip.className = "admin-chip" + (isUnassigned ? " admin-chip--unassigned" : "");
+				const names = cleanerNamesFor(assignedIds);
+				chip.innerHTML = `
+					<span class="admin-chip__time">${fmtTime(job.start)}</span>
+					<span class="admin-chip__summary">${escapeHtml(job.summary)}</span>
+					<span class="admin-chip__cleaners${names.length ? "" : " admin-chip__cleaners--empty"}">
+						${names.length ? escapeHtml(names.join(", ")) : "Needs cleaner"}
+					</span>
+					<span class="admin-chip__footer">
+						<span class="admin-badge admin-badge--${job.status}">${STATUS_LABELS[job.status] || job.status}</span>
+						${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
+					</span>
+				`;
+				chip.addEventListener("click", () => openPopup(job));
+				return chip;
+			}
+
+			function weekColumn(dateStr, jobs, isToday) {
+				const col = document.createElement("div");
+				col.className = "admin-week-col" + (isToday ? " is-today" : "");
+				const date = localDate(dateStr);
+				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
+
+				col.innerHTML = `
+					<button type="button" class="admin-week-col__header" data-date="${dateStr}">
+						<span class="admin-week-col__day">${date.toLocaleDateString("en-US", { weekday: "short" })}</span>
+						<span class="admin-week-col__date">${date.getDate()}</span>
+						${unassignedCount ? `<span class="admin-week-col__badge">${unassignedCount}</span>` : ""}
+					</button>
+					<div class="admin-week-col__jobs"></div>
+				`;
+
+				col.querySelector(".admin-week-col__header").addEventListener("click", () => jumpToDay(dateStr));
+
+				const jobsEl = col.querySelector(".admin-week-col__jobs");
+				if (!jobs.length) {
+					jobsEl.innerHTML = `<p class="admin-week-empty">No visits</p>`;
+				} else {
+					jobs.forEach((job) => jobsEl.appendChild(jobChip(job)));
+				}
+				return col;
+			}
+
+			function renderWeekBoard(jobs) {
+				weekBoard.innerHTML = "";
+				const weekStart = startOfWeek(dayPicker.value);
+				const byDate = groupByDate(jobs);
+				const today = todayLocalIso();
+				for (let i = 0; i < 7; i++) {
+					const dateStr = addDays(weekStart, i);
+					weekBoard.appendChild(weekColumn(dateStr, byDate.get(dateStr) || [], dateStr === today));
+				}
+			}
+
+			// --- Month view (calendar grid, chips open the popup) ------------------
+
+			function monthCell(dateStr, dayNum, jobs, isToday) {
+				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
+				const cell = document.createElement("div");
+				cell.className = "admin-month-day" + (isToday ? " is-today" : "") + (unassignedCount ? " has-unassigned" : "");
+
+				cell.innerHTML = `
+					<button type="button" class="admin-month-day__header" data-date="${dateStr}">
+						<span class="admin-month-day__num">${dayNum}</span>
+						${jobs.length ? `<span class="admin-month-day__count">${jobs.length} visit${jobs.length === 1 ? "" : "s"}</span>` : ""}
+					</button>
+					<div class="admin-month-day__chips"></div>
+				`;
+
+				cell.querySelector(".admin-month-day__header").addEventListener("click", () => jumpToDay(dateStr));
+
+				const chipsEl = cell.querySelector(".admin-month-day__chips");
+				jobs.forEach((job) => {
+					const assignedIds = job.assignedCleanerIds || [];
+					const mini = document.createElement("button");
+					mini.type = "button";
+					mini.className = "admin-month-chip" + (assignedIds.length === 0 ? " admin-month-chip--unassigned" : "");
+					mini.innerHTML = `<span class="admin-month-chip__dot"></span>${escapeHtml(job.summary)}`;
+					mini.addEventListener("click", (e) => {
+						e.stopPropagation();
+						openPopup(job);
+					});
+					chipsEl.appendChild(mini);
+				});
+
+				return cell;
+			}
+
+			function renderMonthGrid(jobs) {
+				monthGrid.innerHTML = "";
+				const monthStart = startOfMonth(dayPicker.value);
+				const totalDays = daysInMonthCount(monthStart);
+				const byDate = groupByDate(jobs);
+				const today = todayLocalIso();
+				const firstDow = localDate(monthStart).getDay();
+				for (let i = 0; i < firstDow; i++) {
+					const pad = document.createElement("span");
+					pad.className = "admin-month-pad";
+					monthGrid.appendChild(pad);
+				}
+				for (let d = 1; d <= totalDays; d++) {
+					const dateStr = `${monthStart.slice(0, 8)}${String(d).padStart(2, "0")}`;
+					monthGrid.appendChild(monthCell(dateStr, d, byDate.get(dateStr) || [], dateStr === today));
+				}
+			}
+
+			// --- View switching / shared date nav / period loading ------------------
+
+			function setViewMode(mode) {
+				viewMode = mode;
+				viewButtons.forEach((b) => b.classList.toggle("is-active", b.dataset.view === mode));
+				dayViewEl.hidden = mode !== "day";
+				weekViewEl.hidden = mode !== "week";
+				monthViewEl.hidden = mode !== "month";
+			}
+
+			function jumpToDay(dateStr) {
+				dayPicker.value = dateStr;
+				setViewMode("day");
+				loadCurrentPeriod();
+			}
+
+			viewButtons.forEach((btn) => {
+				btn.addEventListener("click", () => {
+					if (btn.dataset.view === viewMode) return;
+					setViewMode(btn.dataset.view);
+					loadCurrentPeriod();
+				});
+			});
+
+			function updatePeriodLabel() {
+				if (viewMode === "day") {
+					periodLabel.textContent = localDate(dayPicker.value).toLocaleDateString("en-US", {
+						weekday: "long",
+						month: "long",
+						day: "numeric",
+						year: "numeric",
+					});
+				} else if (viewMode === "week") {
+					periodLabel.textContent = formatWeekRange(startOfWeek(dayPicker.value));
+				} else {
+					periodLabel.textContent = localDate(startOfMonth(dayPicker.value)).toLocaleDateString("en-US", {
+						month: "long",
+						year: "numeric",
+					});
+				}
+			}
+
+			async function loadCurrentPeriod() {
+				loadStatus.hidden = false;
+				loadStatus.textContent = "Loading…";
+				loadStatus.classList.remove("admin-status--error");
+				updatePeriodLabel();
+
+				let date = dayPicker.value;
+				let days = 1;
+				if (viewMode === "week") {
+					date = startOfWeek(dayPicker.value);
+					days = 7;
+				} else if (viewMode === "month") {
+					date = startOfMonth(dayPicker.value);
+					days = daysInMonthCount(date);
+				}
+
+				try {
+					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${date}&days=${days}`);
+					const data = await res.json();
+					if (!res.ok) {
+						loadStatus.textContent = data.error || "Couldn't load the schedule.";
+						loadStatus.classList.add("admin-status--error");
+						return;
+					}
+					loadStatus.hidden = true;
+					allJobsRaw = data.jobs || [];
+					renderCurrentView();
+				} catch {
+					loadStatus.textContent = "Network error, please try again.";
+					loadStatus.classList.add("admin-status--error");
+				}
+			}
+
+			prevPeriodBtn.addEventListener("click", () => {
+				if (viewMode === "day") dayPicker.value = addDays(dayPicker.value, -1);
+				else if (viewMode === "week") dayPicker.value = addDays(dayPicker.value, -7);
+				else dayPicker.value = addMonths(dayPicker.value, -1);
+				loadCurrentPeriod();
+			});
+			nextPeriodBtn.addEventListener("click", () => {
+				if (viewMode === "day") dayPicker.value = addDays(dayPicker.value, 1);
+				else if (viewMode === "week") dayPicker.value = addDays(dayPicker.value, 7);
+				else dayPicker.value = addMonths(dayPicker.value, 1);
+				loadCurrentPeriod();
+			});
+			todayBtn.addEventListener("click", () => {
+				dayPicker.value = todayLocalIso();
+				loadCurrentPeriod();
+			});
+
+			dayPicker.value = todayLocalIso();
+			loadCleaners().then(loadCurrentPeriod);
+		</script>
+
+		<style is:global>
+			/* is:global — this page builds nearly all of its visual structure via
+			   document.createElement/innerHTML, which Astro's scoped-CSS
+			   attribute-tagging never reaches. Same reasoning as jobs.astro,
+			   whose Day/Week/Month styles below are carried over verbatim. */
+			.admin-container {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding-block: 3rem;
+			}
+
+			.admin-hint {
+				color: var(--color-slate);
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-hint--tight {
+				margin: 0 0 1rem;
+				font-size: 0.85rem;
+			}
+
+			.admin-status {
+				margin-bottom: 1rem;
+			}
+
+			.admin-status--error {
+				color: #b3261e;
+			}
+
+			.admin-add-card {
+				margin-bottom: 1.5rem;
+				padding: 1.25rem 1.5rem;
+			}
+
+			.admin-add-summary {
+				cursor: pointer;
+				font-weight: 600;
+				color: var(--color-ink);
+			}
+
+			.admin-cleaner-row {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 1rem;
+				padding: 0.5rem 0;
+				border-bottom: 1px solid var(--color-border);
+				font-size: 0.9rem;
+			}
+
+			.admin-inline-form {
+				display: flex;
+				align-items: flex-end;
+				gap: 1rem;
+				flex-wrap: wrap;
+				margin-top: 1rem;
+			}
+
+			.admin-form__row {
+				display: flex;
+				flex-direction: column;
+				gap: 0.35rem;
+			}
+
+			.admin-form__row label {
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-form__row input,
+			.admin-form__row select,
+			.admin-form__row textarea {
+				padding: 0.6rem 0.75rem;
+				border: 1px solid var(--color-border);
+				border-radius: 8px;
+				font-size: 0.95rem;
+				font-family: inherit;
+				resize: vertical;
+			}
+
+			.admin-form__grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 1rem;
+				margin-bottom: 0.5rem;
+			}
+
+			@media (max-width: 640px) {
+				.admin-form__grid {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			/* --- Schedule toolbar --------------------------------------------- */
+
+			.admin-schedule-toolbar {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.75rem;
+				margin-bottom: 1.5rem;
+			}
+
+			.admin-schedule-toolbar__nav {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+			}
+
+			.admin-day-picker-hidden {
+				display: none;
+			}
+
+			.admin-period-label {
+				font-family: var(--font-heading);
+				font-weight: 600;
+				color: var(--color-ink);
+				margin-left: 0.5rem;
+				white-space: nowrap;
+			}
+
+			.admin-schedule-toolbar__filters {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+			}
+
+			.admin-filter-popover {
+				position: relative;
+			}
+
+			.admin-filter-btn {
+				padding: 0.4rem 0.9rem;
+				border-radius: 999px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				font-size: 0.82rem;
+				font-weight: 600;
+				color: var(--color-ink);
+				cursor: pointer;
+				white-space: nowrap;
+			}
+
+			.admin-filter-popover__menu {
+				position: absolute;
+				top: calc(100% + 4px);
+				left: 0;
+				z-index: 30;
+				background: var(--color-white);
+				border: 1px solid var(--color-border);
+				border-radius: 10px;
+				padding: 0.5rem;
+				min-width: 200px;
+				box-shadow: 0 8px 24px rgba(28, 43, 69, 0.12);
+			}
+
+			.admin-filter-popover__option {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				padding: 0.35rem 0.4rem;
+				font-size: 0.88rem;
+				color: var(--color-ink);
+				cursor: pointer;
+				border-radius: 6px;
+			}
+
+			.admin-filter-popover__option:hover {
+				background: var(--color-sky-light);
+			}
+
+			.admin-filter-popover__option input {
+				width: auto;
+			}
+
+			.admin-filter-popover__menu--actions {
+				display: flex;
+				flex-direction: column;
+				gap: 0.15rem;
+			}
+
+			.admin-menu-item {
+				display: block;
+				width: 100%;
+				text-align: left;
+				padding: 0.5rem 0.6rem;
+				border: none;
+				background: none;
+				border-radius: 6px;
+				font-size: 0.88rem;
+				font-family: inherit;
+				color: var(--color-ink);
+				cursor: pointer;
+			}
+
+			.admin-menu-item:hover {
+				background: var(--color-sky-light);
+			}
+
+			.admin-view-switcher {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 0.5rem;
+			}
+
+			.admin-view-btn {
+				padding: 0.4rem 1rem;
+				border-radius: 999px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				font-size: 0.85rem;
+				font-weight: 600;
+				color: var(--color-slate);
+				cursor: pointer;
+			}
+
+			.admin-view-btn.is-active {
+				background: var(--color-ink);
+				border-color: var(--color-ink);
+				color: var(--color-white);
+			}
+
+			.admin-badge {
+				display: inline-block;
+				padding: 0.2rem 0.6rem;
+				border-radius: 999px;
+				font-size: 0.8rem;
+				font-weight: 600;
+				white-space: nowrap;
+			}
+
+			.admin-badge--unassigned {
+				background: var(--color-sky-light);
+				color: var(--color-ink);
+			}
+
+			.admin-badge--assigned {
+				background: #eaf1fb;
+				color: #1a5fb4;
+			}
+
+			.admin-badge--en_route {
+				background: #fdf0dc;
+				color: #a4640a;
+			}
+
+			.admin-badge--in_progress {
+				background: #fdf0dc;
+				color: #a4640a;
+			}
+
+			.admin-badge--completed {
+				background: #e3f3e6;
+				color: #1e7a34;
+			}
+
+			.admin-confirmed-check {
+				display: inline-block;
+				font-size: 0.78rem;
+				font-weight: 700;
+				color: #1e7a34;
+				white-space: nowrap;
+			}
+
+			.admin-result-message {
+				margin-top: 0.75rem;
+				font-weight: 600;
+				color: #1e7a34;
+				font-size: 0.9rem;
+			}
+
+			.admin-result-message--error {
+				color: #b3261e;
+			}
+
+			/* --- Week board --------------------------------------------------- */
+
+			.admin-week-board {
+				display: grid;
+				grid-template-columns: repeat(7, minmax(160px, 1fr));
+				gap: 0.75rem;
+				overflow-x: auto;
+				padding-bottom: 0.5rem;
+			}
+
+			.admin-week-col {
+				background: var(--color-white);
+				border: 1px solid var(--color-border);
+				border-radius: var(--radius);
+				padding: 0.75rem;
+				min-height: 120px;
+			}
+
+			.admin-week-col.is-today {
+				border-color: var(--color-sky);
+				box-shadow: 0 0 0 1px var(--color-sky);
+			}
+
+			.admin-week-col__header {
+				display: flex;
+				align-items: baseline;
+				gap: 0.4rem;
+				width: 100%;
+				margin-bottom: 0.6rem;
+				padding: 0 0 0.5rem;
+				border: none;
+				border-bottom: 1px solid var(--color-border);
+				background: none;
+				cursor: pointer;
+				font-family: inherit;
+			}
+
+			.admin-week-col__day {
+				font-size: 0.72rem;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--color-slate-light);
+				font-weight: 600;
+			}
+
+			.admin-week-col__date {
+				font-family: var(--font-heading);
+				font-weight: 700;
+				color: var(--color-ink);
+			}
+
+			.admin-week-col__badge {
+				margin-left: auto;
+				background: #fdeceb;
+				color: #b3261e;
+				border-radius: 999px;
+				padding: 0.05rem 0.5rem;
+				font-size: 0.72rem;
+				font-weight: 700;
+			}
+
+			.admin-week-col__jobs {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+
+			.admin-week-empty {
+				margin: 0;
+				font-size: 0.8rem;
+				color: var(--color-slate-light);
+			}
+
+			/* --- Month grid ----------------------------------------------------- */
+
+			.admin-month-weekdays {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				margin-bottom: 0.4rem;
+			}
+
+			.admin-month-weekdays span {
+				text-align: center;
+				font-size: 0.75rem;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.03em;
+				color: var(--color-slate-light);
+			}
+
+			.admin-month-grid {
+				display: grid;
+				grid-template-columns: repeat(7, 1fr);
+				gap: 0.4rem;
+			}
+
+			.admin-month-pad {
+				display: block;
+			}
+
+			.admin-month-day {
+				display: flex;
+				flex-direction: column;
+				gap: 0.3rem;
+				min-height: 90px;
+				padding: 0.4rem;
+				border-radius: 10px;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+			}
+
+			.admin-month-day.is-today {
+				border-color: var(--color-sky);
+				box-shadow: 0 0 0 1px var(--color-sky);
+			}
+
+			.admin-month-day.has-unassigned {
+				background: #fdeceb;
+			}
+
+			.admin-month-day__header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.3rem;
+				border: none;
+				background: none;
+				padding: 0;
+				cursor: pointer;
+				font-family: inherit;
+			}
+
+			.admin-month-day__num {
+				font-family: var(--font-heading);
+				font-weight: 700;
+				color: var(--color-ink);
+				font-size: 0.9rem;
+			}
+
+			.admin-month-day__count {
+				font-size: 0.65rem;
+				font-weight: 600;
+				color: var(--color-slate-light);
+				background: var(--color-sky-light);
+				border-radius: 999px;
+				padding: 0.05rem 0.4rem;
+				white-space: nowrap;
+			}
+
+			.admin-month-day__chips {
+				display: flex;
+				flex-direction: column;
+				gap: 0.2rem;
+			}
+
+			.admin-month-chip {
+				display: flex;
+				align-items: center;
+				gap: 0.3rem;
+				width: 100%;
+				text-align: left;
+				border: none;
+				border-radius: 6px;
+				background: #eaf1fb;
+				color: #1a3a5c;
+				padding: 0.15rem 0.35rem;
+				font-size: 0.7rem;
+				font-family: inherit;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+				cursor: pointer;
+			}
+
+			.admin-month-chip__dot {
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: #1a5fb4;
+				flex-shrink: 0;
+			}
+
+			.admin-month-chip--unassigned {
+				background: #fdeceb;
+				color: #7a1a15;
+			}
+
+			.admin-month-chip--unassigned .admin-month-chip__dot {
+				background: #b3261e;
+			}
+
+			/* --- Day view: hour grid, one column per cleaner --------------------- */
+
+			.admin-daygrid {
+				border: 1px solid var(--color-border);
+				border-radius: var(--radius);
+				overflow-x: auto;
+				background: var(--color-white);
+			}
+
+			.admin-daygrid__empty {
+				margin: 1rem 1.25rem 0;
+			}
+
+			.admin-daygrid__inner {
+				min-width: fit-content;
+			}
+
+			.admin-daygrid__headers,
+			.admin-daygrid__body {
+				display: flex;
+			}
+
+			.admin-daygrid__gutter-cell,
+			.admin-daygrid__gutter {
+				width: 64px;
+				flex-shrink: 0;
+			}
+
+			.admin-daygrid__headers {
+				border-bottom: 1px solid var(--color-border);
+				position: sticky;
+				top: 0;
+				background: var(--color-white);
+				z-index: 2;
+			}
+
+			.admin-daygrid__col-header {
+				flex: 1 0 170px;
+				padding: 0.6rem 0.75rem;
+				border-left: 1px solid var(--color-border);
+				font-family: var(--font-heading);
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-daygrid__col-header--unassigned {
+				color: #b3261e;
+			}
+
+			.admin-daygrid__gutter {
+				position: relative;
+			}
+
+			.admin-daygrid__hour-label {
+				position: absolute;
+				right: 8px;
+				top: 4px;
+				font-size: 0.7rem;
+				color: var(--color-slate-light);
+				white-space: nowrap;
+			}
+
+			.admin-daygrid__col {
+				position: relative;
+				flex: 1 0 170px;
+				border-left: 1px solid var(--color-border);
+			}
+
+			.admin-daygrid__gridline {
+				position: absolute;
+				left: 0;
+				right: 0;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.admin-daygrid__block {
+				position: absolute;
+				left: 4px;
+				right: 4px;
+				display: flex;
+				flex-direction: column;
+				gap: 0.1rem;
+				border-radius: 6px;
+				background: #eaf1fb;
+				border: 1px solid #1a5fb4;
+				color: #1a3a5c;
+				text-align: left;
+				padding: 0.25rem 0.4rem;
+				overflow: hidden;
+				cursor: pointer;
+				font-family: inherit;
+			}
+
+			.admin-daygrid__block:hover {
+				filter: brightness(0.97);
+			}
+
+			.admin-daygrid__block--unassigned {
+				background: #fdeceb;
+				border-color: #b3261e;
+				color: #7a1a15;
+			}
+
+			.admin-daygrid__block-time {
+				font-size: 0.68rem;
+				font-weight: 700;
+			}
+
+			.admin-daygrid__block-title {
+				font-size: 0.75rem;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+
+			/* --- Shared modal shell ------------------------------------------------ */
+
+			.admin-modal-backdrop {
+				position: fixed;
+				inset: 0;
+				z-index: 80;
+				background: rgba(28, 43, 69, 0.45);
+				display: flex;
+				align-items: flex-start;
+				justify-content: center;
+				padding: 4rem 1.5rem;
+				overflow-y: auto;
+			}
+
+			.admin-modal-backdrop[hidden] {
+				display: none;
+			}
+
+			.admin-modal {
+				width: 100%;
+				max-width: 480px;
+				padding: 1.5rem;
+			}
+
+			.admin-modal__header {
+				display: flex;
+				align-items: flex-start;
+				justify-content: space-between;
+				gap: 1rem;
+				margin-bottom: 1rem;
+				padding-bottom: 1rem;
+				border-bottom: 1px solid var(--color-border);
+			}
+
+			.admin-modal__header h3 {
+				margin: 0 0 0.3rem;
+			}
+
+			.admin-modal__close {
+				flex-shrink: 0;
+				width: 32px;
+				height: 32px;
+				border-radius: 50%;
+				border: 1px solid var(--color-border);
+				background: var(--color-white);
+				color: var(--color-slate);
+				cursor: pointer;
+				font-size: 0.9rem;
+			}
+
+			.admin-modal__close:hover {
+				border-color: var(--color-sky);
+				color: var(--color-sky-dark);
+			}
+
+			.admin-modal__body {
+				display: flex;
+				flex-direction: column;
+				gap: 1rem;
+			}
+
+			.admin-confirm-label {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+				cursor: pointer;
+			}
+
+			.admin-confirm-label input {
+				width: auto;
+			}
+
+			/* --- Visit Popup (tier 1) ---------------------------------------------- */
+
+			.admin-visit-popup__completed {
+				margin-bottom: 0.75rem;
+				padding-bottom: 0.75rem;
+				border-bottom: 1px solid var(--color-border);
+			}
+
+			.admin-visit-popup__row {
+				display: flex;
+				gap: 0.75rem;
+				font-size: 0.9rem;
+				padding: 0.3rem 0;
+			}
+
+			.admin-visit-popup__label {
+				flex: 0 0 90px;
+				font-weight: 600;
+				color: var(--color-slate);
+			}
+
+			.admin-visit-popup__actions {
+				display: flex;
+				gap: 0.5rem;
+				margin-top: 1rem;
+			}
+
+			.admin-visit-popup__actions--top {
+				margin-top: 0;
+				margin-bottom: 1.25rem;
+			}
+
+			/* --- Edit Visit (tier 2a) ----------------------------------------------- */
+
+			.admin-edit-title {
+				margin: 0;
+				font-weight: 600;
+				color: var(--color-ink);
+			}
+
+			.admin-edit-jobdetails {
+				background: var(--color-sky-light);
+				border-radius: 8px;
+				padding: 0.75rem 1rem;
+			}
+
+			.admin-edit-jobdetails__title {
+				margin: 0 0 0.5rem;
+				font-weight: 600;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-edit-jobdetails__grid {
+				display: grid;
+				grid-template-columns: auto 1fr;
+				gap: 0.25rem 0.75rem;
+				font-size: 0.88rem;
+			}
+
+			.admin-edit-jobdetails__grid span:nth-child(odd) {
+				color: var(--color-slate);
+				font-weight: 600;
+			}
+
+			.admin-edit-section-title {
+				margin: 0.25rem 0 0;
+				font-weight: 700;
+				font-size: 0.85rem;
+				color: var(--color-ink);
+			}
+
+			.admin-edit-footer {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 0.75rem;
+				margin-top: 1.25rem;
+				padding-top: 1rem;
+				border-top: 1px solid var(--color-border);
+			}
+
+			.admin-edit-footer__right {
+				display: flex;
+				gap: 0.5rem;
+			}
+
+			.admin-btn--danger {
+				color: #b3261e;
+				border-color: #f3c8c5;
+			}
+
+			.admin-btn--danger:disabled {
+				opacity: 0.5;
+				cursor: not-allowed;
+			}
+
+			/* --- Visit Details (tier 2b) --------------------------------------------- */
+
+			.admin-tabs {
+				display: flex;
+				gap: 1.25rem;
+				border-bottom: 1px solid var(--color-border);
+				margin-bottom: 1rem;
+			}
+
+			.admin-tab {
+				padding: 0.5rem 0;
+				border: none;
+				background: none;
+				font-family: inherit;
+				font-weight: 600;
+				font-size: 0.88rem;
+				color: var(--color-slate);
+				cursor: pointer;
+				border-bottom: 2px solid transparent;
+			}
+
+			.admin-tab.is-active {
+				color: var(--color-ink);
+				border-bottom-color: var(--color-sky-dark);
+			}
+
+			.admin-tab-panel {
+				margin-bottom: 1rem;
+			}
+
+			.admin-tab-panel textarea {
+				width: 100%;
+				padding: 0.6rem 0.75rem;
+				border: 1px solid var(--color-border);
+				border-radius: 8px;
+				font-size: 0.9rem;
+				font-family: inherit;
+				resize: vertical;
+			}
+
+			@media (max-width: 900px) {
+				.admin-week-board {
+					grid-template-columns: repeat(7, minmax(150px, 1fr));
+				}
+			}
+		</style>
+</AdminLayout>

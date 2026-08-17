@@ -5,32 +5,24 @@
 // AGENTS.md → "Jobs (formerly Dispatcher)" and src/lib/dispatch.js for why
 // it's built this way instead of a duplicated `jobs` collection.
 //
-// Formerly two ideas that got consolidated into one page after the business
-// owner shared reference screenshots of Jobber's own Jobs list and asked
-// for it, noting that if something similar already existed it should just
-// become "Jobs" rather than adding a second nav item: this used to be
-// /admin/dispatch (Day/Week/Month calendar only). List is now the default
-// view — a flat, filterable/searchable table with overview stats, closest
-// to what Jobber's screenshots showed — with Day/Week/Month still available
-// as other tabs for actual day-to-day cleaner assignment. All four share the
-// same job-detail modal to edit a job.
+// List-only now — Day/Week/Month moved to the separate /admin/schedule page
+// (see AGENTS.md → "Schedule (split from Jobs)") after the business owner
+// asked for Jobber's own Schedule/Jobs split, rather than one page trying to
+// be both. This page keeps the flat, filterable/searchable table with
+// Jobber-style Overview/Status filtering (Late/Requires Invoicing/Action
+// Required/Unscheduled/Archived, etc. — see the big comment block in the
+// List view section below) and its own job-detail modal (team/status/notes/
+// archive/hold) — day-to-day calendar assignment now happens on Schedule,
+// which has a different, three-tier click-to-edit pattern of its own.
 //
 // Deliberate departures from Jobber's exact layout, worth knowing about
 // rather than discovering by their absence:
-// - No "Job number" column — this app has no sequential per-job id, only a
-//   composite eventId+visitDate key (see dispatch.js's comment on jobKey()).
-// - No "Requires Invoicing" status — billing here is automatic via Stripe
-//   Checkout/subscriptions, there's no manual invoicing step to require.
-// - No "On Hold" / "Archived" states — a job here is either on the calendar
-//   (real) or it isn't; nothing is paused or archived independently of that.
-// - "Ending within 30 days" isn't shown — would require cross-referencing
-//   Stripe subscription cancel_at dates into this list, which /admin/reschedule
-//   and /admin/minimum-commitments already surface; not duplicated here.
+// - No "Job number" column removed — this app DOES have one (`jobNumber`,
+//   from `getNextJobNumber()` in dispatch.js), shown as its own column.
 // - Status/Job Type filters are plain <select> dropdowns, not Jobber's
-//   checkbox-multiselect popovers — same filtering outcome, simpler control.
-// - No drag-and-drop reassignment, and Day view doesn't lay overlapping jobs
-//   on the same cleaner side-by-side (rare for a small crew) — both scope
-//   cuts carried over unchanged from the original Dispatch redesign.
+//   checkbox-multiselect popovers — /admin/schedule got the popover
+//   treatment instead, since its Type/Team/Status filters needed to combine
+//   (AND) rather than this page's single-value Status dropdown.
 export const prerender = false;
 
 import AdminLayout from "../../layouts/AdminLayout.astro";
@@ -47,46 +39,11 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 			>
 				<h1>Jobs</h1>
 				<p class="admin-hint">
-					Every real job on the calendar, with who's assigned, their status, and whether the
-					cleaner has confirmed. This reads directly from Google Calendar, not a separate copy —
-					reschedules, cancellations, and new bookings show up here automatically.
+					Every real job on the calendar, with billing totals and the statuses that need your
+					attention. This reads directly from Google Calendar, not a separate copy — reschedules,
+					cancellations, and new bookings show up here automatically. For the day-to-day calendar
+					and cleaner assignment, see <a href="/admin/schedule">Schedule</a>.
 				</p>
-
-				<details class="card admin-add-card">
-					<summary class="admin-add-summary">Manage cleaners</summary>
-					<div id="cleaners-list"></div>
-					<form id="add-cleaner-form" class="admin-form admin-inline-form">
-						<div class="admin-form__row">
-							<label for="add-cleaner-name">Name *</label>
-							<input type="text" id="add-cleaner-name" name="name" required />
-						</div>
-						<div class="admin-form__row">
-							<label for="add-cleaner-phone">Phone</label>
-							<input type="tel" id="add-cleaner-phone" name="phone" />
-						</div>
-						<div class="admin-form__row">
-							<label for="add-cleaner-email">Email</label>
-							<input type="email" id="add-cleaner-email" name="email" />
-						</div>
-						<button type="submit" class="btn btn--outline">Add Cleaner</button>
-					</form>
-					<p class="admin-result-message" id="cleaner-message" hidden></p>
-				</details>
-
-				<div class="admin-view-switcher" role="group" aria-label="View">
-					<button type="button" class="admin-view-btn is-active" data-view="list">List</button>
-					<button type="button" class="admin-view-btn" data-view="day">Day</button>
-					<button type="button" class="admin-view-btn" data-view="week">Week</button>
-					<button type="button" class="admin-view-btn" data-view="month">Month</button>
-				</div>
-
-				<div id="period-nav" class="admin-day-nav" hidden>
-					<button type="button" id="prev-period" class="btn btn--outline">← Previous</button>
-					<input type="date" id="day-picker" />
-					<span id="period-label" class="admin-period-label" hidden></span>
-					<button type="button" id="next-period" class="btn btn--outline">Next →</button>
-					<button type="button" id="today-btn" class="btn btn--outline">Today</button>
-				</div>
 
 				<p id="load-status" class="admin-status">Loading…</p>
 
@@ -197,21 +154,6 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 						</table>
 					</div>
 				</div>
-
-				<div id="day-view" class="admin-day-view" hidden>
-					<div id="day-grid" class="admin-daygrid"></div>
-				</div>
-
-				<div id="week-view" class="admin-week-view" hidden>
-					<div id="week-board" class="admin-week-board"></div>
-				</div>
-
-				<div id="month-view" class="admin-month-view" hidden>
-					<div class="admin-month-weekdays">
-						<span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
-					</div>
-					<div id="month-grid" class="admin-month-grid"></div>
-				</div>
 			</div>
 
 			<div class="admin-modal-backdrop" id="job-modal-backdrop" hidden>
@@ -260,24 +202,7 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 			const WORKING_HOURS_START = Number(root?.dataset.workingHoursStart) || 8;
 			const WORKING_HOURS_END = Number(root?.dataset.workingHoursEnd) || 18;
 
-			const periodNavEl = document.getElementById("period-nav");
-			const dayPicker = document.getElementById("day-picker");
-			const prevPeriodBtn = document.getElementById("prev-period");
-			const nextPeriodBtn = document.getElementById("next-period");
-			const todayBtn = document.getElementById("today-btn");
-			const periodLabel = document.getElementById("period-label");
 			const loadStatus = document.getElementById("load-status");
-			const cleanersList = document.getElementById("cleaners-list");
-			const addCleanerForm = document.getElementById("add-cleaner-form");
-			const cleanerMessage = document.getElementById("cleaner-message");
-			const viewButtons = Array.from(document.querySelectorAll(".admin-view-btn"));
-			const listViewEl = document.getElementById("list-view");
-			const dayViewEl = document.getElementById("day-view");
-			const weekViewEl = document.getElementById("week-view");
-			const monthViewEl = document.getElementById("month-view");
-			const dayGrid = document.getElementById("day-grid");
-			const weekBoard = document.getElementById("week-board");
-			const monthGrid = document.getElementById("month-grid");
 
 			// Human labels for a paused subscription's billing frequency, shown
 			// in the Action Required panel — same wording
@@ -294,10 +219,8 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				completed: "Completed",
 			};
 			const STATUS_ORDER = ["unassigned", "assigned", "en_route", "in_progress", "completed"];
-			const HOUR_HEIGHT = 56; // px per hour row in the Day view grid
 
 			let cleaners = [];
-			let viewMode = "list"; // "list" | "day" | "week" | "month"
 
 			function escapeHtml(str) {
 				const div = document.createElement("div");
@@ -454,82 +377,19 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				</div>`;
 			}
 
+			// Cleaner roster management (add/deactivate) moved to
+			// /admin/schedule — this page only needs the roster itself, to
+			// resolve assignedCleanerIds into names for the table and the
+			// job-detail modal's team picker.
 			async function loadCleaners() {
 				try {
 					const res = await fetch("/api/admin/dispatch/list-cleaners");
 					const data = await res.json();
 					if (res.ok) cleaners = data.cleaners || [];
-					renderCleanersList();
 				} catch {
 					// Non-fatal — assignment dropdowns/names just come up empty.
 				}
 			}
-
-			function renderCleanersList() {
-				if (!cleaners.length) {
-					cleanersList.innerHTML = `<p class="admin-card__meta">No cleaners added yet.</p>`;
-					return;
-				}
-				cleanersList.innerHTML = cleaners
-					.map(
-						(c) => `
-						<div class="admin-cleaner-row">
-							<span>${escapeHtml(c.name)}${c.phone ? " · " + escapeHtml(c.phone) : ""}${c.active ? "" : " (inactive)"}</span>
-							<button type="button" class="btn btn--outline admin-toggle-active" data-id="${c.id}" data-active="${c.active}">
-								${c.active ? "Mark inactive" : "Mark active"}
-							</button>
-						</div>
-					`,
-					)
-					.join("");
-
-				cleanersList.querySelectorAll(".admin-toggle-active").forEach((btn) => {
-					btn.addEventListener("click", async () => {
-						btn.disabled = true;
-						try {
-							await fetch("/api/admin/dispatch/update-cleaner", {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ id: btn.dataset.id, active: btn.dataset.active !== "true" }),
-							});
-							await loadCleaners();
-						} finally {
-							btn.disabled = false;
-						}
-					});
-				});
-			}
-
-			addCleanerForm.addEventListener("submit", async (e) => {
-				e.preventDefault();
-				const formData = new FormData(addCleanerForm);
-				const payload = Object.fromEntries(formData.entries());
-				const submitBtn = addCleanerForm.querySelector("button[type=submit]");
-				submitBtn.disabled = true;
-				cleanerMessage.hidden = true;
-				try {
-					const res = await fetch("/api/admin/dispatch/create-cleaner", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify(payload),
-					});
-					const data = await res.json();
-					if (!res.ok) {
-						cleanerMessage.hidden = false;
-						cleanerMessage.textContent = data.error || "Something went wrong.";
-						cleanerMessage.classList.add("admin-result-message--error");
-						return;
-					}
-					addCleanerForm.reset();
-					await loadCleaners();
-				} catch {
-					cleanerMessage.hidden = false;
-					cleanerMessage.textContent = "Network error, please try again.";
-					cleanerMessage.classList.add("admin-result-message--error");
-				} finally {
-					submitBtn.disabled = false;
-				}
-			});
 
 			function cleanerOptions(selectedIds) {
 				return cleaners
@@ -538,7 +398,7 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 					.join("");
 			}
 
-			// --- Shared job-detail modal (List/Month/Week/Day all open this) -------
+			// --- Job-detail modal ---------------------------------------------------
 
 			const modalBackdrop = document.getElementById("job-modal-backdrop");
 			const modalTitle = document.getElementById("job-modal-title");
@@ -599,10 +459,10 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 			function closeJobModal() {
 				modalBackdrop.hidden = true;
 				currentModalJob = null;
-				// Anything edited in the modal can change which view (and the
-				// sidebar's unassigned badge, next page load) is stale — simplest
-				// correct thing is to just reload whichever view is open.
-				loadCurrentView();
+				// Anything edited in the modal can change the sidebar's unassigned
+				// badge on next page load too, but the list itself just needs a
+				// fresh read.
+				loadListView();
 			}
 
 			modalClose.addEventListener("click", closeJobModal);
@@ -1157,365 +1017,7 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				});
 			});
 
-			// --- Day view: hour-ruler grid, one column per cleaner -----------------
-
-			function hourLabel(h) {
-				const hour24 = ((h % 24) + 24) % 24;
-				const period = hour24 < 12 ? "AM" : "PM";
-				let hour12 = hour24 % 12;
-				if (hour12 === 0) hour12 = 12;
-				return `${hour12} ${period}`;
-			}
-
-			function dayBlock(job, gridStartHour) {
-				const startMin = minutesSinceMidnightPT(job.start);
-				// Never render a sliver too short to read/click — visually widened,
-				// doesn't change the real scheduled time (shown in the label and,
-				// authoritatively, in the modal).
-				const endMin = Math.max(minutesSinceMidnightPT(job.end), startMin + 20);
-				const top = (startMin - gridStartHour * 60) * (HOUR_HEIGHT / 60);
-				const height = Math.max((endMin - startMin) * (HOUR_HEIGHT / 60), 24);
-
-				const assignedIds = job.assignedCleanerIds || [];
-				const block = document.createElement("button");
-				block.type = "button";
-				block.className = "admin-daygrid__block" + (assignedIds.length === 0 ? " admin-daygrid__block--unassigned" : "");
-				block.style.top = `${top}px`;
-				block.style.height = `${height}px`;
-				block.innerHTML = `
-					<span class="admin-daygrid__block-time">${fmtTime(job.start)}</span>
-					<span class="admin-daygrid__block-title">${escapeHtml(job.summary)}</span>
-					${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
-				`;
-				block.addEventListener("click", () => openJobModal(job));
-				return block;
-			}
-
-			function buildDayGrid(jobs) {
-				dayGrid.innerHTML = "";
-
-				let startHour = WORKING_HOURS_START;
-				let endHour = WORKING_HOURS_END;
-				jobs.forEach((job) => {
-					const s = minutesSinceMidnightPT(job.start) / 60;
-					const e = minutesSinceMidnightPT(job.end) / 60;
-					startHour = Math.min(startHour, Math.floor(s));
-					endHour = Math.max(endHour, Math.ceil(e));
-				});
-				const totalHours = Math.max(1, endHour - startHour);
-				const gridHeight = totalHours * HOUR_HEIGHT;
-
-				// Only cleaners actually relevant today get a column: active ones,
-				// plus any inactive one who somehow still has a job assigned today
-				// (so an existing assignment never just disappears from view).
-				const dayCleaners = cleaners.filter(
-					(c) => c.active || jobs.some((j) => (j.assignedCleanerIds || []).includes(c.id)),
-				);
-				const columns = [{ id: "", name: "Unassigned" }, ...dayCleaners.map((c) => ({ id: c.id, name: c.name }))];
-
-				const inner = document.createElement("div");
-				inner.className = "admin-daygrid__inner";
-
-				const header = document.createElement("div");
-				header.className = "admin-daygrid__headers";
-				header.innerHTML =
-					`<div class="admin-daygrid__gutter-cell"></div>` +
-					columns
-						.map(
-							(col) => `
-						<div class="admin-daygrid__col-header${col.id ? "" : " admin-daygrid__col-header--unassigned"}">
-							${escapeHtml(col.name)}
-						</div>
-					`,
-						)
-						.join("");
-				inner.appendChild(header);
-
-				const body = document.createElement("div");
-				body.className = "admin-daygrid__body";
-				body.style.height = `${gridHeight}px`;
-
-				const gutter = document.createElement("div");
-				gutter.className = "admin-daygrid__gutter";
-				for (let h = startHour; h <= endHour; h++) {
-					const label = document.createElement("div");
-					label.className = "admin-daygrid__hour-label";
-					label.style.top = `${(h - startHour) * HOUR_HEIGHT}px`;
-					label.textContent = hourLabel(h);
-					gutter.appendChild(label);
-				}
-				body.appendChild(gutter);
-
-				columns.forEach((col) => {
-					const colEl = document.createElement("div");
-					colEl.className = "admin-daygrid__col";
-
-					for (let h = startHour; h <= endHour; h++) {
-						const line = document.createElement("div");
-						line.className = "admin-daygrid__gridline";
-						line.style.top = `${(h - startHour) * HOUR_HEIGHT}px`;
-						colEl.appendChild(line);
-					}
-
-					const colJobs = jobs.filter((j) => {
-						const ids = j.assignedCleanerIds || [];
-						return col.id ? ids.includes(col.id) : ids.length === 0;
-					});
-					colJobs.forEach((job) => colEl.appendChild(dayBlock(job, startHour)));
-
-					body.appendChild(colEl);
-				});
-
-				inner.appendChild(body);
-
-				if (!jobs.length) {
-					const empty = document.createElement("p");
-					empty.className = "admin-status admin-daygrid__empty";
-					empty.textContent = "No jobs scheduled this day.";
-					dayGrid.appendChild(empty);
-				}
-				dayGrid.appendChild(inner);
-			}
-
-			async function loadDayView() {
-				loadStatus.hidden = false;
-				loadStatus.textContent = "Loading…";
-				loadStatus.classList.remove("admin-status--error");
-				dayGrid.innerHTML = "";
-				try {
-					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${dayPicker.value}`);
-					const data = await res.json();
-					if (!res.ok) {
-						loadStatus.textContent = data.error || "Couldn't load jobs.";
-						loadStatus.classList.add("admin-status--error");
-						return;
-					}
-					loadStatus.hidden = true;
-					buildDayGrid(data.jobs || []);
-				} catch {
-					loadStatus.textContent = "Network error, please try again.";
-					loadStatus.classList.add("admin-status--error");
-				}
-			}
-
-			// --- Week view (7-column board, chips open the shared modal) -----------
-
-			function formatWeekRange(weekStart) {
-				const start = localDate(weekStart).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-				const end = localDate(addDays(weekStart, 6)).toLocaleDateString("en-US", {
-					month: "short",
-					day: "numeric",
-					year: "numeric",
-				});
-				return `${start} – ${end}`;
-			}
-
-			function jobChip(job) {
-				const chip = document.createElement("button");
-				chip.type = "button";
-				const assignedIds = job.assignedCleanerIds || [];
-				const isUnassigned = assignedIds.length === 0;
-				chip.className = "admin-chip" + (isUnassigned ? " admin-chip--unassigned" : "");
-				const names = cleanerNamesFor(assignedIds);
-				chip.innerHTML = `
-					<span class="admin-chip__time">${fmtTime(job.start)}</span>
-					<span class="admin-chip__summary">${escapeHtml(job.summary)}</span>
-					<span class="admin-chip__cleaners${names.length ? "" : " admin-chip__cleaners--empty"}">
-						${names.length ? escapeHtml(names.join(", ")) : "Needs cleaner"}
-					</span>
-					<span class="admin-chip__footer">
-						<span class="admin-badge admin-badge--${job.status}">${STATUS_LABELS[job.status] || job.status}</span>
-						${job.cleanerConfirmed ? `<span class="admin-confirmed-check">✓</span>` : ""}
-					</span>
-				`;
-				chip.addEventListener("click", () => openJobModal(job));
-				return chip;
-			}
-
-			function weekColumn(dateStr, jobs, isToday) {
-				const col = document.createElement("div");
-				col.className = "admin-week-col" + (isToday ? " is-today" : "");
-				const date = localDate(dateStr);
-				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
-
-				col.innerHTML = `
-					<button type="button" class="admin-week-col__header" data-date="${dateStr}">
-						<span class="admin-week-col__day">${date.toLocaleDateString("en-US", { weekday: "short" })}</span>
-						<span class="admin-week-col__date">${date.getDate()}</span>
-						${unassignedCount ? `<span class="admin-week-col__badge">${unassignedCount}</span>` : ""}
-					</button>
-					<div class="admin-week-col__jobs"></div>
-				`;
-
-				col.querySelector(".admin-week-col__header").addEventListener("click", () => jumpToDay(dateStr));
-
-				const jobsEl = col.querySelector(".admin-week-col__jobs");
-				if (!jobs.length) {
-					jobsEl.innerHTML = `<p class="admin-week-empty">No jobs</p>`;
-				} else {
-					jobs.forEach((job) => jobsEl.appendChild(jobChip(job)));
-				}
-				return col;
-			}
-
-			async function loadWeekView() {
-				loadStatus.hidden = false;
-				loadStatus.textContent = "Loading…";
-				loadStatus.classList.remove("admin-status--error");
-				weekBoard.innerHTML = "";
-				const weekStart = startOfWeek(dayPicker.value);
-				periodLabel.hidden = false;
-				periodLabel.textContent = formatWeekRange(weekStart);
-				try {
-					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${weekStart}&days=7`);
-					const data = await res.json();
-					if (!res.ok) {
-						loadStatus.textContent = data.error || "Couldn't load jobs.";
-						loadStatus.classList.add("admin-status--error");
-						return;
-					}
-					loadStatus.hidden = true;
-					const byDate = groupByDate(data.jobs || []);
-					const today = todayLocalIso();
-					for (let i = 0; i < 7; i++) {
-						const dateStr = addDays(weekStart, i);
-						weekBoard.appendChild(weekColumn(dateStr, byDate.get(dateStr) || [], dateStr === today));
-					}
-				} catch {
-					loadStatus.textContent = "Network error, please try again.";
-					loadStatus.classList.add("admin-status--error");
-				}
-			}
-
-			// --- Month view (calendar grid, chips open the shared modal) -----------
-
-			function monthCell(dateStr, dayNum, jobs, isToday) {
-				const unassignedCount = jobs.filter((j) => (j.assignedCleanerIds || []).length === 0).length;
-				const cell = document.createElement("div");
-				cell.className = "admin-month-day" + (isToday ? " is-today" : "") + (unassignedCount ? " has-unassigned" : "");
-
-				cell.innerHTML = `
-					<button type="button" class="admin-month-day__header" data-date="${dateStr}">
-						<span class="admin-month-day__num">${dayNum}</span>
-						${jobs.length ? `<span class="admin-month-day__count">${jobs.length} visit${jobs.length === 1 ? "" : "s"}</span>` : ""}
-					</button>
-					<div class="admin-month-day__chips"></div>
-				`;
-
-				cell.querySelector(".admin-month-day__header").addEventListener("click", () => jumpToDay(dateStr));
-
-				const chipsEl = cell.querySelector(".admin-month-day__chips");
-				jobs.forEach((job) => {
-					const assignedIds = job.assignedCleanerIds || [];
-					const mini = document.createElement("button");
-					mini.type = "button";
-					mini.className = "admin-month-chip" + (assignedIds.length === 0 ? " admin-month-chip--unassigned" : "");
-					mini.innerHTML = `<span class="admin-month-chip__dot"></span>${escapeHtml(job.summary)}`;
-					mini.addEventListener("click", (e) => {
-						e.stopPropagation();
-						openJobModal(job);
-					});
-					chipsEl.appendChild(mini);
-				});
-
-				return cell;
-			}
-
-			async function loadMonthView() {
-				loadStatus.hidden = false;
-				loadStatus.textContent = "Loading…";
-				loadStatus.classList.remove("admin-status--error");
-				monthGrid.innerHTML = "";
-				const monthStart = startOfMonth(dayPicker.value);
-				const totalDays = daysInMonthCount(monthStart);
-				periodLabel.hidden = false;
-				periodLabel.textContent = localDate(monthStart).toLocaleDateString("en-US", {
-					month: "long",
-					year: "numeric",
-				});
-				try {
-					const res = await fetch(`/api/admin/dispatch/list-jobs?date=${monthStart}&days=${totalDays}`);
-					const data = await res.json();
-					if (!res.ok) {
-						loadStatus.textContent = data.error || "Couldn't load jobs.";
-						loadStatus.classList.add("admin-status--error");
-						return;
-					}
-					loadStatus.hidden = true;
-					const byDate = groupByDate(data.jobs || []);
-					const today = todayLocalIso();
-					const firstDow = localDate(monthStart).getDay();
-					for (let i = 0; i < firstDow; i++) {
-						const pad = document.createElement("span");
-						pad.className = "admin-month-pad";
-						monthGrid.appendChild(pad);
-					}
-					for (let d = 1; d <= totalDays; d++) {
-						const dateStr = `${monthStart.slice(0, 8)}${String(d).padStart(2, "0")}`;
-						monthGrid.appendChild(monthCell(dateStr, d, byDate.get(dateStr) || [], dateStr === today));
-					}
-				} catch {
-					loadStatus.textContent = "Network error, please try again.";
-					loadStatus.classList.add("admin-status--error");
-				}
-			}
-
-			// --- View switching / shared date nav ------------------------------------
-
-			function loadCurrentView() {
-				if (viewMode === "list") loadListView();
-				else if (viewMode === "day") loadDayView();
-				else if (viewMode === "week") loadWeekView();
-				else loadMonthView();
-			}
-
-			function setViewMode(mode) {
-				viewMode = mode;
-				viewButtons.forEach((b) => b.classList.toggle("is-active", b.dataset.view === mode));
-				listViewEl.hidden = mode !== "list";
-				dayViewEl.hidden = mode !== "day";
-				weekViewEl.hidden = mode !== "week";
-				monthViewEl.hidden = mode !== "month";
-				periodNavEl.hidden = mode === "list";
-				periodLabel.hidden = mode === "day" || mode === "list";
-			}
-
-			// Used by week/month "no chip clicked" areas to drop into the
-			// full-detail Day view for that date.
-			function jumpToDay(dateStr) {
-				dayPicker.value = dateStr;
-				setViewMode("day");
-				loadDayView();
-			}
-
-			viewButtons.forEach((btn) => {
-				btn.addEventListener("click", () => {
-					if (btn.dataset.view === viewMode) return;
-					setViewMode(btn.dataset.view);
-					loadCurrentView();
-				});
-			});
-
-			prevPeriodBtn.addEventListener("click", () => {
-				if (viewMode === "day") dayPicker.value = addDays(dayPicker.value, -1);
-				else if (viewMode === "week") dayPicker.value = addDays(dayPicker.value, -7);
-				else dayPicker.value = addMonths(dayPicker.value, -1);
-				loadCurrentView();
-			});
-			nextPeriodBtn.addEventListener("click", () => {
-				if (viewMode === "day") dayPicker.value = addDays(dayPicker.value, 1);
-				else if (viewMode === "week") dayPicker.value = addDays(dayPicker.value, 7);
-				else dayPicker.value = addMonths(dayPicker.value, 1);
-				loadCurrentView();
-			});
-			todayBtn.addEventListener("click", () => {
-				dayPicker.value = todayLocalIso();
-				loadCurrentView();
-			});
-			dayPicker.addEventListener("change", loadCurrentView);
-
-			dayPicker.value = todayLocalIso();
-			loadCleaners().then(loadCurrentView);
+			loadCleaners().then(loadListView);
 		</script>
 
 		<style is:global>
@@ -1623,51 +1125,6 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 
 			.admin-confirm-label input {
 				width: auto;
-			}
-
-			.admin-view-switcher {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 0.5rem;
-				margin-bottom: 1rem;
-			}
-
-			.admin-view-btn {
-				padding: 0.4rem 1rem;
-				border-radius: 999px;
-				border: 1px solid var(--color-border);
-				background: var(--color-white);
-				font-size: 0.85rem;
-				font-weight: 600;
-				color: var(--color-slate);
-				cursor: pointer;
-			}
-
-			.admin-view-btn.is-active {
-				background: var(--color-ink);
-				border-color: var(--color-ink);
-				color: var(--color-white);
-			}
-
-			.admin-day-nav {
-				display: flex;
-				align-items: center;
-				gap: 0.75rem;
-				flex-wrap: wrap;
-				margin-bottom: 1.5rem;
-			}
-
-			.admin-day-nav input[type="date"] {
-				padding: 0.6rem 0.75rem;
-				border: 1px solid var(--color-border);
-				border-radius: 8px;
-				font-family: inherit;
-			}
-
-			.admin-period-label {
-				font-family: var(--font-heading);
-				font-weight: 600;
-				color: var(--color-ink);
 			}
 
 			.admin-badge {
@@ -1949,377 +1406,6 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				text-align: center;
 				color: var(--color-slate-light);
 				padding: 2rem 1rem;
-			}
-
-			/* --- Shared chip (used by Week columns) ------------------------------ */
-
-			.admin-chip {
-				display: block;
-				width: 100%;
-				text-align: left;
-				background: var(--color-cream);
-				border: 1px solid var(--color-border);
-				border-radius: 10px;
-				padding: 0.5rem 0.65rem;
-				cursor: pointer;
-				font-family: inherit;
-			}
-
-			.admin-chip:hover {
-				border-color: var(--color-sky);
-			}
-
-			.admin-chip--unassigned {
-				background: #fdeceb;
-				border-color: #f3c8c5;
-			}
-
-			.admin-chip__time {
-				display: block;
-				font-size: 0.78rem;
-				font-weight: 700;
-				color: var(--color-ink);
-			}
-
-			.admin-chip__summary {
-				display: block;
-				margin: 0.15rem 0;
-				font-size: 0.8rem;
-				color: var(--color-slate);
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-			}
-
-			.admin-chip__cleaners {
-				display: block;
-				margin: 0 0 0.4rem;
-				font-size: 0.75rem;
-				color: var(--color-slate);
-			}
-
-			.admin-chip__cleaners--empty {
-				color: #b3261e;
-				font-weight: 600;
-			}
-
-			.admin-chip__footer {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 0.4rem;
-			}
-
-			/* --- Week board --------------------------------------------------- */
-
-			.admin-week-board {
-				display: grid;
-				grid-template-columns: repeat(7, minmax(160px, 1fr));
-				gap: 0.75rem;
-				overflow-x: auto;
-				padding-bottom: 0.5rem;
-			}
-
-			.admin-week-col {
-				background: var(--color-white);
-				border: 1px solid var(--color-border);
-				border-radius: var(--radius);
-				padding: 0.75rem;
-				min-height: 120px;
-			}
-
-			.admin-week-col.is-today {
-				border-color: var(--color-sky);
-				box-shadow: 0 0 0 1px var(--color-sky);
-			}
-
-			.admin-week-col__header {
-				display: flex;
-				align-items: baseline;
-				gap: 0.4rem;
-				width: 100%;
-				margin-bottom: 0.6rem;
-				padding: 0 0 0.5rem;
-				border: none;
-				border-bottom: 1px solid var(--color-border);
-				background: none;
-				cursor: pointer;
-				font-family: inherit;
-			}
-
-			.admin-week-col__day {
-				font-size: 0.72rem;
-				text-transform: uppercase;
-				letter-spacing: 0.04em;
-				color: var(--color-slate-light);
-				font-weight: 600;
-			}
-
-			.admin-week-col__date {
-				font-family: var(--font-heading);
-				font-weight: 700;
-				color: var(--color-ink);
-			}
-
-			.admin-week-col__badge {
-				margin-left: auto;
-				background: #fdeceb;
-				color: #b3261e;
-				border-radius: 999px;
-				padding: 0.05rem 0.5rem;
-				font-size: 0.72rem;
-				font-weight: 700;
-			}
-
-			.admin-week-col__jobs {
-				display: flex;
-				flex-direction: column;
-				gap: 0.5rem;
-			}
-
-			.admin-week-empty {
-				margin: 0;
-				font-size: 0.8rem;
-				color: var(--color-slate-light);
-			}
-
-			/* --- Month grid ----------------------------------------------------- */
-
-			.admin-month-weekdays {
-				display: grid;
-				grid-template-columns: repeat(7, 1fr);
-				margin-bottom: 0.4rem;
-			}
-
-			.admin-month-weekdays span {
-				text-align: center;
-				font-size: 0.75rem;
-				font-weight: 600;
-				text-transform: uppercase;
-				letter-spacing: 0.03em;
-				color: var(--color-slate-light);
-			}
-
-			.admin-month-grid {
-				display: grid;
-				grid-template-columns: repeat(7, 1fr);
-				gap: 0.4rem;
-			}
-
-			.admin-month-pad {
-				display: block;
-			}
-
-			.admin-month-day {
-				display: flex;
-				flex-direction: column;
-				gap: 0.3rem;
-				min-height: 90px;
-				padding: 0.4rem;
-				border-radius: 10px;
-				border: 1px solid var(--color-border);
-				background: var(--color-white);
-			}
-
-			.admin-month-day.is-today {
-				border-color: var(--color-sky);
-				box-shadow: 0 0 0 1px var(--color-sky);
-			}
-
-			.admin-month-day.has-unassigned {
-				background: #fdeceb;
-			}
-
-			.admin-month-day__header {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 0.3rem;
-				border: none;
-				background: none;
-				padding: 0;
-				cursor: pointer;
-				font-family: inherit;
-			}
-
-			.admin-month-day__num {
-				font-family: var(--font-heading);
-				font-weight: 700;
-				color: var(--color-ink);
-				font-size: 0.9rem;
-			}
-
-			.admin-month-day__count {
-				font-size: 0.65rem;
-				font-weight: 600;
-				color: var(--color-slate-light);
-				background: var(--color-sky-light);
-				border-radius: 999px;
-				padding: 0.05rem 0.4rem;
-				white-space: nowrap;
-			}
-
-			.admin-month-day__chips {
-				display: flex;
-				flex-direction: column;
-				gap: 0.2rem;
-			}
-
-			.admin-month-chip {
-				display: flex;
-				align-items: center;
-				gap: 0.3rem;
-				width: 100%;
-				text-align: left;
-				border: none;
-				border-radius: 6px;
-				background: #eaf1fb;
-				color: #1a3a5c;
-				padding: 0.15rem 0.35rem;
-				font-size: 0.7rem;
-				font-family: inherit;
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
-				cursor: pointer;
-			}
-
-			.admin-month-chip__dot {
-				width: 6px;
-				height: 6px;
-				border-radius: 50%;
-				background: #1a5fb4;
-				flex-shrink: 0;
-			}
-
-			.admin-month-chip--unassigned {
-				background: #fdeceb;
-				color: #7a1a15;
-			}
-
-			.admin-month-chip--unassigned .admin-month-chip__dot {
-				background: #b3261e;
-			}
-
-			/* --- Day view: hour grid, one column per cleaner --------------------- */
-
-			.admin-daygrid {
-				border: 1px solid var(--color-border);
-				border-radius: var(--radius);
-				overflow-x: auto;
-				background: var(--color-white);
-			}
-
-			.admin-daygrid__empty {
-				margin: 1rem 1.25rem 0;
-			}
-
-			.admin-daygrid__inner {
-				min-width: fit-content;
-			}
-
-			.admin-daygrid__headers,
-			.admin-daygrid__body {
-				display: flex;
-			}
-
-			.admin-daygrid__gutter-cell,
-			.admin-daygrid__gutter {
-				width: 64px;
-				flex-shrink: 0;
-			}
-
-			.admin-daygrid__headers {
-				border-bottom: 1px solid var(--color-border);
-				position: sticky;
-				top: 0;
-				background: var(--color-white);
-				z-index: 2;
-			}
-
-			.admin-daygrid__col-header {
-				flex: 1 0 170px;
-				padding: 0.6rem 0.75rem;
-				border-left: 1px solid var(--color-border);
-				font-family: var(--font-heading);
-				font-weight: 600;
-				font-size: 0.85rem;
-				color: var(--color-ink);
-			}
-
-			.admin-daygrid__col-header--unassigned {
-				color: #b3261e;
-			}
-
-			.admin-daygrid__gutter {
-				position: relative;
-			}
-
-			.admin-daygrid__hour-label {
-				position: absolute;
-				right: 8px;
-				/* Sits just below the gridline marking the start of this hour,
-				   not centered on it (no translateY(-50%)) — centering it on
-				   the line pushed the topmost label half above the grid's own
-				   top edge, right where it visually collided with the header
-				   row's bottom border, making "8 AM" look cut in half. */
-				top: 4px;
-				font-size: 0.7rem;
-				color: var(--color-slate-light);
-				white-space: nowrap;
-			}
-
-			.admin-daygrid__col {
-				position: relative;
-				flex: 1 0 170px;
-				border-left: 1px solid var(--color-border);
-			}
-
-			.admin-daygrid__gridline {
-				position: absolute;
-				left: 0;
-				right: 0;
-				border-top: 1px solid var(--color-border);
-			}
-
-			.admin-daygrid__block {
-				position: absolute;
-				left: 4px;
-				right: 4px;
-				display: flex;
-				flex-direction: column;
-				gap: 0.1rem;
-				border-radius: 6px;
-				background: #eaf1fb;
-				border: 1px solid #1a5fb4;
-				color: #1a3a5c;
-				text-align: left;
-				padding: 0.25rem 0.4rem;
-				overflow: hidden;
-				cursor: pointer;
-				font-family: inherit;
-			}
-
-			.admin-daygrid__block:hover {
-				filter: brightness(0.97);
-			}
-
-			.admin-daygrid__block--unassigned {
-				background: #fdeceb;
-				border-color: #b3261e;
-				color: #7a1a15;
-			}
-
-			.admin-daygrid__block-time {
-				font-size: 0.68rem;
-				font-weight: 700;
-			}
-
-			.admin-daygrid__block-title {
-				font-size: 0.75rem;
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
 			}
 
 			/* --- Job detail modal (List/Month/Week/Day all share this) ----------- */
