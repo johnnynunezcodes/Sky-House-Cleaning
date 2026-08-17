@@ -1,0 +1,815 @@
+---
+// Staff-only tool — gated by HTTP Basic Auth in src/middleware.js. Full
+// client-detail page, opened from a row click on /admin/crm/contacts (see
+// AGENTS.md → "CRM" → "Client detail page"). The business owner asked for
+// this after seeing Jobber's own dedicated client page — a header with an
+// edit-pencil icon, contact info, and (unlike Jobber's separate "Client
+// schedule"/"Invoices" screens) a combined Jobs + Invoices history section,
+// since this app already has one dedicated page for each of those things
+// individually and doesn't need a third copy.
+//
+// Deliberately NOT built (no data model or explicit ask for either): multiple
+// Properties per client, multiple Contacts per client, Tags, a general free
+// -text Notes field, a Communication log/"Last communication" field, Payment
+// methods ("Jobber Payments" equivalent), and a separate "Client schedule"
+// table distinct from the Jobs section below — this app is one-job-per-visit
+// with a single client record per contact, so none of those add anything a
+// business owner asking for the screenshots actually requested.
+//
+// clientId is a Firestore doc id (see crm.js) — no colons or other
+// characters that need percent-encoding, so this route doesn't run into the
+// Astro SSR param-decoding bug documented on /admin/jobs/[eventId].astro.
+export const prerender = false;
+
+import AdminLayout from "../../../../layouts/AdminLayout.astro";
+
+const { clientId } = Astro.params;
+---
+
+<AdminLayout title="Client | Sky House Cleaning Staff Tools">
+	<div class="container admin-container" id="client-page" data-client-id={clientId}>
+		<a href="/admin/crm/contacts" class="admin-back-link">← Back to Clients</a>
+
+		<p id="load-status" class="admin-status">Loading…</p>
+
+		<div id="client-content" hidden>
+			<div class="admin-job-header">
+				<div>
+					<h1 id="client-name"></h1>
+					<div class="admin-job-header__meta">
+						<span class="admin-badge" id="client-stage-badge"></span>
+					</div>
+				</div>
+				<button type="button" class="admin-edit-pencil" id="edit-client-btn" title="Edit client details" aria-label="Edit client details">
+					✎
+				</button>
+			</div>
+
+			<div class="admin-job-grid">
+				<div class="admin-job-main">
+					<div class="card admin-card">
+						<h3>Contact info</h3>
+						<div class="admin-job-info-grid" id="client-contact-grid"></div>
+					</div>
+
+					<div class="card admin-card">
+						<h3>Jobs</h3>
+						<p class="admin-card__meta" id="jobs-status">Loading…</p>
+						<div id="jobs-table-wrap" hidden></div>
+					</div>
+
+					<div class="card admin-card">
+						<h3>Invoices</h3>
+						<p class="admin-card__meta" id="invoices-status">Loading…</p>
+						<div id="invoices-table-wrap" hidden></div>
+					</div>
+				</div>
+
+				<div class="admin-job-side">
+					<div class="card admin-card">
+						<h3>Overview</h3>
+						<div class="admin-overview-stat">
+							<span>Lifetime value</span>
+							<strong id="stat-lifetime-value">$0.00</strong>
+						</div>
+						<div class="admin-overview-stat">
+							<span>Current balance</span>
+							<strong id="stat-current-balance">$0.00</strong>
+						</div>
+						<p class="admin-card__meta admin-card__meta--small">
+							Computed from this client's invoices (paid = lifetime value, sent/overdue = current balance).
+						</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="admin-modal-backdrop" id="edit-modal-backdrop" hidden>
+		<div class="admin-modal card" id="edit-modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+			<div class="admin-modal__header">
+				<h3 id="edit-modal-title">Edit Client</h3>
+				<button type="button" class="admin-modal__close" id="edit-modal-close" aria-label="Close">✕</button>
+			</div>
+			<form id="edit-form" class="admin-form">
+				<div class="admin-form__grid">
+					<div class="admin-form__row">
+						<label for="edit-name">Name *</label>
+						<input type="text" id="edit-name" name="name" required />
+					</div>
+					<div class="admin-form__row">
+						<label for="edit-lifecycleStage">Stage</label>
+						<select id="edit-lifecycleStage" name="lifecycleStage">
+							<option value="lead">Lead</option>
+							<option value="active_client">Active client</option>
+							<option value="past_client">Past client</option>
+						</select>
+					</div>
+					<div class="admin-form__row">
+						<label for="edit-phone">Phone</label>
+						<input type="tel" id="edit-phone" name="phone" />
+					</div>
+					<div class="admin-form__row">
+						<label for="edit-email">Email</label>
+						<input type="email" id="edit-email" name="email" />
+					</div>
+					<div class="admin-form__row">
+						<label for="edit-leadSource">Lead source</label>
+						<input type="text" id="edit-leadSource" name="leadSource" placeholder="Referral, Google, Facebook…" />
+					</div>
+					<div class="admin-form__row admin-form__row--full">
+						<label for="edit-address">Address</label>
+						<input type="text" id="edit-address" name="address" />
+					</div>
+					<div class="admin-form__row admin-form__row--full">
+						<label for="edit-accessNotes">Access notes</label>
+						<input type="text" id="edit-accessNotes" name="accessNotes" placeholder="Key under the mat, gate code…" />
+					</div>
+					<div class="admin-form__row admin-form__row--full">
+						<label for="edit-petNotes">Pet notes</label>
+						<input type="text" id="edit-petNotes" name="petNotes" />
+					</div>
+					<div class="admin-form__row admin-form__row--full">
+						<label for="edit-stripeCustomerId">Stripe customer ID</label>
+						<input type="text" id="edit-stripeCustomerId" name="stripeCustomerId" placeholder="cus_…" />
+					</div>
+				</div>
+				<button type="submit" class="btn btn--primary">Save</button>
+				<button type="button" class="btn btn--outline" id="edit-cancel-btn">Cancel</button>
+				<p class="admin-result-message" hidden></p>
+			</form>
+		</div>
+	</div>
+
+	<script>
+		const root = document.getElementById("client-page");
+		const clientId = root?.dataset.clientId || "";
+
+		const loadStatus = document.getElementById("load-status");
+		const clientContent = document.getElementById("client-content");
+		const clientNameEl = document.getElementById("client-name");
+		const stageBadge = document.getElementById("client-stage-badge");
+		const contactGrid = document.getElementById("client-contact-grid");
+
+		const jobsStatus = document.getElementById("jobs-status");
+		const jobsTableWrap = document.getElementById("jobs-table-wrap");
+		const invoicesStatus = document.getElementById("invoices-status");
+		const invoicesTableWrap = document.getElementById("invoices-table-wrap");
+
+		const statLifetimeValue = document.getElementById("stat-lifetime-value");
+		const statCurrentBalance = document.getElementById("stat-current-balance");
+
+		const editClientBtn = document.getElementById("edit-client-btn");
+		const editModalBackdrop = document.getElementById("edit-modal-backdrop");
+		const editModalClose = document.getElementById("edit-modal-close");
+		const editCancelBtn = document.getElementById("edit-cancel-btn");
+		const editForm = document.getElementById("edit-form");
+
+		const STAGE_LABELS = { lead: "Lead", active_client: "Active", past_client: "Past client" };
+		const JOB_STATUS_LABELS = {
+			unassigned: "Unassigned",
+			assigned: "Assigned",
+			en_route: "En route",
+			in_progress: "In progress",
+			completed: "Completed",
+		};
+		const INVOICE_STATUS_LABELS = { draft: "Draft", sent: "Sent", overdue: "Overdue", paid: "Paid", void: "Void" };
+
+		let currentClient = null;
+
+		function escapeHtml(str) {
+			const div = document.createElement("div");
+			div.textContent = str ?? "";
+			return div.innerHTML;
+		}
+
+		function money(n) {
+			return `$${(Number(n) || 0).toFixed(2)}`;
+		}
+
+		// Same fallback every calendar-event-backed job reader uses — see
+		// [eventId].astro's identical parseSummary()/clientNameFor() comment.
+		function parseSummary(summary) {
+			const m = (summary || "").match(/^Sky House Cleaning: (.+?), (.+)$/);
+			return m ? { client: m[1], service: m[2] } : { client: summary || "—", service: "" };
+		}
+
+		function serviceNameFor(job) {
+			return parseSummary(job.summary).service;
+		}
+
+		function todayLocalIso() {
+			return new Intl.DateTimeFormat("en-CA", {
+				timeZone: "America/Los_Angeles",
+				year: "numeric",
+				month: "2-digit",
+				day: "2-digit",
+			}).format(new Date());
+		}
+
+		function addDays(dateStr, delta) {
+			const [y, m, d] = dateStr.split("-").map(Number);
+			const date = new Date(Date.UTC(y, m - 1, d));
+			date.setUTCDate(date.getUTCDate() + delta);
+			return date.toISOString().slice(0, 10);
+		}
+
+		function fmtDate(iso) {
+			return new Date(iso).toLocaleDateString("en-US", {
+				timeZone: "America/Los_Angeles",
+				month: "short",
+				day: "numeric",
+				year: "numeric",
+			});
+		}
+
+		// Firestore Admin SDK timestamps serialize to `{ _seconds, _nanoseconds }`
+		// over JSON — same handling as contacts.astro's toMillis().
+		function toMillis(ts) {
+			if (!ts) return null;
+			if (typeof ts === "string" || typeof ts === "number") {
+				const d = new Date(ts).getTime();
+				return Number.isNaN(d) ? null : d;
+			}
+			if (typeof ts._seconds === "number") return ts._seconds * 1000;
+			return null;
+		}
+
+		function renderHeader() {
+			const c = currentClient;
+			clientNameEl.textContent = c.name || "(no name)";
+			document.title = `${c.name || "Client"} | Sky House Cleaning Staff Tools`;
+			stageBadge.textContent = STAGE_LABELS[c.lifecycleStage] || c.lifecycleStage;
+			stageBadge.className = `admin-badge admin-badge--${c.lifecycleStage}`;
+
+			contactGrid.innerHTML = `
+				<span>Phone</span><span>${c.phone ? `<a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a>` : "—"}</span>
+				<span>Email</span><span>${c.email ? `<a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a>` : "—"}</span>
+				<span>Address</span><span>${escapeHtml(c.address) || "—"}</span>
+				<span>Lead source</span><span>${escapeHtml(c.leadSource) || "—"}</span>
+				<span>Access notes</span><span>${escapeHtml(c.accessNotes) || "—"}</span>
+				<span>Pet notes</span><span>${escapeHtml(c.petNotes) || "—"}</span>
+			`;
+		}
+
+		// Same rolling-window fetch jobs.astro's List view uses (30 days back,
+		// 90 days of results) — filtered client-side by clientEmail since
+		// list-jobs.js has no server-side client filter (jobs come from Google
+		// Calendar, not a Firestore query that could take a `where`).
+		async function loadJobs() {
+			if (!currentClient.email) {
+				jobsStatus.textContent = "No email on file for this client — can't match jobs.";
+				return;
+			}
+			try {
+				const windowStart = addDays(todayLocalIso(), -30);
+				const res = await fetch(`/api/admin/dispatch/list-jobs?date=${windowStart}&days=90`);
+				const data = await res.json();
+				if (!res.ok) {
+					jobsStatus.textContent = data.error || "Couldn't load jobs.";
+					return;
+				}
+				const email = currentClient.email.trim().toLowerCase();
+				const jobs = (data.jobs || [])
+					.filter((j) => (j.clientEmail || "").trim().toLowerCase() === email)
+					.sort((a, b) => new Date(b.start) - new Date(a.start));
+
+				if (!jobs.length) {
+					jobsStatus.textContent = "No jobs in the last 30 days or next 60 days for this client.";
+					return;
+				}
+				jobsStatus.hidden = true;
+				const table = document.createElement("table");
+				table.className = "admin-table";
+				table.innerHTML = `
+					<thead><tr><th>Date</th><th>Service</th><th>Status</th><th></th></tr></thead>
+					<tbody>
+						${jobs
+							.map(
+								(j) => `
+							<tr>
+								<td>${fmtDate(j.start)}</td>
+								<td>${escapeHtml(serviceNameFor(j)) || "—"}</td>
+								<td><span class="admin-badge admin-badge--${j.status}">${JOB_STATUS_LABELS[j.status] || j.status}</span></td>
+								<td><a href="/admin/jobs/${encodeURIComponent(j.eventId)}">View →</a></td>
+							</tr>
+						`,
+							)
+							.join("")}
+					</tbody>
+				`;
+				jobsTableWrap.innerHTML = "";
+				jobsTableWrap.appendChild(table);
+				jobsTableWrap.hidden = false;
+			} catch {
+				jobsStatus.textContent = "Network error loading jobs.";
+			}
+		}
+
+		// Invoices carry clientEmail directly (see invoices.js's createInvoice
+		// defaults) so this doesn't need the job-list detour jobs.astro's
+		// Invoice card uses — it's a straight client-side filter by email.
+		async function loadInvoices() {
+			if (!currentClient.email) {
+				invoicesStatus.textContent = "No email on file for this client — can't match invoices.";
+				statLifetimeValue.textContent = money(0);
+				statCurrentBalance.textContent = money(0);
+				return;
+			}
+			try {
+				const res = await fetch("/api/admin/invoices/list");
+				const data = await res.json();
+				if (!res.ok) {
+					invoicesStatus.textContent = data.error || "Couldn't load invoices.";
+					return;
+				}
+				const email = currentClient.email.trim().toLowerCase();
+				const invoices = (data.invoices || [])
+					.filter((i) => (i.clientEmail || "").trim().toLowerCase() === email)
+					.sort((a, b) => (toMillis(b.createdAt) || 0) - (toMillis(a.createdAt) || 0));
+
+				const lifetimeValue = invoices
+					.filter((i) => i.effectiveStatus === "paid")
+					.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+				const currentBalance = invoices
+					.filter((i) => i.effectiveStatus === "sent" || i.effectiveStatus === "overdue")
+					.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+				statLifetimeValue.textContent = money(lifetimeValue);
+				statCurrentBalance.textContent = money(currentBalance);
+
+				if (!invoices.length) {
+					invoicesStatus.textContent = "No invoices for this client.";
+					return;
+				}
+				invoicesStatus.hidden = true;
+				const table = document.createElement("table");
+				table.className = "admin-table";
+				table.innerHTML = `
+					<thead><tr><th>Date</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+					<tbody>
+						${invoices
+							.map(
+								(i) => `
+							<tr>
+								<td>${toMillis(i.createdAt) ? fmtDate(new Date(toMillis(i.createdAt)).toISOString()) : "—"}</td>
+								<td>${money(i.amount)}</td>
+								<td><span class="admin-badge admin-badge--${i.effectiveStatus}">${INVOICE_STATUS_LABELS[i.effectiveStatus] || i.effectiveStatus}</span></td>
+								<td><a href="/admin/invoices">View →</a></td>
+							</tr>
+						`,
+							)
+							.join("")}
+					</tbody>
+				`;
+				invoicesTableWrap.innerHTML = "";
+				invoicesTableWrap.appendChild(table);
+				invoicesTableWrap.hidden = false;
+			} catch {
+				invoicesStatus.textContent = "Network error loading invoices.";
+			}
+		}
+
+		function openEditModal() {
+			const c = currentClient;
+			editForm.querySelector("#edit-name").value = c.name || "";
+			editForm.querySelector("#edit-lifecycleStage").value = c.lifecycleStage || "lead";
+			editForm.querySelector("#edit-phone").value = c.phone || "";
+			editForm.querySelector("#edit-email").value = c.email || "";
+			editForm.querySelector("#edit-leadSource").value = c.leadSource || "";
+			editForm.querySelector("#edit-address").value = c.address || "";
+			editForm.querySelector("#edit-accessNotes").value = c.accessNotes || "";
+			editForm.querySelector("#edit-petNotes").value = c.petNotes || "";
+			editForm.querySelector("#edit-stripeCustomerId").value = c.stripeCustomerId || "";
+			const messageEl = editForm.querySelector(".admin-result-message");
+			messageEl.hidden = true;
+			messageEl.classList.remove("admin-result-message--error");
+			editModalBackdrop.hidden = false;
+		}
+
+		function closeEditModal() {
+			editModalBackdrop.hidden = true;
+		}
+
+		editClientBtn.addEventListener("click", openEditModal);
+		editModalClose.addEventListener("click", closeEditModal);
+		editCancelBtn.addEventListener("click", closeEditModal);
+		editModalBackdrop.addEventListener("click", (e) => {
+			if (e.target === editModalBackdrop) closeEditModal();
+		});
+		document.addEventListener("keydown", (e) => {
+			if (e.key === "Escape" && !editModalBackdrop.hidden) closeEditModal();
+		});
+
+		editForm.addEventListener("submit", async (e) => {
+			e.preventDefault();
+			const messageEl = editForm.querySelector(".admin-result-message");
+			const submitBtn = editForm.querySelector("button[type=submit]");
+			const formData = new FormData(editForm);
+			const payload = { id: clientId };
+			for (const [key, value] of formData.entries()) payload[key] = value;
+
+			submitBtn.disabled = true;
+			messageEl.hidden = true;
+			try {
+				const res = await fetch("/api/admin/crm/update-client", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(payload),
+				});
+				const data = await res.json();
+				if (!res.ok) {
+					messageEl.hidden = false;
+					messageEl.textContent = data.error || "Something went wrong.";
+					messageEl.classList.add("admin-result-message--error");
+					return;
+				}
+				closeEditModal();
+				await loadClient();
+			} catch {
+				messageEl.hidden = false;
+				messageEl.textContent = "Network error, please try again.";
+				messageEl.classList.add("admin-result-message--error");
+			} finally {
+				submitBtn.disabled = false;
+			}
+		});
+
+		async function loadClient() {
+			if (!clientId) {
+				loadStatus.textContent = "Missing client.";
+				loadStatus.classList.add("admin-status--error");
+				return;
+			}
+			loadStatus.hidden = false;
+			loadStatus.textContent = "Loading…";
+			try {
+				const res = await fetch(`/api/admin/crm/get-client?id=${encodeURIComponent(clientId)}`);
+				const data = await res.json();
+				if (!res.ok) {
+					loadStatus.textContent = data.error || "Couldn't load this client.";
+					loadStatus.classList.add("admin-status--error");
+					return;
+				}
+				currentClient = data.client;
+				loadStatus.hidden = true;
+				clientContent.hidden = false;
+				renderHeader();
+				loadJobs();
+				loadInvoices();
+
+				// Deep link from the Clients list page (see AGENTS.md → "Client deep
+				// link") — auto-open the Edit Client modal, consumed once.
+				const params = new URLSearchParams(location.search);
+				if (params.get("openEdit") === "1") {
+					openEditModal();
+					params.delete("openEdit");
+					const qs = params.toString();
+					history.replaceState(null, "", location.pathname + (qs ? `?${qs}` : ""));
+				}
+			} catch {
+				loadStatus.textContent = "Network error, please try again.";
+				loadStatus.classList.add("admin-status--error");
+			}
+		}
+
+		loadClient();
+	</script>
+
+	<style is:global>
+		.admin-container {
+			max-width: 1100px;
+			margin: 0 auto;
+			padding-block: 3rem;
+		}
+
+		.admin-back-link {
+			display: inline-block;
+			margin-bottom: 1.25rem;
+			font-weight: 600;
+			font-size: 0.9rem;
+			color: var(--color-slate);
+		}
+
+		.admin-status {
+			margin-bottom: 1rem;
+		}
+
+		.admin-status--error {
+			color: #b3261e;
+		}
+
+		.admin-job-header {
+			display: flex;
+			align-items: flex-start;
+			justify-content: space-between;
+			gap: 1rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.admin-job-header h1 {
+			margin-bottom: 0.4rem;
+		}
+
+		.admin-job-header__meta {
+			display: flex;
+			align-items: center;
+			gap: 0.6rem;
+			flex-wrap: wrap;
+		}
+
+		.admin-edit-pencil {
+			flex-shrink: 0;
+			width: 36px;
+			height: 36px;
+			border-radius: 50%;
+			border: 1px solid var(--color-border);
+			background: var(--color-white);
+			color: var(--color-slate);
+			cursor: pointer;
+			font-size: 1rem;
+		}
+
+		.admin-edit-pencil:hover {
+			border-color: var(--color-sky);
+			color: var(--color-sky-dark);
+		}
+
+		.admin-job-grid {
+			display: grid;
+			grid-template-columns: 2fr 1fr;
+			gap: 1.5rem;
+			align-items: start;
+		}
+
+		.admin-job-main,
+		.admin-job-side {
+			display: flex;
+			flex-direction: column;
+			gap: 1.5rem;
+			min-width: 0;
+		}
+
+		@media (max-width: 900px) {
+			.admin-job-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		.admin-card h3 {
+			margin-top: 0;
+			margin-bottom: 1rem;
+			font-size: 1.05rem;
+		}
+
+		.admin-card__meta {
+			color: var(--color-slate);
+			margin: 0.35rem 0;
+		}
+
+		.admin-card__meta--small {
+			font-size: 0.8rem;
+			margin-top: 0.75rem;
+		}
+
+		.admin-job-info-grid {
+			display: grid;
+			grid-template-columns: 120px 1fr;
+			gap: 0.6rem 0.75rem;
+			font-size: 0.92rem;
+		}
+
+		.admin-job-info-grid > span:nth-child(odd) {
+			font-weight: 600;
+			color: var(--color-slate);
+		}
+
+		.admin-job-info-grid a {
+			color: var(--color-sky-dark);
+		}
+
+		.admin-overview-stat {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 0.5rem 0;
+			border-bottom: 1px solid var(--color-border);
+			font-size: 0.95rem;
+		}
+
+		.admin-overview-stat:last-of-type {
+			border-bottom: none;
+		}
+
+		.admin-overview-stat strong {
+			font-family: var(--font-heading);
+			font-size: 1.15rem;
+			color: var(--color-ink);
+		}
+
+		/* --- Badges (client stage + job status + invoice status; same values
+		   as contacts.astro/jobs.astro/[eventId].astro — each admin page
+		   duplicates its own badge CSS since there's no shared stylesheet
+		   across these is:global page blocks). */
+		.admin-badge {
+			display: inline-block;
+			padding: 0.25rem 0.7rem;
+			border-radius: 999px;
+			font-size: 0.8rem;
+			font-weight: 600;
+			white-space: nowrap;
+		}
+
+		.admin-badge--lead {
+			background: var(--color-sky-light);
+			color: var(--color-ink);
+		}
+
+		.admin-badge--active_client {
+			background: #e3f3e6;
+			color: #1e7a34;
+		}
+
+		.admin-badge--past_client {
+			background: #ececec;
+			color: var(--color-slate);
+		}
+
+		.admin-badge--unassigned {
+			background: var(--color-sky-light);
+			color: var(--color-ink);
+		}
+
+		.admin-badge--assigned {
+			background: #eaf1fb;
+			color: #1a5fb4;
+		}
+
+		.admin-badge--en_route,
+		.admin-badge--in_progress {
+			background: #fdf0dc;
+			color: #a4640a;
+		}
+
+		.admin-badge--completed,
+		.admin-badge--paid {
+			background: #e3f3e6;
+			color: #1e7a34;
+		}
+
+		.admin-badge--draft {
+			background: var(--color-sky-light);
+			color: var(--color-ink);
+		}
+
+		.admin-badge--sent {
+			background: #eaf1fb;
+			color: #1a5fb4;
+		}
+
+		.admin-badge--overdue {
+			background: #fdeceb;
+			color: #b3261e;
+		}
+
+		.admin-badge--void {
+			background: #ececec;
+			color: var(--color-slate);
+		}
+
+		/* --- Jobs/Invoices tables --- */
+		.admin-table {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.9rem;
+			margin-top: 0.5rem;
+		}
+
+		.admin-table th,
+		.admin-table td {
+			text-align: left;
+			padding: 0.6rem 0.75rem;
+			border-bottom: 1px solid var(--color-border);
+		}
+
+		.admin-table th {
+			background: var(--color-sky-light);
+			font-weight: 600;
+			font-size: 0.78rem;
+			text-transform: uppercase;
+			letter-spacing: 0.03em;
+			color: var(--color-slate);
+			white-space: nowrap;
+		}
+
+		.admin-table td a {
+			color: var(--color-sky-dark);
+			font-weight: 600;
+		}
+
+		/* --- Edit Client modal — same admin-modal pattern used elsewhere. */
+		.admin-modal-backdrop {
+			position: fixed;
+			inset: 0;
+			z-index: 80;
+			background: rgba(28, 43, 69, 0.45);
+			display: flex;
+			align-items: flex-start;
+			justify-content: center;
+			padding: 4rem 1.5rem;
+			overflow-y: auto;
+		}
+
+		.admin-modal-backdrop[hidden] {
+			display: none;
+		}
+
+		.admin-modal {
+			width: 100%;
+			max-width: 560px;
+			padding: 1.5rem;
+		}
+
+		.admin-modal__header {
+			display: flex;
+			align-items: flex-start;
+			justify-content: space-between;
+			gap: 1rem;
+			margin-bottom: 1rem;
+			padding-bottom: 1rem;
+			border-bottom: 1px solid var(--color-border);
+		}
+
+		.admin-modal__header h3 {
+			margin: 0;
+		}
+
+		.admin-modal__close {
+			flex-shrink: 0;
+			width: 32px;
+			height: 32px;
+			border-radius: 50%;
+			border: 1px solid var(--color-border);
+			background: var(--color-white);
+			color: var(--color-slate);
+			cursor: pointer;
+			font-size: 0.9rem;
+		}
+
+		.admin-modal__close:hover {
+			border-color: var(--color-sky);
+			color: var(--color-sky-dark);
+		}
+
+		.admin-form__grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1rem 1.5rem;
+			margin-bottom: 1.25rem;
+		}
+
+		.admin-form__row {
+			display: flex;
+			flex-direction: column;
+			gap: 0.35rem;
+		}
+
+		.admin-form__row--full {
+			grid-column: 1 / -1;
+		}
+
+		.admin-form__row label {
+			font-weight: 600;
+			font-size: 0.85rem;
+			color: var(--color-ink);
+		}
+
+		.admin-form__row input,
+		.admin-form__row select {
+			padding: 0.6rem 0.75rem;
+			border: 1px solid var(--color-border);
+			border-radius: 8px;
+			font-size: 0.95rem;
+			font-family: inherit;
+		}
+
+		@media (max-width: 640px) {
+			.admin-form__grid {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		#edit-form .btn {
+			margin-right: 0.75rem;
+		}
+
+		.admin-result-message {
+			margin-top: 0.75rem;
+			font-weight: 600;
+			color: #1e7a34;
+		}
+
+		.admin-result-message--error {
+			color: #b3261e;
+		}
+	</style>
+</AdminLayout>
