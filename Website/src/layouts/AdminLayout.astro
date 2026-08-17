@@ -444,6 +444,27 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				min-width: 0;
 			}
 
+			/* The global .btn class (global.css) is sized for the public
+			   marketing site's big CTA buttons — 0.85rem 1.6rem padding, 0.95rem
+			   font — which reads as oversized everywhere on the denser admin
+			   side (Team Organization's "Mark inactive", Manage Plans' ←/→,
+			   Contacts' "Edit", and more). Several admin pages had already
+			   independently landed on the same ~0.85rem-font, ~0.4-0.45rem-
+			   vertical-padding scale via their own one-off overrides (see
+			   schedule.astro's .admin-schedule-toolbar__nav .btn /
+			   .admin-visit-popup__actions .btn, requests.astro's and
+			   quotes.astro's .admin-deal-actions .btn) — this promotes that
+			   same sizing to every button on every /admin/* page at once,
+			   scoped to .admin-main so the public site's .btn usage is
+			   untouched. Page-specific overrides with an equally- or more-
+			   specific selector still win where they exist (Astro renders this
+			   layout's <style> before the page's own, so later = higher
+			   priority on a tie) — this is just the shared default. */
+			.admin-main .btn {
+				padding: 0.45rem 1rem;
+				font-size: 0.85rem;
+			}
+
 			@media (max-width: 900px) {
 				.admin-shell {
 					display: block;
