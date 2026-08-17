@@ -11,17 +11,35 @@
 // pages, this page needs the same live-editing affordances (checkbox
 // popover for team, status dropdown, debounced notes save, etc.) every
 // other /admin page already builds with plain client-side JS, so it follows
-// THAT convention instead. Astro.params.jobKey is only used here to hand
+// THAT convention instead. Astro.params.eventId is only used here to hand
 // the raw string to the page as a data attribute for the script to read.
+//
+// IMPORTANT — the route param is the raw Calendar `eventId` alone, NOT the
+// full `${eventId}::${visitDate}` jobKey (this file used to be named
+// [jobKey].astro and took the whole key — see AGENTS.md for why that broke).
+// Astro's SSR dynamic-route params aren't reliably decoded (confirmed via
+// withastro/astro issue #16313 — colons encoded as %3A survive `decodeURI`
+// verbatim rather than becoming `:`), so a jobKey containing `::` arrived
+// here as literal `%3A%3A`, get-job.js's key-splitting logic extracted
+// garbage as the "eventId," Google's API call failed, and the page showed
+// a false "this job's calendar event no longer exists" error even for a
+// perfectly real job. A plain Calendar event ID has no colons or other
+// characters that need percent-encoding in the first place, so keying the
+// route off eventId alone sidesteps the whole decode-inconsistency class of
+// bug rather than working around it. get-job.js already recomputes the
+// job's visitDate/jobKey fresh from the live event's current start time
+// regardless (a recurring plan's event moves forward in place each billing
+// cycle), so the visitDate half of the old jobKey was never actually used
+// for the lookup anyway — dropping it from the URL loses nothing.
 export const prerender = false;
 
 import AdminLayout from "../../../layouts/AdminLayout.astro";
 
-const { jobKey } = Astro.params;
+const { eventId } = Astro.params;
 ---
 
 <AdminLayout title="Job | Sky House Cleaning Staff Tools">
-	<div class="container admin-container" id="job-page" data-job-key={jobKey}>
+	<div class="container admin-container" id="job-page" data-event-id={eventId}>
 		<a href="/admin/jobs" class="admin-back-link">← Back to Jobs</a>
 
 		<p id="load-status" class="admin-status">Loading…</p>
@@ -116,7 +134,7 @@ const { jobKey } = Astro.params;
 
 	<script>
 		const root = document.getElementById("job-page");
-		const requestedJobKey = root?.dataset.jobKey || "";
+		const requestedEventId = root?.dataset.eventId || "";
 
 		const loadStatus = document.getElementById("load-status");
 		const jobContent = document.getElementById("job-content");
@@ -534,7 +552,7 @@ const { jobKey } = Astro.params;
 		}
 
 		async function loadJob() {
-			if (!requestedJobKey) {
+			if (!requestedEventId) {
 				loadStatus.textContent = "Missing job.";
 				loadStatus.classList.add("admin-status--error");
 				return;
@@ -543,7 +561,7 @@ const { jobKey } = Astro.params;
 			loadStatus.textContent = "Loading…";
 			jobContent.hidden = true;
 			try {
-				const res = await fetch(`/api/admin/dispatch/get-job?jobKey=${encodeURIComponent(requestedJobKey)}`);
+				const res = await fetch(`/api/admin/dispatch/get-job?eventId=${encodeURIComponent(requestedEventId)}`);
 				const data = await res.json();
 				if (!res.ok) {
 					loadStatus.textContent = data.error || "Couldn't load this job.";

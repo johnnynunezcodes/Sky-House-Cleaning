@@ -760,9 +760,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				updatePopupTeamSummary();
 				if (!currentJob) return;
 				const selectedIds = popupTeamSelectedIds();
+				// Going from zero cleaners to at least one bumps status out of
+				// "unassigned" the same way the Jobs detail page's team editor
+				// does (see AGENTS.md → "Jobs" → the full job detail page) — this
+				// popup used to skip that bump, which is why a visit could show
+				// real cleaners here yet still read "Unassigned" on the Jobs list.
+				const nextStatus = selectedIds.length && currentJob.status === "unassigned" ? "assigned" : undefined;
+				const extra = { assignedCleanerIds: selectedIds, ...(nextStatus ? { status: nextStatus } : {}) };
 				try {
-					await saveJobFields(currentJob, { assignedCleanerIds: selectedIds });
+					await saveJobFields(currentJob, extra);
 					currentJob.assignedCleanerIds = selectedIds;
+					if (nextStatus) currentJob.status = nextStatus;
 					await loadCurrentPeriod();
 				} catch (err) {
 					popupMessage.hidden = false;
@@ -944,10 +952,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				editMessage.hidden = true;
 				try {
 					const selectedIds = editAssignSelectedIds();
+					// Same status auto-bump as the Visit Popup's team editor and the
+					// Jobs detail page — going from zero cleaners to at least one
+					// moves status out of "unassigned" so the Jobs list doesn't keep
+					// showing a visit as unassigned once it actually has a team.
+					const nextStatus = selectedIds.length && currentJob.status === "unassigned" ? "assigned" : undefined;
 					await saveJobFields(currentJob, {
 						assignedCleanerIds: selectedIds,
 						dispatchNotes: editInstructions.value,
+						...(nextStatus ? { status: nextStatus } : {}),
 					});
+					if (nextStatus) currentJob.status = nextStatus;
 
 					if (currentJob.jobType !== "recurring" && editDate.value && editStartTime.value && editEndTime.value) {
 						const res = await fetch("/api/admin/dispatch/reschedule-visit", {

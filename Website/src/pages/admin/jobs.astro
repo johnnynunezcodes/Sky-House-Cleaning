@@ -738,9 +738,10 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 					// AGENTS.md → "Jobs") instead of a popup, so there's room for a
 					// real client card, invoice status, and an edit path, matching
 					// what the business owner asked for after seeing Jobber's own
-					// job page.
+					// job page. Links by eventId alone, not the full jobKey — see
+					// get-job.js's own comment for why a jobKey's "::" broke this.
 					tr.addEventListener("click", () => {
-						window.location.href = `/admin/jobs/${encodeURIComponent(job.jobKey)}`;
+						window.location.href = `/admin/jobs/${encodeURIComponent(job.eventId)}`;
 					});
 					listTableBody.appendChild(tr);
 				});

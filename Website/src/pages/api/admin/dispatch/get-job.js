@@ -1,7 +1,19 @@
-// Staff-only: single-job read for the /admin/jobs/[jobKey] detail page —
+// Staff-only: single-job read for the /admin/jobs/[eventId] detail page —
 // the one-event equivalent of list-jobs.js's date-window read. Reuses the
 // same jobFromCalendarEvent() transform so the two never drift apart (see
 // that function's own comment in src/lib/dispatch.js).
+//
+// Keyed by the raw Calendar eventId alone, NOT the `${eventId}::${visitDate}`
+// jobKey — this endpoint (and its page) used to take the full jobKey, but
+// Astro's SSR dynamic-route params don't reliably decodeURIComponent (see
+// withastro/astro issue #16313: a `::` encoded as `%3A%3A` in the URL can
+// survive `decodeURI`-based param extraction as literal `%3A%3A` rather than
+// becoming `::`), so splitting on "::" here was finding nothing and treating
+// the whole mangled string as the eventId — a real job would 404 with "this
+// job's calendar event no longer exists" even though nothing was wrong with
+// it. A bare Calendar eventId has no colons or other characters needing
+// percent-encoding in the first place, so keying off it alone sidesteps the
+// entire class of bug rather than working around Astro's inconsistency.
 export const prerender = false;
 
 import { getBookingEvent, isConfigured as calendarConfigured } from "../../../../lib/googleCalendar.js";
@@ -16,36 +28,38 @@ export async function GET({ url }) {
 		return json({ error: "Firebase isn't configured yet. See AGENTS.md → CRM (Firebase/Firestore)." }, 500);
 	}
 
-	const key = url.searchParams.get("jobKey") || "";
-	// jobKey is `${eventId}::${visitDate}` (see dispatch.js's jobKey()).
-	// Calendar event IDs never contain "::" (Google's IDs are lowercase
-	// base32hex), so splitting on the last occurrence is safe and doesn't
-	// need the visitDate half at all — the fresh event's own start time is
-	// the source of truth for that (see below).
-	const sepIndex = key.lastIndexOf("::");
-	const eventId = sepIndex === -1 ? key : key.slice(0, sepIndex);
+	const eventId = url.searchParams.get("eventId") || "";
 	if (!eventId) {
-		return json({ error: "Missing jobKey." }, 400);
+		return json({ error: "Missing eventId." }, 400);
+	}
+
+	let event;
+	try {
+		event = await getBookingEvent({ eventId });
+	} catch (err) {
+		// Distinguish "Google said this ID doesn't exist" (a real 404 — the
+		// event was actually deleted) from anything else (auth/config/network
+		// errors) so a genuine bug doesn't get mislabeled as "deleted" the way
+		// a blanket catch here did before — that swallowed error is exactly
+		// what made the earlier jobKey-decoding bug so confusing to diagnose.
+		const status = err?.code || err?.response?.status;
+		if (status === 404) {
+			return json({ error: "This job's calendar event no longer exists — it may have been deleted." }, 404);
+		}
+		return json({ error: "Couldn't reach Google Calendar: " + (err?.message || String(err)) }, 502);
+	}
+
+	if (event.status === "cancelled") {
+		return json({ error: "This job's calendar event has been cancelled." }, 404);
 	}
 
 	try {
-		let event;
-		try {
-			event = await getBookingEvent({ eventId });
-		} catch {
-			return json({ error: "This job's calendar event no longer exists — it may have been deleted." }, 404);
-		}
-		if (event.status === "cancelled") {
-			return json({ error: "This job's calendar event has been cancelled." }, 404);
-		}
-
 		// Recompute the job from the event's CURRENT start time rather than
-		// trusting the visitDate half of the requested jobKey — a recurring
+		// trusting any visitDate a caller might separately track — a recurring
 		// plan's event moves forward in place each billing cycle (see
-		// dispatch.js's own jobKey() comment), so a bookmarked/stale link
-		// should land on wherever the visit actually is now, with the
-		// assignment overlay looked up under that same fresh key, not
-		// whatever key the link happened to encode when it was generated.
+		// dispatch.js's own jobKey() comment), so this always lands on
+		// wherever the visit actually is now, with the assignment overlay
+		// looked up under that same fresh key.
 		const job = jobFromCalendarEvent(event);
 		const assignments = await getJobAssignments([job.jobKey]);
 		const merged = { ...job, ...assignments.get(job.jobKey) };
