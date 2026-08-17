@@ -1806,6 +1806,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				flex-direction: column;
 				gap: 0.3rem;
 				min-height: 90px;
+				/* Grid items default to min-width: auto, which resolves to their
+				   content's min-content size — a long unbroken visit-chip label
+				   (e.g. "Sky House Cleaning: ..., Office & Commercial Cleaning")
+				   was stretching that day's grid column past its 1fr share,
+				   throwing off every other column's alignment with the SUN-SAT
+				   headers above. Same overflow bug fixed elsewhere in this
+				   codebase (see AdminLayout.astro's own min-width: 0 comment) —
+				   this explicit override is what lets the column actually shrink
+				   back to 1fr and rely on .admin-month-chip's own text-overflow:
+				   ellipsis to truncate the label instead. */
+				min-width: 0;
 				padding: 0.4rem;
 				border-radius: 10px;
 				border: 1px solid var(--color-border);
