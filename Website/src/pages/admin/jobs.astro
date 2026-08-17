@@ -161,6 +161,7 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 					<div class="admin-modal__header">
 						<div>
 							<h3 id="job-modal-title"></h3>
+							<p class="admin-card__meta" id="job-modal-client"></p>
 							<p class="admin-card__meta" id="job-modal-time"></p>
 							<p class="admin-card__meta" id="job-modal-location"></p>
 							<p class="admin-card__meta admin-card__meta--quote" id="job-modal-quote" hidden></p>
@@ -402,6 +403,7 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 
 			const modalBackdrop = document.getElementById("job-modal-backdrop");
 			const modalTitle = document.getElementById("job-modal-title");
+			const modalClient = document.getElementById("job-modal-client");
 			const modalTime = document.getElementById("job-modal-time");
 			const modalLocation = document.getElementById("job-modal-location");
 			const modalQuote = document.getElementById("job-modal-quote");
@@ -420,6 +422,20 @@ import { WORKING_HOURS, QUOTE_SERVICE_TYPES } from "../../data/booking.js";
 				currentModalJob = job;
 				const assignedIds = job.assignedCleanerIds || [];
 				modalTitle.textContent = job.jobNumber ? `#${job.jobNumber} — ${job.summary || "Job"}` : job.summary || "Job";
+				// Jobs/visits aren't stored with a Firestore contact id (see
+				// AGENTS.md — they come from Google Calendar events, not the CRM
+				// `clients` collection), so we can't deep-link straight to a doc.
+				// We match by email instead: /admin/crm/contacts?email=... finds
+				// the contact with that email and opens its edit form. Falls back
+				// to plain text (no link) when the calendar event has no attendee
+				// email to match against.
+				const clientName = clientNameFor(job);
+				if (job.clientEmail) {
+					modalClient.innerHTML = `Client: <a href="/admin/crm/contacts?email=${encodeURIComponent(job.clientEmail)}" target="_blank" rel="noopener">${escapeHtml(clientName)}</a>`;
+				} else {
+					modalClient.textContent = `Client: ${clientName}`;
+				}
+				modalClient.hidden = !clientName || clientName === "—";
 				modalTime.textContent = `${fmtDateTime(job.start)} · ${fmtTime(job.start)} – ${fmtTime(job.end)}`;
 				modalLocation.textContent = job.location || "";
 				modalLocation.hidden = !job.location;

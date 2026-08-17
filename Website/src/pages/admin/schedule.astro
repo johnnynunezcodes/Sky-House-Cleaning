@@ -815,7 +815,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				editTitleDisplay.textContent = job.jobNumber ? `#${job.jobNumber} — ${job.summary || "Visit"}` : job.summary || "Visit";
 				editInstructions.value = job.dispatchNotes || "";
 				editJobNumber.textContent = job.jobNumber ? `#${job.jobNumber}` : "—";
-				editClient.textContent = clientNameFor(job);
+				// Visits aren't stored with a Firestore contact id (they come from
+				// Google Calendar events, not the `clients` collection — same
+				// reasoning as the Client tab's email-match in loadClientTab()
+				// above), so we link out by matching email rather than an id.
+				// Opens in a new tab so editing the contact doesn't lose this
+				// in-progress visit edit.
+				if (job.clientEmail) {
+					editClient.innerHTML = `<a href="/admin/crm/contacts?email=${encodeURIComponent(job.clientEmail)}" target="_blank" rel="noopener">${escapeHtml(clientNameFor(job))}</a>`;
+				} else {
+					editClient.textContent = clientNameFor(job);
+				}
 				editPhone.textContent = "—"; // not exposed on the calendar event today
 				editAddress.textContent = job.location || "—";
 

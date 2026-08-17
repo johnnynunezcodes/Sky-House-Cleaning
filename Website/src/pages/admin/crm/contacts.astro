@@ -86,6 +86,18 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 			const STAGE_LABELS = { lead: "Lead", active_client: "Active client", past_client: "Past client" };
 			let currentStage = "";
 
+			// Deep-link support: Jobs' job-detail modal and Schedule's Edit Visit
+			// modal both link here as /admin/crm/contacts?email=... so staff can
+			// jump straight from a booking to editing the client's info. Jobs
+			// and visits come from Google Calendar events, not this page's
+			// Firestore `clients` collection, so there's no shared id to link by
+			// — email is the best available match. Read once on load, consumed
+			// (cleared) after the first successful match so switching stage
+			// filters afterward doesn't keep re-triggering it.
+			let pendingDeepLinkEmail = (new URLSearchParams(location.search).get("email") || "")
+				.trim()
+				.toLowerCase();
+
 			function escapeHtml(str) {
 				const div = document.createElement("div");
 				div.textContent = str ?? "";
@@ -120,9 +132,11 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 				}
 
 				resultsEl.innerHTML = "";
+				let deepLinkMatchCard = null;
 				for (const client of clients) {
 					const card = document.createElement("div");
 					card.className = "card admin-card";
+					card.id = `contact-${client.id}`;
 					card.innerHTML = `
 						<div class="admin-card__header">
 							<h3>${escapeHtml(client.name) || "(no name)"}</h3>
@@ -229,7 +243,20 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 						}
 					});
 
+					if (pendingDeepLinkEmail && (client.email || "").trim().toLowerCase() === pendingDeepLinkEmail) {
+						deepLinkMatchCard = card;
+						editForm.hidden = false;
+						editToggle.hidden = true;
+					}
+
 					resultsEl.appendChild(card);
+				}
+
+				if (deepLinkMatchCard) {
+					deepLinkMatchCard.classList.add("admin-card--highlight");
+					deepLinkMatchCard.scrollIntoView({ behavior: "smooth", block: "center" });
+					setTimeout(() => deepLinkMatchCard.classList.remove("admin-card--highlight"), 2500);
+					pendingDeepLinkEmail = ""; // only auto-open once per page load
 				}
 			}
 
@@ -381,6 +408,15 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 			.admin-card {
 				margin-bottom: 1.25rem;
 				padding: 1.5rem;
+				transition: box-shadow 0.3s ease;
+			}
+
+			/* Briefly marks the contact a Jobs/Schedule deep link (?email=...)
+			   scrolled to and auto-opened for editing, so it's obvious which
+			   card just appeared/expanded. Removed a couple seconds after
+			   render — see the deep-link handling in renderContacts(). */
+			.admin-card--highlight {
+				box-shadow: 0 0 0 3px var(--color-sky);
 			}
 
 			.admin-card__header {
