@@ -416,6 +416,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				return (ids || []).map((id) => cleaners.find((c) => c.id === id)?.name).filter(Boolean);
 			}
 
+			// Up to 2 letters ("John Torres" -> "JT", "Maria" -> "M") for the
+			// small round avatar on Month view visit cards, Jobber-style.
+			function initials(name) {
+				return (name || "")
+					.split(/\s+/)
+					.filter(Boolean)
+					.slice(0, 2)
+					.map((part) => part[0].toUpperCase())
+					.join("");
+			}
+
 			function parseSummary(summary) {
 				const m = (summary || "").match(/^Sky House Cleaning: (.+?), (.+)$/);
 				return m ? { client: m[1], service: m[2] } : { client: summary || "—", service: "" };
@@ -1287,10 +1298,15 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				const chipsEl = cell.querySelector(".admin-month-day__chips");
 				jobs.forEach((job) => {
 					const assignedIds = job.assignedCleanerIds || [];
+					const isUnassigned = assignedIds.length === 0;
+					const firstCleanerName = cleanerNamesFor(assignedIds)[0];
 					const mini = document.createElement("button");
 					mini.type = "button";
-					mini.className = "admin-month-chip" + (assignedIds.length === 0 ? " admin-month-chip--unassigned" : "");
-					mini.innerHTML = `<span class="admin-month-chip__dot"></span>${escapeHtml(job.summary)}`;
+					mini.className = "admin-month-chip" + (isUnassigned ? " admin-month-chip--unassigned" : "");
+					mini.innerHTML = `
+						<span class="admin-month-chip__avatar">${isUnassigned ? "—" : escapeHtml(initials(firstCleanerName))}</span>
+						<span class="admin-month-chip__body"><strong>${fmtTime(job.start)}</strong> ${escapeHtml(job.summary)}</span>
+					`;
 					mini.addEventListener("click", (e) => {
 						e.stopPropagation();
 						openPopup(job);
@@ -1774,6 +1790,69 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				color: var(--color-slate-light);
 			}
 
+			/* .admin-chip — the fuller Week-board visit card (time, summary,
+			   assigned cleaner names, status badge). This had no CSS at all
+			   until now (a gap from the original single-file build, never
+			   noticed since the Month card redesign is what prompted a close
+			   look at this file's chip styles) — same blue/red assigned/
+			   unassigned color language as the Day view's .admin-daygrid__block
+			   and the new .admin-month-chip, just roomier since a week column
+			   has much more width to work with than a month cell. */
+			.admin-chip {
+				display: flex;
+				flex-direction: column;
+				gap: 0.2rem;
+				width: 100%;
+				text-align: left;
+				border: none;
+				border-radius: 8px;
+				background: #eaf1fb;
+				color: #1a3a5c;
+				padding: 0.5rem 0.6rem;
+				font-family: inherit;
+				cursor: pointer;
+			}
+
+			.admin-chip:hover {
+				filter: brightness(0.97);
+			}
+
+			.admin-chip--unassigned {
+				background: #fdeceb;
+				color: #7a1a15;
+			}
+
+			.admin-chip__time {
+				font-size: 0.72rem;
+				font-weight: 700;
+			}
+
+			.admin-chip__summary {
+				font-size: 0.85rem;
+				font-weight: 600;
+				line-height: 1.3;
+			}
+
+			.admin-chip__cleaners {
+				font-size: 0.78rem;
+				color: #1a5fb4;
+			}
+
+			.admin-chip--unassigned .admin-chip__cleaners {
+				color: #b3261e;
+			}
+
+			.admin-chip__cleaners--empty {
+				font-style: italic;
+			}
+
+			.admin-chip__footer {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
+				margin-top: 0.1rem;
+			}
+
 			/* --- Month grid ----------------------------------------------------- */
 
 			.admin-month-weekdays {
@@ -1867,31 +1946,55 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				gap: 0.2rem;
 			}
 
+			/* A small rounded card per visit (avatar + bold time + wrapping
+			   summary text) — Jobber-style, replacing an earlier version that
+			   truncated everything to one ellipsized line. Text is allowed to
+			   wrap onto a second line rather than being cut off; the day cell
+			   grows taller to fit instead. Relies on .admin-month-day's own
+			   min-width: 0 (see that rule's comment) to keep the grid column
+			   itself from stretching to fit a long label. */
 			.admin-month-chip {
 				display: flex;
-				align-items: center;
-				gap: 0.3rem;
+				align-items: flex-start;
+				gap: 0.35rem;
 				width: 100%;
 				text-align: left;
 				border: none;
-				border-radius: 6px;
+				border-radius: 8px;
 				background: #eaf1fb;
 				color: #1a3a5c;
-				padding: 0.15rem 0.35rem;
-				font-size: 0.7rem;
+				padding: 0.3rem 0.45rem;
+				font-size: 0.72rem;
 				font-family: inherit;
-				overflow: hidden;
-				text-overflow: ellipsis;
-				white-space: nowrap;
 				cursor: pointer;
 			}
 
-			.admin-month-chip__dot {
-				width: 6px;
-				height: 6px;
+			.admin-month-chip:hover {
+				filter: brightness(0.97);
+			}
+
+			.admin-month-chip__avatar {
+				flex-shrink: 0;
+				width: 18px;
+				height: 18px;
+				margin-top: 0.05rem;
 				border-radius: 50%;
 				background: #1a5fb4;
-				flex-shrink: 0;
+				color: var(--color-white);
+				font-size: 0.58rem;
+				font-weight: 700;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			.admin-month-chip__body {
+				min-width: 0;
+				line-height: 1.3;
+				overflow: hidden;
+				display: -webkit-box;
+				-webkit-line-clamp: 3;
+				-webkit-box-orient: vertical;
 			}
 
 			.admin-month-chip--unassigned {
@@ -1899,7 +2002,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				color: #7a1a15;
 			}
 
-			.admin-month-chip--unassigned .admin-month-chip__dot {
+			.admin-month-chip--unassigned .admin-month-chip__avatar {
 				background: #b3261e;
 			}
 
