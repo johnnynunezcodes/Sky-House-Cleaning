@@ -1,2 +1,7 @@
 .DS_Store
 .env
+
+# Raw job photos being sorted through before picking/optimizing final shots
+# for the live site. Copy finished picks into Website/public/images/ by hand
+# when ready (same pattern as the logo assets in Images/Appendix.md).
+Images/Job Photos - Unsorted/
