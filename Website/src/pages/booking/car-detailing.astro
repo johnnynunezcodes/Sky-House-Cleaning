@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import PageHero from "../../components/PageHero.astro";
 import CtaBand from "../../components/CtaBand.astro";
 import CarDetailingConfigurator from "../../components/CarDetailingConfigurator.astro";
+import BookingTypeToggle from "../../components/BookingTypeToggle.astro";
 ---
 
 <Layout
@@ -13,7 +14,9 @@ import CarDetailingConfigurator from "../../components/CarDetailingConfigurator.
 		eyebrow="Vehicle Care · One-Time $275 or Membership $250/Visit"
 		title="Book Your Interior Detail"
 		lede="Pick one-time or ongoing care, add any extras, and see your price update live. Not sure what's included? See the full details on our Interior Car Detailing page."
-	/>
+	>
+		<BookingTypeToggle active="car" />
+	</PageHero>
 
 	<section class="section">
 		<div class="container">

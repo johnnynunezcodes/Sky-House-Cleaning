@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import PageHero from "../components/PageHero.astro";
 import CtaBand from "../components/CtaBand.astro";
 import PricingConfigurator from "../components/PricingConfigurator.astro";
+import BookingTypeToggle from "../components/BookingTypeToggle.astro";
 import { pricingMatrix } from "../data/content.js";
 ---
 
@@ -14,7 +15,9 @@ import { pricingMatrix } from "../data/content.js";
 		eyebrow="Pricing"
 		title="Straightforward pricing, based on your home"
 		lede="Our home cleaning rates are flat-rate and based on square footage, no surprises. Find your home's size below to see pricing across every service."
-	/>
+	>
+		<BookingTypeToggle active="home" />
+	</PageHero>
 
 	<section class="section">
 		<div class="container">

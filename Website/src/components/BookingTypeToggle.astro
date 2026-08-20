@@ -1,0 +1,74 @@
+---
+interface Props {
+	active: "home" | "car";
+}
+
+const { active } = Astro.props;
+
+const options = [
+	{ key: "home", label: "Home Cleaning", href: "/booking" },
+	{ key: "car", label: "Car Detailing", href: "/booking/car-detailing" },
+] as const;
+---
+
+<div class="booking-toggle" role="tablist" aria-label="Booking type">
+	{options.map((opt) => (
+		<a
+			href={opt.href}
+			role="tab"
+			aria-selected={opt.key === active}
+			class:list={["booking-toggle__option", { "is-active": opt.key === active }]}
+		>
+			{opt.label}
+		</a>
+	))}
+</div>
+
+<style>
+	.booking-toggle {
+		display: inline-flex;
+		margin: 1.25rem auto 0;
+		padding: 0.3rem;
+		background: var(--color-sky-light);
+		border-radius: 999px;
+		gap: 0.25rem;
+	}
+
+	.booking-toggle__option {
+		display: inline-block;
+		padding: 0.55rem 1.4rem;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.9rem;
+		color: var(--color-slate);
+		border-radius: 999px;
+		text-decoration: none;
+		transition: background 0.15s ease, color 0.15s ease;
+	}
+
+	.booking-toggle__option:hover {
+		color: var(--color-sky-dark);
+	}
+
+	.booking-toggle__option.is-active {
+		background: var(--color-sky);
+		color: var(--color-white);
+	}
+
+	.booking-toggle__option.is-active:hover {
+		color: var(--color-white);
+	}
+
+	@media (max-width: 480px) {
+		.booking-toggle {
+			width: 100%;
+			max-width: 360px;
+		}
+
+		.booking-toggle__option {
+			flex: 1;
+			text-align: center;
+			padding: 0.55rem 0.75rem;
+		}
+	}
+</style>
