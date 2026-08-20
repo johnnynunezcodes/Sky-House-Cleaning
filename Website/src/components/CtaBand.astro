@@ -2,11 +2,15 @@
 interface Props {
 	heading?: string;
 	subtext?: string;
+	primaryLabel?: string;
+	primaryHref?: string;
 }
 
 const {
 	heading = "Ready for a cleaner, calmer home?",
 	subtext = "Give us a call or send us an email and we'll help you find the right plan for your home.",
+	primaryLabel = "Call (801) 759-2044",
+	primaryHref = "tel:+18017592044",
 } = Astro.props;
 ---
 
@@ -15,7 +19,7 @@ const {
 		<h2>{heading}</h2>
 		<p>{subtext}</p>
 		<div class="cta-band__actions">
-			<a href="tel:+18017592044" class="btn btn--primary">Call (801) 759-2044</a>
+			<a href={primaryHref} class="btn btn--primary">{primaryLabel}</a>
 			<a href="mailto:info@skyhousecleaning.com" class="btn btn--ghost">Email Us</a>
 		</div>
 	</div>
