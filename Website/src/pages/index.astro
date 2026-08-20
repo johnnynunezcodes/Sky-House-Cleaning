@@ -103,15 +103,42 @@ const galleryPhotos = [
 		<div class="container">
 			<div class="section-heading">
 				<p class="eyebrow">See the Difference</p>
-				<h2>A real kitchen, before and after</h2>
-				<p>Drag the slider to see what a Sky House Cleaning visit looks like in person.</p>
+				<h2>Real homes, before and after</h2>
+				<p>Drag any slider to see what a Sky House Cleaning visit looks like in person.</p>
 			</div>
-			<div class="before-after-wrap">
-				<BeforeAfterSlider
-					beforeSrc="/images/before-after/kitchen-before.jpg"
-					afterSrc="/images/before-after/kitchen-after.jpg"
-					alt="Kitchen cleaned by Sky House Cleaning"
-				/>
+			<div class="before-after-grid">
+				<div class="before-after-item">
+					<BeforeAfterSlider
+						beforeSrc="/images/before-after/kitchen-before.jpg"
+						afterSrc="/images/before-after/kitchen-after.jpg"
+						alt="Kitchen cleaned by Sky House Cleaning"
+					/>
+					<p class="before-after-caption">Kitchen</p>
+				</div>
+				<div class="before-after-item">
+					<BeforeAfterSlider
+						beforeSrc="/images/before-after/living-room-before.jpg"
+						afterSrc="/images/before-after/living-room-after.jpg"
+						alt="Living room cleaned by Sky House Cleaning"
+					/>
+					<p class="before-after-caption">Living Room</p>
+				</div>
+				<div class="before-after-item">
+					<BeforeAfterSlider
+						beforeSrc="/images/before-after/bathroom-tub-before.jpg"
+						afterSrc="/images/before-after/bathroom-tub-after.jpg"
+						alt="Bathroom tub cleaned by Sky House Cleaning"
+					/>
+					<p class="before-after-caption">Bathroom</p>
+				</div>
+				<div class="before-after-item">
+					<BeforeAfterSlider
+						beforeSrc="/images/before-after/fridge-before.jpg"
+						afterSrc="/images/before-after/fridge-after.jpg"
+						alt="Refrigerator interior cleaned by Sky House Cleaning"
+					/>
+					<p class="before-after-caption">Refrigerator</p>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -180,9 +207,27 @@ const galleryPhotos = [
 		margin: 2.75rem auto 0;
 	}
 
-	.before-after-wrap {
-		max-width: 760px;
+	.before-after-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 2.5rem 2rem;
+		max-width: 900px;
 		margin: 0 auto;
+	}
+
+	.before-after-caption {
+		margin: 0.85rem 0 0;
+		text-align: center;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.95rem;
+		color: var(--color-ink);
+	}
+
+	@media (max-width: 640px) {
+		.before-after-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	.gallery {

@@ -46,15 +46,34 @@ import {
 		<div class="container">
 			<div class="section-heading section-heading--left">
 				<p class="eyebrow">See the Difference</p>
-				<h2>A real kitchen, before and after</h2>
-				<p>Drag the slider to see what a Sky House Cleaning visit looks like in person.</p>
+				<h2>Real results, before and after</h2>
+				<p>Drag any slider to see what a Sky House Cleaning visit looks like in person.</p>
 			</div>
-			<div class="before-after-wrap">
-				<BeforeAfterSlider
-					beforeSrc="/images/before-after/kitchen-2-before.jpg"
-					afterSrc="/images/before-after/kitchen-2-after.jpg"
-					alt="Kitchen cleaned by Sky House Cleaning"
-				/>
+			<div class="before-after-grid">
+				<div class="before-after-item">
+					<BeforeAfterSlider
+						beforeSrc="/images/before-after/kitchen-2-before.jpg"
+						afterSrc="/images/before-after/kitchen-2-after.jpg"
+						alt="Kitchen cleaned by Sky House Cleaning"
+					/>
+					<p class="before-after-caption">Kitchen</p>
+				</div>
+				<div class="before-after-item">
+					<BeforeAfterSlider
+						beforeSrc="/images/before-after/stove-before.jpg"
+						afterSrc="/images/before-after/stove-after.jpg"
+						alt="Stovetop cleaned by Sky House Cleaning"
+					/>
+					<p class="before-after-caption">Stove</p>
+				</div>
+				<div class="before-after-item">
+					<BeforeAfterSlider
+						beforeSrc="/images/before-after/toilet-before.jpg"
+						afterSrc="/images/before-after/toilet-after.jpg"
+						alt="Toilet cleaned by Sky House Cleaning"
+					/>
+					<p class="before-after-caption">Toilet</p>
+				</div>
 			</div>
 		</div>
 	</section>
@@ -151,9 +170,31 @@ import {
 		margin: 0 0 2.5rem;
 	}
 
-	.before-after-wrap {
-		max-width: 760px;
-		margin: 0 auto;
+	.before-after-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 2.5rem 2rem;
+	}
+
+	.before-after-caption {
+		margin: 0.85rem 0 0;
+		text-align: center;
+		font-family: var(--font-heading);
+		font-weight: 600;
+		font-size: 0.95rem;
+		color: var(--color-ink);
+	}
+
+	@media (max-width: 900px) {
+		.before-after-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (max-width: 640px) {
+		.before-after-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	/* Only one card in this section, so it's capped to a normal card width
