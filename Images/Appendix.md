@@ -13,4 +13,6 @@ Located in `Logos/`:
 ## Job Photos (Unsorted)
 `Job Photos - Unsorted/` holds raw before/after job photos (HEIC/JPEG straight off the phone) waiting to be sorted through. Git-ignored — never pushed to GitHub. When you pick shots to actually use on the site, convert them to a web format (JPG/WebP), optimize/resize, give them a descriptive filename, and copy just those into `Website/public/images/` by hand — the same pattern already used for the logo assets above.
 
+- `Job Photos - Unsorted/Cleaners/` holds staff photos (currently one: a team member in uniform, on the job). The first pick from here (`IMG_2053.heic`) was converted/resized to `Website/public/images/about/team-member-cleaning.jpg`, used on the About page's intro section (`about.astro`) as the site's first real photo of the team — everything there was plain text before.
+
 When you add new images (or markdown files) to this project, add a link or folder note here so I know where to find them.

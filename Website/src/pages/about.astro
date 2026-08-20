@@ -53,8 +53,14 @@ const productStandards = [
 	/>
 
 	<section class="section">
-		<div class="container about-copy">
-			<p>
+		<div class="container about-intro">
+			<img
+				src="/images/about/team-member-cleaning.jpg"
+				alt="A Sky House Cleaning team member, in uniform, smiling in a client's dining room"
+				class="about-intro__photo"
+				loading="lazy"
+			/>
+			<p class="about-intro__text">
 				That shows up in how we run things. Pricing you can see before you book, no surprises at
 				the door. Memberships built to actually fit your schedule, not the other way around. And a
 				team that pays attention to the small stuff (the baseboard, the cabinet handle, the corner
@@ -115,11 +121,37 @@ const productStandards = [
 </Layout>
 
 <style>
-	.about-copy {
-		max-width: 720px;
+	.about-intro {
+		display: grid;
+		grid-template-columns: minmax(0, 340px) 1fr;
+		gap: 2.5rem;
+		align-items: center;
+		max-width: 960px;
 		margin: 0 auto;
-		text-align: center;
+	}
+
+	.about-intro__photo {
+		width: 100%;
+		height: auto;
+		border-radius: var(--radius);
+		box-shadow: var(--shadow-soft);
+		object-fit: cover;
+	}
+
+	.about-intro__text {
 		font-size: 1.05rem;
+	}
+
+	@media (max-width: 720px) {
+		.about-intro {
+			grid-template-columns: 1fr;
+			text-align: center;
+		}
+
+		.about-intro__photo {
+			max-width: 340px;
+			margin: 0 auto;
+		}
 	}
 
 	.value-card {
