@@ -138,8 +138,17 @@ export function calculatePrice(selections) {
 			basePrice = tier.deep;
 		} else if (type === "moveInOut") {
 			basePrice = tier.moveInOut;
-		} else {
+		} else if (type === "standard") {
 			basePrice = tier[safeFrequency] ?? tier.oneTime;
+		} else {
+			// Unrecognized `type` — never fall through to the discounted
+			// weekly/biweekly/monthly tier price. create-checkout-session.js's
+			// `isRecurring`/`policyFor()` checks both require `type === "standard"`
+			// exactly, so anything else must be priced as a plain one-time clean,
+			// not the recurring per-visit rate, or the two would disagree on
+			// what a request actually is (recurring-priced but billed once, with
+			// no policy agreement required).
+			basePrice = tier.oneTime;
 		}
 	}
 

@@ -54,6 +54,20 @@ export async function POST({ request }) {
 		});
 	}
 
+	// Reject any service type outside the closed enum calculatePrice()/
+	// isRecurring/policyFor() are all written against (see pricing.js's own
+	// JSDoc) — an unrecognized type must never reach those checks, since each
+	// one independently decides pricing/billing-mode/policy from the same
+	// string and disagreeing about what a request "is" is exactly how a
+	// recurring-tier discount could previously be billed as a one-time charge.
+	const VALID_SERVICE_TYPES = ["standard", "deep", "moveInOut", "carDetailing"];
+	if (selections?.type !== undefined && !VALID_SERVICE_TYPES.includes(selections.type)) {
+		return new Response(JSON.stringify({ error: "Invalid service type." }), {
+			status: 400,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
+
 	// Close the small race window between two people picking the same slot —
 	// only worth checking if Calendar is actually wired up.
 	if (isCalendarConfigured()) {

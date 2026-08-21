@@ -70,6 +70,12 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
 			const FREQUENCY_LABELS = { weekly: "Weekly", biweekly: "Bi-Weekly", monthly: "Monthly" };
 
+			function escapeHtml(str) {
+				const div = document.createElement("div");
+				div.textContent = str ?? "";
+				return div.innerHTML;
+			}
+
 			function fmt(iso) {
 				if (!iso) return "N/A";
 				return new Date(iso).toLocaleString("en-US", {
@@ -152,8 +158,8 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 					const card = document.createElement("div");
 					card.className = "card admin-card";
 					card.innerHTML = `
-						<h3>${sub.name || "(no name on file)"}</h3>
-						<p class="admin-card__meta">${sub.address || ""}${sub.phone ? " · " + sub.phone : ""}</p>
+						<h3>${escapeHtml(sub.name) || "(no name on file)"}</h3>
+						<p class="admin-card__meta">${escapeHtml(sub.address)}${sub.phone ? " · " + escapeHtml(sub.phone) : ""}</p>
 						<p class="admin-card__meta">
 							Plan: ${sub.frequency || "N/A"} · Current schedule: <strong>${fmt(sub.lastVisitStart)}</strong>
 							${sub.status && sub.status !== "active" ? ` · Status: <strong>${statusLabel(sub.status)}</strong>` : ""}
