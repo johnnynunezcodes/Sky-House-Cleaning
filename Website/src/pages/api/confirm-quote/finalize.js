@@ -39,7 +39,8 @@ export async function POST({ request }) {
 	try {
 		quote = await getQuote(id);
 	} catch (err) {
-		return json({ error: "Couldn't load this quote: " + err.message }, 500);
+		console.error("Quote lookup failed:", err?.message);
+		return json({ error: "Couldn't load this quote. Please try again or call us." }, 500);
 	}
 
 	if (!quote) {

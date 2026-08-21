@@ -42,7 +42,8 @@ export async function POST({ request }) {
 	try {
 		pending = await getPendingBooking(id);
 	} catch (err) {
-		return json({ error: "Couldn't load this booking: " + err.message }, 500);
+		console.error("Pending booking lookup failed:", err?.message);
+		return json({ error: "Couldn't load this booking. Please try again or call us." }, 500);
 	}
 
 	if (!pending) {
@@ -89,7 +90,8 @@ export async function POST({ request }) {
 		checkoutResponse = await createCheckoutSession({ request: syntheticRequest });
 		checkoutData = await checkoutResponse.json();
 	} catch (err) {
-		return json({ error: "Something went wrong starting checkout: " + err.message }, 500);
+		console.error("Checkout hand-off from pending booking failed:", err?.message);
+		return json({ error: "Something went wrong starting checkout. Please try again or call us." }, 500);
 	}
 
 	if (!checkoutResponse.ok || !checkoutData?.url) {

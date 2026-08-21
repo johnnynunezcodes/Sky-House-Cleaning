@@ -60,7 +60,8 @@ export async function POST({ request }) {
 		const origin = new URL(request.url).origin;
 		return json({ id, confirmUrl: `${origin}/confirm/${id}` });
 	} catch (err) {
-		return json({ error: "Couldn't create the booking: " + err.message }, 500);
+		console.error("Pending booking creation failed:", err?.message);
+		return json({ error: "Couldn't create the booking. Please try again." }, 500);
 	}
 }
 

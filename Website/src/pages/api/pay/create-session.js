@@ -40,7 +40,8 @@ export async function POST({ request }) {
 	try {
 		invoice = await getInvoice(id);
 	} catch (err) {
-		return json({ error: "Couldn't load this invoice: " + err.message }, 500);
+		console.error("Invoice lookup failed:", err?.message);
+		return json({ error: "Couldn't load this invoice. Please try again or call us." }, 500);
 	}
 
 	if (!invoice) {

@@ -49,7 +49,8 @@ export async function POST({ request }) {
 	try {
 		pending = await getPendingDeposit(id);
 	} catch (err) {
-		return json({ error: "Couldn't load this request: " + err.message }, 500);
+		console.error("Pending deposit lookup failed:", err?.message);
+		return json({ error: "Couldn't load this request. Please try again or call us." }, 500);
 	}
 
 	if (!pending) {
