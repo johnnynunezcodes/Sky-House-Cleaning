@@ -1603,6 +1603,11 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			   specificity wins here without touching their width. */
 			#schedule-page.admin-container {
 				max-width: 1800px;
+				/* Warm Card Board direction: the whole page sits on a cream tint
+				   rather than plain white, so the Month grid's white day-cards
+				   (see .admin-month-day below) read as cards sitting on a warm
+				   surface instead of a bordered table on white-on-white. */
+				background: var(--color-cream);
 			}
 
 			.admin-hint {
@@ -1711,8 +1716,8 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			.admin-filter-btn {
 				padding: 0.4rem 0.9rem;
 				border-radius: 999px;
-				border: 1px solid var(--color-border);
-				background: var(--color-white);
+				border: none;
+				background: var(--color-sky-light);
 				font-size: 0.82rem;
 				font-weight: 600;
 				color: var(--color-ink);
@@ -1817,17 +1822,23 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				background: var(--color-sky-light);
 			}
 
+			/* Warm Card Board: a real segmented control (tinted track, white
+			   active pill with a soft shadow) rather than a row of separately
+			   bordered pill buttons. */
 			.admin-view-switcher {
 				display: flex;
 				flex-wrap: wrap;
-				gap: 0.5rem;
+				gap: 2px;
+				background: var(--color-sky-light);
+				border-radius: 999px;
+				padding: 3px;
 			}
 
 			.admin-view-btn {
 				padding: 0.4rem 1rem;
 				border-radius: 999px;
-				border: 1px solid var(--color-border);
-				background: var(--color-white);
+				border: none;
+				background: none;
 				font-size: 0.85rem;
 				font-weight: 600;
 				color: var(--color-slate);
@@ -1835,9 +1846,9 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			}
 
 			.admin-view-btn.is-active {
-				background: var(--color-ink);
-				border-color: var(--color-ink);
-				color: var(--color-white);
+				background: var(--color-white);
+				color: var(--color-ink);
+				box-shadow: 0 2px 6px rgba(28, 43, 69, 0.1);
 			}
 
 			.admin-badge {
@@ -1909,6 +1920,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				border-radius: var(--radius);
 				padding: 0.75rem;
 				min-height: 120px;
+				box-shadow: var(--shadow-soft);
 			}
 
 			.admin-week-col.is-today {
@@ -1980,14 +1992,13 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				gap: 0.2rem;
 				width: 100%;
 				text-align: left;
-				border: 1px solid #cddef2;
-				border-radius: 8px;
+				border: none;
+				border-radius: 10px;
 				background: #eaf1fb;
 				color: #1a3a5c;
 				padding: 0.5rem 0.6rem;
 				font-family: inherit;
 				cursor: pointer;
-				box-shadow: 0 1px 2px rgba(28, 43, 69, 0.06);
 			}
 
 			.admin-chip:hover {
@@ -1996,7 +2007,6 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-chip--unassigned {
 				background: #fdeceb;
-				border-color: #f3c6c1;
 				color: #7a1a15;
 			}
 
@@ -2055,23 +2065,14 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				color: var(--color-ink);
 			}
 
-			/* Cells sit flush against each other (no gap) with a single shared
-			   grid line between them, closer to Jobber's own calendar — a
-			   1px gap filled with the container's own border color is a
-			   standard trick for that: each cell paints over it with its own
-			   background, leaving a uniform 1px line wherever two cells meet,
-			   without doubling up borders the way giving every cell its own
-			   full border would. Reclaims the space that gap: 0.4rem between
-			   every cell was eating into (was the actual ask — more room for
-			   what's inside each day, not just visual polish). */
+			/* Warm Card Board: each day is its own white rounded card sitting on
+			   the page's cream background (see #schedule-page.admin-container
+			   above), separated by a real gap rather than a shared 1px grid
+			   line — replaces the earlier flush hairline-table treatment. */
 			.admin-month-grid {
 				display: grid;
 				grid-template-columns: repeat(7, 1fr);
-				gap: 1px;
-				background: var(--color-border);
-				border: 1px solid var(--color-border);
-				border-radius: 10px;
-				overflow: hidden;
+				gap: 0.6rem;
 			}
 
 			/* Leading/trailing days from the neighboring months (see
@@ -2081,6 +2082,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			   rather than looking like an equally-relevant empty day. */
 			.admin-month-day--outside {
 				background: var(--color-cream);
+				box-shadow: none;
 			}
 
 			.admin-month-day--outside .admin-month-day__num {
@@ -2106,23 +2108,25 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				min-width: 0;
 				padding: 0.65rem 0.65rem 0.5rem;
 				background: var(--color-white);
+				border-radius: var(--radius);
+				box-shadow: var(--shadow-soft);
 			}
 
 			.admin-month-day.is-today {
-				/* inset, not a regular box-shadow — an outward ring would draw
-				   past this cell's own bounds into its neighbors now that
-				   there's no gap between cells to draw it into. */
-				box-shadow: inset 0 0 0 2px var(--color-sky);
+				/* A real outward ring, not inset — now that cards have a gap
+				   between them (see .admin-month-grid above), an outward ring
+				   has room to draw without touching the neighboring card. */
+				box-shadow: 0 0 0 2px var(--color-sky), var(--shadow-soft);
 			}
 
 			/* Deliberately NOT tinting the whole cell here (an earlier version
 			   set this to the exact same #fdeceb as .admin-month-chip--unassigned
 			   below) — a "needs a cleaner" day and its visit card ended up the
 			   same color and visually merged into one blob, which is what
-			   prompted this pass. The cell stays neutral white/bordered; only
-			   the chip itself (with its own border below) carries the color, so
-			   it reads as a distinct card sitting inside the cell — closer to
-			   how Jobber's own calendar looks. */
+			   prompted this pass. The cell stays a neutral white card; only
+			   the chip itself carries the color, so it reads as a distinct
+			   card sitting inside the cell — closer to how Jobber's own
+			   calendar looks. */
 
 			.admin-month-day__header {
 				display: flex;
@@ -2141,6 +2145,17 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				font-weight: 700;
 				color: var(--color-ink);
 				font-size: 0.8rem;
+			}
+
+			.admin-month-day.is-today .admin-month-day__num {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				width: 22px;
+				height: 22px;
+				border-radius: 999px;
+				background: var(--color-sky);
+				color: var(--color-white);
 			}
 
 			.admin-month-day__count {
@@ -2168,19 +2183,18 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			   itself from stretching to fit a long label. */
 			.admin-month-chip {
 				display: flex;
-				align-items: flex-start;
-				gap: 0.35rem;
+				align-items: center;
+				gap: 0.45rem;
 				width: 100%;
 				text-align: left;
-				border: 1px solid #cddef2;
-				border-radius: 8px;
+				border: none;
+				border-radius: 10px;
 				background: #eaf1fb;
 				color: #1a3a5c;
-				padding: 0.3rem 0.45rem;
-				font-size: 0.72rem;
+				padding: 0.35rem 0.5rem;
+				font-size: 0.74rem;
 				font-family: inherit;
 				cursor: pointer;
-				box-shadow: 0 1px 2px rgba(28, 43, 69, 0.06);
 			}
 
 			.admin-month-chip:hover {
@@ -2189,13 +2203,12 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-month-chip__avatar {
 				flex-shrink: 0;
-				width: 18px;
-				height: 18px;
-				margin-top: 0.05rem;
+				width: 22px;
+				height: 22px;
 				border-radius: 50%;
 				background: #1a5fb4;
 				color: var(--color-white);
-				font-size: 0.58rem;
+				font-size: 0.62rem;
 				font-weight: 700;
 				display: flex;
 				align-items: center;
@@ -2213,7 +2226,6 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-month-chip--unassigned {
 				background: #fdeceb;
-				border-color: #f3c6c1;
 				color: #7a1a15;
 			}
 
