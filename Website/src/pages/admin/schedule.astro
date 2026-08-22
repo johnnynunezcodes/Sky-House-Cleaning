@@ -1693,10 +1693,20 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			   public site's big CTA buttons — oversized next to this toolbar's
 			   own compact filter popover buttons (0.4rem 0.9rem, 0.82rem font).
 			   Scoped overrides here rather than touching .btn itself, which is
-			   shared by every button on every admin AND public page. */
+			   shared by every button on every admin AND public page. Also
+			   overrides .btn--outline's transparent/bordered look (mismatched
+			   against the toolbar's other filled warm-tint pill buttons) with
+			   the same filled pill treatment as .admin-filter-btn. */
 			.admin-schedule-toolbar__nav .btn {
 				padding: 0.45rem 1rem;
 				font-size: 0.85rem;
+				border: none;
+				background: var(--admin-warm-tint);
+				color: var(--color-ink);
+			}
+
+			.admin-schedule-toolbar__nav .btn--outline:hover {
+				background: var(--admin-warm-tint);
 			}
 
 			.admin-day-picker-hidden {
@@ -2189,6 +2199,12 @@ import { WORKING_HOURS } from "../../data/booking.js";
 			   grows taller to fit instead. Relies on .admin-month-day's own
 			   min-width: 0 (see that rule's comment) to keep the grid column
 			   itself from stretching to fit a long label. */
+			/* Warm Card Board: the chip itself carries NO background — it's just
+			   time + summary text sitting directly on the day-card, with only
+			   the avatar carrying a colored ring per status. An earlier pass
+			   gave the whole chip a tinted background (blue/red/etc.), which
+			   read as a colored "event block" the mockup never actually had —
+			   this is the corrected, ring-only version. */
 			.admin-month-chip {
 				display: flex;
 				align-items: center;
@@ -2197,16 +2213,16 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				text-align: left;
 				border: none;
 				border-radius: 10px;
-				background: #eaf1fb;
-				color: #1a3a5c;
-				padding: 0.35rem 0.5rem;
+				background: none;
+				color: var(--color-ink);
+				padding: 0.3rem 0.4rem;
 				font-size: 0.74rem;
 				font-family: inherit;
 				cursor: pointer;
 			}
 
 			.admin-month-chip:hover {
-				filter: brightness(0.97);
+				background: var(--color-sky-light);
 			}
 
 			.admin-month-chip__avatar {
@@ -2214,13 +2230,14 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				width: 22px;
 				height: 22px;
 				border-radius: 50%;
-				background: #1a5fb4;
-				color: var(--color-white);
+				background: var(--color-sky-light);
+				color: var(--color-ink);
 				font-size: 0.62rem;
 				font-weight: 700;
 				display: flex;
 				align-items: center;
 				justify-content: center;
+				border: 2px solid transparent;
 			}
 
 			.admin-month-chip__body {
@@ -2230,48 +2247,31 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				display: -webkit-box;
 				-webkit-line-clamp: 3;
 				-webkit-box-orient: vertical;
+				color: var(--color-slate);
 			}
 
-			/* Same four color pairings as .admin-badge--* below, just applied to
-			   the whole chip card + its avatar rather than a small text badge —
-			   so a day's cards are scannable by status/color alone, matching the
-			   avatar-ring language from the Warm Card Board direction. */
-			.admin-month-chip--assigned {
-				background: #eaf1fb;
-				color: #1a3a5c;
+			.admin-month-chip__body strong {
+				color: var(--color-ink);
 			}
 
+			/* Same four statuses as .admin-badge--* below, but only the
+			   avatar's ring color changes — not a background fill — matching
+			   the mockup's avatar-ring language exactly. */
 			.admin-month-chip--assigned .admin-month-chip__avatar {
-				background: #1a5fb4;
-			}
-
-			.admin-month-chip--unassigned {
-				background: #fdeceb;
-				color: #7a1a15;
+				border-color: var(--color-sky);
 			}
 
 			.admin-month-chip--unassigned .admin-month-chip__avatar {
-				background: #b3261e;
-			}
-
-			.admin-month-chip--en_route,
-			.admin-month-chip--in_progress {
-				background: #fdf0dc;
-				color: #7a4a06;
+				border-color: #c0392b;
 			}
 
 			.admin-month-chip--en_route .admin-month-chip__avatar,
 			.admin-month-chip--in_progress .admin-month-chip__avatar {
-				background: #a4640a;
-			}
-
-			.admin-month-chip--completed {
-				background: #e3f3e6;
-				color: #1e7a34;
+				border-color: #a4640a;
 			}
 
 			.admin-month-chip--completed .admin-month-chip__avatar {
-				background: #2f8a4e;
+				border-color: #2f8a4e;
 			}
 
 			/* --- Day view: hour grid, one column per cleaner --------------------- */
