@@ -1421,7 +1421,15 @@ import { WORKING_HOURS } from "../../data/booking.js";
 					const firstCleanerName = cleanerNamesFor(assignedIds)[0];
 					const mini = document.createElement("button");
 					mini.type = "button";
-					mini.className = "admin-month-chip" + (isUnassigned ? " admin-month-chip--unassigned" : "");
+					// Colored by the same job.status the Week board's status badge
+					// already uses (see STATUS_LABELS), not just a binary assigned/
+					// unassigned split — but assignedCleanerIds.length is still what
+					// decides "unassigned" specifically, same as the Overview card's
+					// "Needs a Cleaner" count above: status can lag behind a fully
+					// unassigned job (see the Action Required redesign notes), so
+					// checking the real array stays the more reliable signal.
+					const statusKey = isUnassigned ? "unassigned" : job.status;
+					mini.className = "admin-month-chip admin-month-chip--" + statusKey;
 					mini.innerHTML = `
 						<span class="admin-month-chip__avatar">${isUnassigned ? "—" : escapeHtml(initials(firstCleanerName))}</span>
 						<span class="admin-month-chip__body"><strong>${fmtTime(job.start)}</strong> ${escapeHtml(job.summary)}</span>
@@ -1717,7 +1725,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				padding: 0.4rem 0.9rem;
 				border-radius: 999px;
 				border: none;
-				background: var(--color-sky-light);
+				background: var(--admin-warm-tint);
 				font-size: 0.82rem;
 				font-weight: 600;
 				color: var(--color-ink);
@@ -1829,7 +1837,7 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				display: flex;
 				flex-wrap: wrap;
 				gap: 2px;
-				background: var(--color-sky-light);
+				background: var(--admin-warm-tint);
 				border-radius: 999px;
 				padding: 3px;
 			}
@@ -2224,6 +2232,19 @@ import { WORKING_HOURS } from "../../data/booking.js";
 				-webkit-box-orient: vertical;
 			}
 
+			/* Same four color pairings as .admin-badge--* below, just applied to
+			   the whole chip card + its avatar rather than a small text badge —
+			   so a day's cards are scannable by status/color alone, matching the
+			   avatar-ring language from the Warm Card Board direction. */
+			.admin-month-chip--assigned {
+				background: #eaf1fb;
+				color: #1a3a5c;
+			}
+
+			.admin-month-chip--assigned .admin-month-chip__avatar {
+				background: #1a5fb4;
+			}
+
 			.admin-month-chip--unassigned {
 				background: #fdeceb;
 				color: #7a1a15;
@@ -2231,6 +2252,26 @@ import { WORKING_HOURS } from "../../data/booking.js";
 
 			.admin-month-chip--unassigned .admin-month-chip__avatar {
 				background: #b3261e;
+			}
+
+			.admin-month-chip--en_route,
+			.admin-month-chip--in_progress {
+				background: #fdf0dc;
+				color: #7a4a06;
+			}
+
+			.admin-month-chip--en_route .admin-month-chip__avatar,
+			.admin-month-chip--in_progress .admin-month-chip__avatar {
+				background: #a4640a;
+			}
+
+			.admin-month-chip--completed {
+				background: #e3f3e6;
+				color: #1e7a34;
+			}
+
+			.admin-month-chip--completed .admin-month-chip__avatar {
+				background: #2f8a4e;
 			}
 
 			/* --- Day view: hour grid, one column per cleaner --------------------- */

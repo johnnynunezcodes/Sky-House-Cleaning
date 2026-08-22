@@ -268,8 +268,8 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 			.admin-sidebar {
 				width: 240px;
 				flex-shrink: 0;
-				background: var(--color-white);
-				border-right: 1px solid var(--color-border);
+				background: var(--admin-warm-surface);
+				border-right: 1px solid var(--admin-warm-border);
 				padding: 1.5rem 1rem 2rem;
 				position: sticky;
 				top: 0;
@@ -283,7 +283,7 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				gap: 0.6rem;
 				padding: 0 0.5rem 1.25rem;
 				margin-bottom: 1rem;
-				border-bottom: 1px solid var(--color-border);
+				border-bottom: 1px solid var(--admin-warm-border);
 			}
 
 			.admin-sidebar__logo {
@@ -304,7 +304,7 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 			.admin-sidebar__brand-sub {
 				margin: 0;
 				font-size: 0.75rem;
-				color: var(--color-slate-light);
+				color: var(--admin-warm-text-light);
 			}
 
 			.admin-sidebar__nav {
@@ -320,7 +320,7 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 			.admin-nav-group--flat {
 				padding-top: 0.75rem;
 				margin-top: 0.25rem;
-				border-top: 1px solid var(--color-border);
+				border-top: 1px solid var(--admin-warm-border);
 				display: flex;
 				flex-direction: column;
 				gap: 0.15rem;
@@ -334,7 +334,7 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 			.admin-nav-group--top {
 				padding-bottom: 0.6rem;
 				margin-bottom: 0.5rem;
-				border-bottom: 1px solid var(--color-border);
+				border-bottom: 1px solid var(--admin-warm-border);
 				display: flex;
 				flex-direction: column;
 				gap: 0.15rem;
@@ -348,7 +348,7 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				font-size: 0.72rem;
 				text-transform: uppercase;
 				letter-spacing: 0.06em;
-				color: var(--color-slate-light);
+				color: var(--admin-warm-text-light);
 			}
 
 			.admin-nav-group ul {
@@ -364,10 +364,10 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				display: flex;
 				align-items: center;
 				gap: 0.65rem;
-				padding: 0.55rem 0.75rem;
-				border-radius: 8px;
+				padding: 0.55rem 0.8rem;
+				border-radius: 999px;
 				text-decoration: none;
-				color: var(--color-slate);
+				color: var(--admin-warm-text);
 				font-size: 0.9rem;
 				font-weight: 500;
 				transition: background 0.12s ease, color 0.12s ease;
@@ -386,14 +386,14 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 			}
 
 			.admin-nav-link:hover {
-				background: var(--color-sky-light);
-				color: var(--color-sky-dark);
+				background: var(--admin-warm-tint);
 			}
 
 			.admin-nav-link.is-active {
 				background: var(--color-sky);
 				color: var(--color-white);
 				font-weight: 600;
+				box-shadow: 0 3px 10px rgba(62, 124, 177, 0.35);
 			}
 
 			.admin-nav-link--flat {
@@ -419,7 +419,7 @@ function isItemActive(item: { href: string; activeMatch?: (path: string) => bool
 				height: 20px;
 				padding: 0 0.4rem;
 				border-radius: 999px;
-				background: #b3261e;
+				background: var(--admin-warm-badge);
 				color: var(--color-white);
 				font-size: 0.72rem;
 				font-weight: 700;

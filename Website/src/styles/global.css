@@ -15,6 +15,17 @@
 	--color-border: #e4e1da;
 	--color-charcoal: #2e2e2e; /* solid dark section backgrounds (CTA band, footer) */
 
+	/* Admin "Warm Card Board" theme — the staff-tools sidebar and page chrome
+	   under /admin/*, not used by public marketing pages. Centralized here so
+	   every admin page picks up the same palette as it's rolled out, rather
+	   than each page re-deriving similar-but-slightly-different hex values. */
+	--admin-warm-surface: #fff9f0; /* sidebar / elevated warm surfaces */
+	--admin-warm-tint: #f3ede0; /* pill backgrounds, hover states, segmented-control track */
+	--admin-warm-border: #ece6d9; /* borders within warm surfaces */
+	--admin-warm-text: #6b5f4a; /* primary muted text on warm surfaces (nav links) */
+	--admin-warm-text-light: #a08f6f; /* secondary/label text on warm surfaces */
+	--admin-warm-badge: #d97a6c; /* notification badge on warm surfaces */
+
 	/* Type */
 	--font-heading: "Poppins", "Segoe UI", system-ui, sans-serif;
 	--font-body: "Inter", "Segoe UI", system-ui, sans-serif;
